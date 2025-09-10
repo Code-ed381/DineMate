@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import {
   Grid,
   Card,
@@ -63,13 +63,26 @@ import { useNavigate } from "react-router-dom";
 // ];
 
 export default function RestaurantGrid() {
-    const { getRestaurantById, restaurants, selectedRestaurant } = useRestaurantStore();
-    const navigate = useNavigate();
+  const { getRestaurantById, restaurants, selectedRestaurant, getRestaurants, setSelectedRestaurant } = useRestaurantStore();
+  const navigate = useNavigate();
 
-    const handleSelect = (restaurant) => {
-        getRestaurantById(restaurant.restaurants.id);
-        navigate('/app/dashboard');
-    };
+  useEffect(() => {
+    getRestaurants();
+  }, [getRestaurants]);
+
+  useEffect(() => {
+    if (restaurants.length === 1) {
+      const restaurant = restaurants[0];
+      getRestaurantById(restaurant.id);
+      setSelectedRestaurant(restaurant);
+      navigate("/app/dashboard");
+    }
+  }, [restaurants, getRestaurantById, navigate, setSelectedRestaurant]);
+
+  const handleSelect = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+    navigate('/app/dashboard');
+  };
 
   return (
     <Box sx={{ flexGrow: 1, p: 20 }}>

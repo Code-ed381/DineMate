@@ -16,12 +16,15 @@ const useRestaurantStore = create(
     
             setSelectedRestaurant: (value) => set({ selectedRestaurant: value }),
     
-            getRestaurants: async (user_id) => {
+            getRestaurants: async () => {
                 try {
+                    const { user } = useAuthStore.getState();
+                    const userId = user.user.id;
+                    
                     const { data, error } = await supabase
                         .from('restaurant_members')
                         .select('role, restaurants(*)')
-                        .eq('user_id', user_id)
+                        .eq('user_id', userId)
                     if (error) throw error;
     
                     set({ restaurants: data });

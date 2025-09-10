@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import Swal from 'sweetalert2';
 import useAuthStore from './authStore';
+import useRestaurantStore from './restaurantStore';
 
 const useEmployeesStore = create((set, get) => ({
     employees: [],
@@ -10,31 +11,54 @@ const useEmployeesStore = create((set, get) => ({
     position: '',
     editingRow: null,
     rowData: {},
-    member: {},
     role: '',
     username: '',
 
 
     // Fetch employees
-    fetchMembers: async () => {
+    fetchEmployees: async () => {
         set({ loading: true });
         try {
             const { data, error } = await supabase
-                .from('restaurant_members')
-                .select(`*, user:auth_users(*), restaurant(*)`)
-                .eq('user_id', useAuthStore.getState().user.id)
-                .eq('restaurant_id', useAuthStore.getState().restaurant.id)
-                .order('name', { ascending: true });
+              .from("restaurant_members_with_users")
+              .select("*")
+              .eq(
+                "restaurant_id",
+                useRestaurantStore.getState().selectedRestaurant.restaurants.id
+              )
+              .neq("role", "owner")
+              .order("member_id", { ascending: true });
             if (error) throw error;
 
-            console.log(data);
-            console.log(error);
-            set({ members: data });
+            set({ employees: data });
         } catch (error) {
             Swal.fire('Error', 'Failed to fetch employees. Check your internet connection.', 'error');
         } finally {
             set({ loading: false });
         }
+    },
+
+    // Update employee details as admin
+    updateEmployeeDetailsAsAdmin: async (userId, details) => {
+    try {
+        const { data, error } = await supabase
+        .from("restaurant_members")
+        .update({
+            role: details.role,
+            status: details.status,
+        })
+        .eq("user_id", userId) // match by user_id
+        .select();
+
+        if (error) throw error;
+
+        console.log(data);
+
+        get().fetchEmployees();
+        Swal.fire("Success", "Employee details updated successfully!", "success");
+    } catch (error) {
+        Swal.fire("Error", "Failed to update employee details.", "error");
+    }
     },
 
     // Add a new employee
@@ -62,6 +86,17 @@ const useEmployeesStore = create((set, get) => ({
     // Start editing an employee
     handleEditStart: (id, row) => {
         set({ editingRow: id, rowData: { ...row } });
+    },
+
+    handleChangeEmployeeAvatar: (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                set({ rowData: { ...get().rowData, image: event.target.result } });
+            };
+            reader.readAsDataURL(file);
+        }
     },
 
     // Edit employee role

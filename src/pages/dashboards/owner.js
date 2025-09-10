@@ -49,11 +49,15 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import useAuthStore from "../../lib/authStore";
 
 // ————————————————————————————————————————————
 // Owner's Dashboard (single-tenant, Material UI + Recharts)
 // ————————————————————————————————————————————
 export default function OwnerDashboard() {
+  const { user } = useAuthStore();
+
+  console.log(user);
   const [range, setRange] = useState("week"); // today | week | month
 
   // ==== Mock Data (replace with API/Zustand) ====
@@ -153,6 +157,23 @@ export default function OwnerDashboard() {
 
   return (
     <Box className="owner-dashboard" sx={{ p: 3, display: "grid", gap: 3 }}>
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 2,
+          mb: 3,
+          background: "linear-gradient(135deg, #232526 0%, #414345 100%)",
+          color: "#fff",
+        }}
+      >
+        <Typography variant="h5" fontWeight={800}>
+          Welcome {user?.user?.user_metadata?.firstName}
+        </Typography>
+        <Typography variant="body2">
+          Quick overview on your restaurant. Snapshots of your restaurant's
+          performance, orders, and more.
+        </Typography>
+      </Box>
       {/* Header / Filters */}
       <Box
         sx={{
@@ -162,9 +183,6 @@ export default function OwnerDashboard() {
           gap: 2,
         }}
       >
-        <Typography variant="h5" fontWeight={800}>
-          Dashboard
-        </Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           <TextField size="small" placeholder="Search…" />
           <ToggleButtonGroup

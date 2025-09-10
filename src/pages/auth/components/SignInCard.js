@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import MuiCard from '@mui/material/Card';
 import Checkbox from '@mui/material/Checkbox';
-import Divider from '@mui/material/Divider';
 import FormLabel from '@mui/material/FormLabel';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -13,10 +12,12 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
 import ForgotPassword from './ForgotPassword';
-import { GoogleIcon, FacebookIcon, SitemarkIcon } from './CustomIcons';
+import { SitemarkIcon } from './CustomIcons';
 import { useState } from 'react';
 import useAuthStore from '../../../lib/authStore';
 import { useNavigate } from 'react-router-dom';
+import CircularProgress from '@mui/material/CircularProgress';
+import Swal from 'sweetalert2';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -71,10 +72,16 @@ export default function SignInCard() {
       const data = await signIn(email, password);
 
       if (data) {
-        navigate("/app/dashboard", { replace: true });
+        navigate("/restaurant-selection", { replace: true });
       }
     } catch (error) {
-      console.error(error);
+      Swal.fire({
+        title: 'Error',
+        text: error.message,
+        icon: 'error',
+        showConfirmButton: false,
+        timer: 2000,
+      });
     } finally {
       setProcessing(false);
     }
@@ -140,7 +147,6 @@ export default function SignInCard() {
             type="password"
             id="password"
             autoComplete="current-password"
-            autoFocus
             required
             fullWidth
             value={password}
@@ -160,7 +166,7 @@ export default function SignInCard() {
         />
         <ForgotPassword open={open} handleClose={handleClose} />
         <Button type="submit" fullWidth variant="contained" onClick={handleSubmit}>
-          Sign in
+          {processing ? <CircularProgress size={20} /> : 'Sign in'}
         </Button>
         <Typography sx={{ textAlign: 'center' }}>
           Don&apos;t have an account?{' '}
@@ -175,25 +181,6 @@ export default function SignInCard() {
           </span>
         </Typography>
       </Box>
-      {/* <Divider>or</Divider>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => alert('Sign in with Google')}
-          startIcon={<GoogleIcon />}
-        >
-          Sign in with Google
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => alert('Sign in with Facebook')}
-          startIcon={<FacebookIcon />}
-        >
-          Sign in with Facebook
-        </Button>
-      </Box> */}
     </Card>
   );
 }

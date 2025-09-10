@@ -35,6 +35,7 @@ import {
   LocalOffer,
   Add,
 } from "@mui/icons-material";
+import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 
 const orders = [
   {
@@ -69,9 +70,35 @@ export default function CashierDashboard() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ fontWeight: "bold", mb: 3 }}>
-        💰 Cashier Panel
-      </Typography>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+        }}
+      >
+        {/* Left: Icon + Title */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <PriceCheckIcon sx={{ fontSize: 36, color: "primary.main" }} />
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: "bold", letterSpacing: 0.5 }}
+            >
+              Cashier Panel
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontStyle: "italic" }}
+            >
+              Track payments • Manage earnings • Record transactions
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
 
       <Grid container spacing={3}>
         {/* LEFT SIDE */}
@@ -104,7 +131,7 @@ export default function CashierDashboard() {
               </Typography>
             </CardContent>
           </Card>
-          
+
           {/* Orders */}
           <Card
             sx={{ borderRadius: 3, mb: 3, borderLeft: "5px solid #1976d2" }}

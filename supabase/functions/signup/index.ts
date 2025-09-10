@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     // ✅ Insert restaurant_members
     const { data: restaurantMembers, error: restaurantMembersError } =
       await supabaseAdmin.from("restaurant_members")
-        .insert({ user_id: user.id, restaurant_id: restaurant.id, role: "owner" })
+        .insert({ user_id: user.id, restaurant_id: restaurant.id, role: "owner", status: "active" })
         .select()
         .single();
 

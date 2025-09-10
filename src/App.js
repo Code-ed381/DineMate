@@ -1,25 +1,24 @@
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/home';
-import Dashboard from './pages/dashboard';
-import Menu from './pages/menu';
-import Login from './pages/login';
-import Tables from './pages/tables';
-import Employees from './pages/employees';
-import AdminTables from './pages/adminTables';
-import MenuItems from './pages/menuItems';
-import Report from './pages/report';
-import Kitchen from './pages/kitchen';
-import Profile from './pages/profile';
-import SignIn from './pages/auth/signIn';
-import SignUp from './pages/auth/signUp';
-import TableManagement from './pages/tableManagement';
-import ProtectedRoute from './pages/auth/components/ProtectedRoute';
-import Settings from './pages/settings';
-import Cashier from './pages/cashier';
-import Bar from './pages/bar';
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import Home from "./pages/layout/layout";
+import Dashboard from "./pages/dashboard";
+import Menu from "./pages/menu";
+import Login from "./pages/login";
+import Employees from "./pages/admin/employees-management";
+import MenuItemsManagement from "./pages/admin/items-managment";
+import Report from "./pages/report";
+import Kitchen from "./pages/kitchen";
+import Profile from "./pages/profile";
+import SignIn from "./pages/auth/signIn";
+import SignUp from "./pages/auth/signUp";
+import TableManagement from "./pages/admin/tables-management";
+import ProtectedRoute from "./pages/auth/components/ProtectedRoute";
+import Settings from "./pages/settings";
+import Cashier from "./pages/cashier";
+import Bar from "./pages/bar";
 import RestaurantGrid from "./pages/restaurantSelectionPage";
-import ResetPassword from './pages/auth/resetPassword';
-import Onboarding from './pages/auth/onboarding';
+import ResetPassword from "./pages/auth/resetPassword";
+import Onboarding from "./pages/auth/onboarding";
+import Tables from "./pages/tables";
 
 function App() {
   return (
@@ -29,8 +28,14 @@ function App() {
           <Route index element={<Login />} />
           <Route path="sign-up" element={<SignUp />} />
           <Route path="sign-in" element={<SignIn />} />
-          <Route path="table-management" element={<TableManagement />} />
-          <Route path="restaurant-selection" element={<RestaurantGrid />} />
+          <Route
+            path="restaurant-selection"
+            element={
+              <ProtectedRoute>
+                <RestaurantGrid />
+              </ProtectedRoute>
+            }
+          />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="onboarding" element={<Onboarding />} />
         </Route>
@@ -47,9 +52,12 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="profile" element={<Profile />} />
           <Route path="menu" element={<Menu />} />
-          <Route path="tables" element={<TableManagement />} />
-          <Route path="admin-tables" element={<AdminTables />} />
-          <Route path="menu-items" element={<MenuItems />} />
+          <Route path="tables" element={<Tables />} />
+          <Route path="tables-management" element={<TableManagement />} />
+          <Route
+            path="menu-items-management"
+            element={<MenuItemsManagement />}
+          />
           <Route path="employees" element={<Employees />} />
           <Route path="report" element={<Report />} />
           <Route path="kitchen" element={<Kitchen />} />

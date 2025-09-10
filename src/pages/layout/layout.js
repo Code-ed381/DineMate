@@ -1,57 +1,56 @@
 import { Outlet } from "react-router-dom";
-import * as React from 'react';
-import { styled, createTheme, ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import MuiDrawer from '@mui/material/Drawer';
-import Box from '@mui/material/Box';
-import MuiAppBar from '@mui/material/AppBar';
-import Popover from '@mui/material/Popover';
-import Badge from '@mui/material/Badge';
-import Toolbar from '@mui/material/Toolbar';
-import List from '@mui/material/List';
-import Typography from '@mui/material/Typography';
-import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import Link from '@mui/material/Link';
-import logo from '../assets/logo.jpeg'; 
-import { supabase } from '../lib/supabase';
-import dayjs from 'dayjs';
-import RestaurantGrid from './restaurantSelectionPage';
+import * as React from "react";
+import { styled, createTheme, ThemeProvider } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
+import MuiDrawer from "@mui/material/Drawer";
+import Box from "@mui/material/Box";
+import MuiAppBar from "@mui/material/AppBar";
+import Popover from "@mui/material/Popover";
+import Badge from "@mui/material/Badge";
+import Toolbar from "@mui/material/Toolbar";
+import List from "@mui/material/List";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
+import Link from "@mui/material/Link";
+import logo from "../../assets/logo.jpeg";
+import dayjs from "dayjs";
 
 // Icons
-import MenuIcon from '@mui/icons-material/Menu';
-import PersonIcon from '@mui/icons-material/Person';
-import LogoutIcon from '@mui/icons-material/Logout';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import MenuIcon from "@mui/icons-material/Menu";
+import PersonIcon from "@mui/icons-material/Person";
+import LogoutIcon from "@mui/icons-material/Logout";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SettingsIcon from "@mui/icons-material/Settings";
 import CachedIcon from "@mui/icons-material/Cached";
 
-import { MainListItems, SecondaryListItems } from './listItems';
-import Tooltip from '@mui/material/Tooltip';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
+import { MainListItems, SecondaryListItems } from "./list-items";
+import Tooltip from "@mui/material/Tooltip";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Avatar from '@mui/material/Avatar';
-import image from '../assets/image5.jpeg';
-import useDashboardStore from "../lib/dashboardStore";
-import { database_logs } from "../lib/logActivities";
-import useAuthStore from "../lib/authStore";
-import useAppStore from "../lib/appstore";
-import useRestaurantStore from "../lib/restaurantStore";
-
+import Avatar from "@mui/material/Avatar";
+import useDashboardStore from "../../lib/dashboardStore";
+import useAuthStore from "../../lib/authStore";
+import useAppStore from "../../lib/appstore";
+import useRestaurantStore from "../../lib/restaurantStore";
 
 function Copyright(props) {
   return (
     <Typography variant="body2" color="#fff" align="center" {...props}>
-      {'© '}
-      {new Date().getFullYear()} {' '}
-      <Link color="#fff" href="https://cyaneltechnologies.com/" underline="hover">
-        Addai Johnson Exploration Technologies (AJxT)
+      {"© "}
+      {new Date().getFullYear()}{" "}
+      <Link
+        color="#fff"
+        href="https://cyaneltechnologies.com/"
+        underline="hover"
+      >
+        BueTech IT Solutions
       </Link>
-      {'. Developed in Accra, Ghana.'}
+      {". Developed in Accra, Ghana."}
     </Typography>
   );
 }
@@ -59,61 +58,59 @@ function Copyright(props) {
 const drawerWidth = 240;
 
 const AppBar = styled(MuiAppBar, {
-  shouldForwardProp: (prop) => prop !== 'open',
-  })(({ theme, open }) => ({
+  shouldForwardProp: (prop) => prop !== "open",
+})(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
-  transition: theme.transitions.create(['width', 'margin'], {
+  transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
+    transition: theme.transitions.create(["width", "margin"], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
     }),
   }),
 }));
 
-const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
-  ({ theme, open }) => ({
-    '& .MuiDrawer-paper': {
-      position: 'relative',
-      whiteSpace: 'nowrap',
-      width: drawerWidth,
-      transition: theme.transitions.create('width', {
+const Drawer = styled(MuiDrawer, {
+  shouldForwardProp: (prop) => prop !== "open",
+})(({ theme, open }) => ({
+  "& .MuiDrawer-paper": {
+    position: "relative",
+    whiteSpace: "nowrap",
+    width: drawerWidth,
+    transition: theme.transitions.create("width", {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+    boxSizing: "border-box",
+    ...(!open && {
+      overflowX: "hidden",
+      transition: theme.transitions.create("width", {
         easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.enteringScreen,
+        duration: theme.transitions.duration.leavingScreen,
       }),
-      boxSizing: 'border-box',
-      ...(!open && {
-        overflowX: 'hidden',
-        transition: theme.transitions.create('width', {
-          easing: theme.transitions.easing.sharp,
-          duration: theme.transitions.duration.leavingScreen,
-        }),
-        width: theme.spacing(7),
-        [theme.breakpoints.up('sm')]: {
-          width: theme.spacing(9),
-        },
-      }),
-    },
-  }),
-);
+      width: theme.spacing(7),
+      [theme.breakpoints.up("sm")]: {
+        width: theme.spacing(9),
+      },
+    }),
+  },
+}));
 
 const mdTheme = createTheme();
 
 const darkTheme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: "dark",
     primary: {
-      main: '#1976d2',
+      main: "#1976d2",
     },
   },
 });
-
-
 
 const Layout = () => {
   const [open, setOpen] = React.useState(false);
@@ -121,23 +118,26 @@ const Layout = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { breadcrumb, setBreadcrumb } = useAppStore();
-  const { getRestaurants, getRestaurantById, selectedRestaurant, setSelectedRestaurant, restaurants } = useRestaurantStore();
+  const {
+    getRestaurants,
+    selectedRestaurant,
+    setSelectedRestaurant,
+    restaurants,
+  } = useRestaurantStore();
 
   const { fetchUser } = useDashboardStore();
-  const { signOut, memberships, user } = useAuthStore();
+  const { signOut, user } = useAuthStore();
 
   const first_name = user.user.user_metadata.firstName;
   const last_name = user.user.user_metadata.lastName;
 
   useEffect(() => {
-    console.log(user.user.user_metadata);
-    console.log(selectedRestaurant);
     getRestaurants(user.user.id);
   }, [getRestaurants]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-        setCurrentTime(new Date());
+      setCurrentTime(new Date());
     }, 1000);
 
     return () => clearInterval(intervalId);
@@ -152,23 +152,23 @@ const Layout = () => {
   }, [restaurants, selectedRestaurant]);
 
   const formatDate = (date) => {
-    return dayjs(date).format('ddd, DD MMMM YYYY, h:mm:ss A');
+    return dayjs(date).format("ddd, DD MMMM YYYY, h:mm:ss A");
   };
 
   useEffect(() => {
     fetchUser();
-  }, [fetchUser])
+  }, [fetchUser]);
 
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
 
   const handleOpenUserMenu = (event) => {
     setAnchorElUser(event.currentTarget);
   };
-  
+
   const handleCloseUserMenu = () => {
     setAnchorElUser(null);
   };
- 
+
   const toggleDrawer = () => {
     setOpen(!open);
   };
@@ -180,7 +180,7 @@ const Layout = () => {
     localStorage.removeItem("auth-store");
     localStorage.removeItem("restaurant-store");
     setSelectedRestaurant(null);
-    navigate('/sign-in');
+    navigate("/sign-in");
   };
 
   const handleClick = (event) => {
@@ -192,7 +192,7 @@ const Layout = () => {
   };
 
   const openNotification = Boolean(anchorEl);
-  const id = openNotification ? 'simple-popover' : undefined;
+  const id = openNotification ? "simple-popover" : undefined;
 
   return (
     <>
@@ -247,16 +247,18 @@ const Layout = () => {
                     </Typography>
                   </Box>
 
-                  <Tooltip title="Switch Restaurant">
-                    <IconButton
-                      size="large"
-                      aria-label="show 17 new notifications"
-                      color="inherit"
-                      onClick={()=> navigate('/restaurant-selection')}
-                    >
-                      <CachedIcon />
-                    </IconButton>
-                  </Tooltip>
+                  {restaurants.length > 1 && (
+                    <Tooltip title="Switch Restaurant">
+                      <IconButton
+                        size="large"
+                        aria-label="show 17 new notifications"
+                        color="inherit"
+                        onClick={() => navigate("/restaurant-selection")}
+                      >
+                        <CachedIcon />
+                      </IconButton>
+                    </Tooltip>
+                  )}
 
                   <Tooltip title="Notifications">
                     <IconButton
@@ -285,13 +287,14 @@ const Layout = () => {
                     </Popover>
                   </Tooltip>
 
-                  
-
                   <IconButton color="inherit">
                     <Box sx={{ flexGrow: 0 }}>
                       <Tooltip title="Open settings">
                         <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                          <Avatar alt="Remy Sharp" src={user?.image} />
+                          <Avatar
+                            alt="Remy Sharp"
+                            src={user?.user?.user_metadata?.profileAvatar}
+                          />
                         </IconButton>
                       </Tooltip>
                       <Menu
@@ -317,7 +320,7 @@ const Layout = () => {
                             {first_name + " " + last_name}
                           </Typography>
                         </MenuItem>
-                        <Divider/>
+                        <Divider />
                         <MenuItem
                           onClick={() => {
                             handleCloseUserMenu();
@@ -399,8 +402,6 @@ const Layout = () => {
       )}
     </>
   );
-}
+};
 
-export default Layout
-
-
+export default Layout;

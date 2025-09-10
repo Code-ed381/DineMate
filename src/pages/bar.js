@@ -20,6 +20,7 @@ import {
   Person,
   Receipt,
 } from "@mui/icons-material";
+import LocalBarIcon from "@mui/icons-material/LocalBar";
 
 const activeOrders = [
   {
@@ -66,9 +67,35 @@ export default function BartenderPanel() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ fontWeight: "bold", mb: 3 }}>
-        🍹 Bartender Panel
-      </Typography>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+        }}
+      >
+        {/* Left: Icon + Title */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <LocalBarIcon sx={{ fontSize: 36, color: "primary.main" }} />
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: "bold", letterSpacing: 0.5 }}
+            >
+              Bar Panel
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontStyle: "italic" }}
+            >
+              Manage drinks • Track status • Stay efficient
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
 
       <Grid container spacing={3}>
         {/* Active Orders */}

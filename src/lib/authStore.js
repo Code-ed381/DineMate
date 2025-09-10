@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { supabase } from "./supabase";
+import { supabaseAdmin } from "./supabaseAdmin";
 import { persist } from "zustand/middleware";
 import Swal from "sweetalert2";
 import { database_logs } from "./logActivities";
@@ -424,6 +425,47 @@ const useAuthStore = create(
         set({ session, user: session?.user || null, loading: false });
       },
 
+      // Update user avatar
+      updateUserAvatar: async (avatar) => {
+        const { data, error } = await supabase.auth.updateUser({
+          data: { profileAvatar: avatar },
+        });
+        if (error) throw error;
+        return data;
+      },
+
+      // Update another user’s avatar as admin
+      updateUserAvatarAsAdmin: async (userId, avatarUrl) => {
+        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+          userId,
+          {
+            user_metadata: { profileAvatar: avatarUrl },
+          }
+        );
+
+        if (error) throw error;
+        return data;
+      },
+
+      // Update anothe users details as admin
+      updateUserDetailsAsAdmin: async (userId, details) => {
+        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+          userId,
+          {
+            phone: details.phone_number,
+            user_metadata: {
+              firstName: details.first_name,
+              lastName: details.last_name,
+            },
+          }
+        );
+
+        if (error) throw error;
+
+        console.log(data)
+        return data;
+      },
+
       // ✅ Sign in
       signIn: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -471,9 +513,13 @@ const useAuthStore = create(
       // ✅ Sign out
       signOut: async () => {
         await supabase.auth.signOut();
-        set({ user: null, session: null, });
-        useRestaurantStore.persist.clearStorage();
-        useAuthStore.persist.clearStorage();
+        useAuthStore.persist.clearStorage(); // clears persisted store
+        useAuthStore.setState({ user: null, session: null, email: "", password: "" }); // reset any in-memory state
+        useRestaurantStore.persist.clearStorage(); // if you persist restaurants
+        useRestaurantStore.setState({
+          restaurants: [],
+          selectedRestaurant: null,
+        });
       },
 
       // Fetch employees

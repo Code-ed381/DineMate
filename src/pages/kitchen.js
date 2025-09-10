@@ -10,10 +10,12 @@ import {
   CircularProgress,
   List,
   ListItem,
+  Divider,
 } from "@mui/material";
 import { PendingActions, DoneAll } from "@mui/icons-material";
 import AlarmOnIcon from "@mui/icons-material/AlarmOn";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
+import RestaurantMenuIcon from "@mui/icons-material/RestaurantMenu";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -73,7 +75,37 @@ const Kitchen = () => {
   const getTimeAgo = (timestamp) => dayjs(timestamp).fromNow();
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+        }}
+      >
+        {/* Left: Icon + Title */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <RestaurantMenuIcon sx={{ fontSize: 36, color: "primary.main" }} />
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: "bold", letterSpacing: 0.5 }}
+            >
+              Kitchen Panel
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ fontStyle: "italic" }}
+            >
+              Manage orders • Track status • Stay efficient
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+      
       {/* Summary Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={4}>

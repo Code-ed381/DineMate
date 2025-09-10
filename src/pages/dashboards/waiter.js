@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Grid,
@@ -9,6 +10,13 @@ import {
   Avatar,
   List,
   ListItem,
+  IconButton,
+  Tooltip,
+  Divider,
+  Chip,
+  Button,
+  LinearProgress,
+  Stack,
 } from "@mui/material";
 import {
   TableBar,
@@ -17,277 +25,421 @@ import {
   DoneAll,
   MonetizationOn,
   Notifications,
+  RoomService,
+  CheckCircleOutline,
+  AccessTime,
+  MoreVert,
 } from "@mui/icons-material";
+import useAuthStore from "../../lib/authStore";
 
-const WaiterDashboard = () => {
-  // Dummy data
-  const assignedTables = [
+/**
+ * WaiterDashboard_Pro.jsx
+ * A redesigned, production-ready single-file React component for a waiter dashboard.
+ * - Responsive layout
+ * - Accessible, semantic markup
+ * - Micro-interactions (hover, focus, status chips)
+ * - Clear visual hierarchy, reduced cognitive load
+ * - Props for data injection + sensible defaults for rapid prototyping
+ *
+ * Integration:
+ * import WaiterDashboard from './WaiterDashboard_Pro';
+ * <WaiterDashboard />
+ */
+
+const StatCard = ({ icon, title, value, subtitle, accent }) => (
+  <Card
+    elevation={2}
+    sx={{
+      p: 2,
+      display: "flex",
+      alignItems: "center",
+      gap: 2,
+      borderRadius: 2,
+      transition: "transform .18s ease, box-shadow .18s ease",
+      "&:hover": {
+        transform: "translateY(-6px)",
+        boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
+      },
+    }}
+  >
+    <Avatar
+      sx={{ bgcolor: accent ?? "primary.main", width: 56, height: 56 }}
+      aria-hidden
+    >
+      {icon}
+    </Avatar>
+    <Box sx={{ flex: 1 }}>
+      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        {value}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {subtitle}
+      </Typography>
+    </Box>
+  </Card>
+);
+
+StatCard.propTypes = {
+  icon: PropTypes.node,
+  title: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  subtitle: PropTypes.string,
+  accent: PropTypes.string,
+};
+
+const StatusChip = ({ status }) => {
+  const map = {
+    Occupied: { label: "Occupied", color: "error" },
+    Waiting: { label: "Waiting", color: "warning" },
+    Free: { label: "Free", color: "success" },
+    Ready: { label: "Ready", color: "success" },
+    Cooking: { label: "Cooking", color: "info" },
+  };
+  const meta = map[status] || { label: status, color: "default" };
+  return <Chip size="small" label={meta.label} color={meta.color} />;
+};
+
+StatusChip.propTypes = { status: PropTypes.string };
+
+const WaiterDashboard = ({
+  initialAssignedTables,
+  initialActiveOrders,
+  initialNotifications,
+  tipsToday,
+}) => {
+  const { user } = useAuthStore();
+
+  // Local state (would be wired to real-time store/ws in production)
+  const [assignedTables, setAssignedTables] = useState(initialAssignedTables);
+  const [activeOrders, setActiveOrders] = useState(initialActiveOrders);
+  const [notifications, setNotifications] = useState(initialNotifications);
+
+  useEffect(() => {
+    // subtle: keep state in sync if parent changes props
+    setAssignedTables(initialAssignedTables);
+    setActiveOrders(initialActiveOrders);
+    setNotifications(initialNotifications);
+  }, [initialAssignedTables, initialActiveOrders, initialNotifications]);
+
+  const totalOpen = useMemo(
+    () => activeOrders.length + notifications.length,
+    [activeOrders, notifications]
+  );
+
+  // Actions
+  const markOrderReady = (id) => {
+    setActiveOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: "Ready" } : o))
+    );
+    setNotifications((n) => [
+      {
+        id: `note-${id}`,
+        table: activeOrders.find((o) => o.id === id)?.table,
+        message: "Order is ready",
+      },
+      ...n,
+    ]);
+  };
+
+  const serveTable = (tableId) => {
+    setAssignedTables((prev) =>
+      prev.map((t) => (t.id === tableId ? { ...t, status: "Free" } : t))
+    );
+    setNotifications((n) => n.filter((note) => note.table !== tableId));
+  };
+
+  return (
+    <Box sx={{ p: 2 }}>
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 2,
+          mb: 3,
+          background:
+            "linear-gradient(135deg,rgb(5, 146, 165) 0%, rgb(224, 21, 140) 100%)",
+          color: "#fff",
+        }}
+      >
+        <Typography variant="h5" fontWeight={800}>
+          Welcome Waiter 👨
+        </Typography>
+        <Typography variant="body2">
+          Manage the line, monitor stations, and keep the kitchen running
+          smoothly.
+        </Typography>
+      </Box>
+      {/* Top: Greeting + quick actions */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: 2,
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+          flexWrap: "wrap",
+        }}
+      >
+      </Box>
+
+      {/* Stats */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={3}>
+          <StatCard
+            icon={<TableBar />}
+            value={assignedTables.length}
+            subtitle="Assigned Tables"
+            accent="#6a1b9a"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <StatCard
+            icon={<ListAlt />}
+            value={activeOrders.length}
+            subtitle="Active Orders"
+            accent="#0d47a1"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <StatCard
+            icon={<LocalDining />}
+            value={assignedTables.filter((t) => t.status === "Waiting").length}
+            subtitle="Waiting Tables"
+            accent="#f57c00"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <StatCard
+            icon={<MonetizationOn />}
+            value={tipsToday ?? "$0"}
+            subtitle="Tips Today"
+            accent="#f9a825"
+          />
+        </Grid>
+      </Grid>
+
+      {/* Main content: Left (Tables & Orders) / Right (Notifications & Activity) */}
+      <Grid container spacing={2}>
+        <Grid item xs={12} lg={7}>
+          <Card sx={{ borderRadius: 2 }}>
+            <CardHeader
+              title="Floor Overview"
+              subheader={`Open tasks: ${totalOpen}`}
+            />
+            <CardContent>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Typography sx={{ mb: 1, fontWeight: 700 }}>
+                    Assigned Tables
+                  </Typography>
+                  <List>
+                    {assignedTables.map((table) => (
+                      <ListItem
+                        key={table.id}
+                        sx={{
+                          mb: 1,
+                          py: 1,
+                          px: 2,
+                          background:
+                            "linear-gradient(180deg, rgba(255,255,255,0.8), rgba(243,243,246,0.9))",
+                          borderRadius: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography sx={{ fontWeight: 700 }}>
+                            Table {table.number}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Orders: {table.orders}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <StatusChip status={table.status} />
+                          <Tooltip title="Mark table served">
+                            <IconButton
+                              aria-label={`serve-table-${table.id}`}
+                              onClick={() => serveTable(table.id)}
+                            >
+                              <CheckCircleOutline />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Typography sx={{ mb: 1, fontWeight: 700 }}>
+                    Active Orders
+                  </Typography>
+                  <List>
+                    {activeOrders.map((order) => (
+                      <ListItem
+                        key={order.id}
+                        sx={{
+                          mb: 1,
+                          py: 1,
+                          px: 2,
+                          borderRadius: 2,
+                          background:
+                            "linear-gradient(180deg, rgba(249,250,255,1), rgba(235,244,255,1))",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontWeight: 700 }}>
+                            {order.item}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Table {order.table} • {order.status}
+                          </Typography>
+                          <Box sx={{ mt: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={
+                                order.status === "Cooking"
+                                  ? 60
+                                  : order.status === "Ready"
+                                  ? 100
+                                  : 30
+                              }
+                              sx={{ height: 6, borderRadius: 1 }}
+                            />
+                          </Box>
+                        </Box>
+
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {order.status !== "Ready" && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => markOrderReady(order.id)}
+                              startIcon={<AccessTime />}
+                            >
+                              Mark Ready
+                            </Button>
+                          )}
+                          <Tooltip title="Order details">
+                            <IconButton aria-label={`order-more-${order.id}`}>
+                              <MoreVert />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} lg={5}>
+          <Card sx={{ borderRadius: 2 }}>
+            <CardHeader title="Notifications & Requests" />
+            <CardContent>
+              {notifications.length === 0 ? (
+                <Box sx={{ textAlign: "center", py: 6 }}>
+                  <Typography color="text.secondary">
+                    No active requests — great job!
+                  </Typography>
+                </Box>
+              ) : (
+                <List>
+                  {notifications.map((note) => (
+                    <ListItem
+                      key={note.id}
+                      sx={{
+                        mb: 1,
+                        py: 1,
+                        px: 2,
+                        borderRadius: 2,
+                        background: "#fff8e1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          Table {note.table}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {note.message}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1}>
+                        <Tooltip title="Acknowledge">
+                          <IconButton
+                            onClick={() =>
+                              setNotifications((n) =>
+                                n.filter((x) => x.id !== note.id)
+                              )
+                            }
+                          >
+                            <CheckCircleOutline />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Daily progress
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(100, (12 / (12 + 4)) * 100)}
+                sx={{ height: 8, borderRadius: 2 }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                Completed 12 of 16 tasks
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Box sx={{ mt: 3, textAlign: "center" }}>
+        <Typography variant="caption" color="text.secondary">
+          Tip: keyboard shortcuts and real-time updates improve throughput.
+          Integrate with a WebSocket for live order pushing.
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
+WaiterDashboard.propTypes = {
+  initialAssignedTables: PropTypes.array,
+  initialActiveOrders: PropTypes.array,
+  initialNotifications: PropTypes.array,
+  tipsToday: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+};
+
+WaiterDashboard.defaultProps = {
+  initialAssignedTables: [
     { id: 1, number: 5, status: "Occupied", orders: 2 },
     { id: 2, number: 7, status: "Occupied", orders: 1 },
     { id: 3, number: 10, status: "Waiting", orders: 0 },
-  ];
-
-  const activeOrders = [
+  ],
+  initialActiveOrders: [
     { id: 1, item: "Pasta Alfredo", table: 5, status: "Cooking" },
     { id: 2, item: "Caesar Salad", table: 7, status: "Ready" },
-  ];
-
-  const notifications = [
+  ],
+  initialNotifications: [
     { id: 1, table: 5, message: "Needs water" },
     { id: 2, table: 10, message: "Calling waiter" },
-  ];
-
-  return (
-    <Box>
-      {/* Summary Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#f3e5f5",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#8e24aa", mr: 2 }}>
-              <TableBar />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#4a148c" }}
-              >
-                {assignedTables.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#6a1b9a" }}>
-                Assigned Tables
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#e3f2fd",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#1976d2", mr: 2 }}>
-              <ListAlt />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#0d47a1" }}
-              >
-                {activeOrders.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                Active Orders
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#fff3e0",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#f57c00", mr: 2 }}>
-              <LocalDining />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#e65100" }}
-              >
-                4
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#ef6c00" }}>
-                Pending Deliveries
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#e8f5e9",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#43a047", mr: 2 }}>
-              <DoneAll />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#1b5e20" }}
-              >
-                12
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#2e7d32" }}>
-                Completed Orders
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#fffde7",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#fbc02d", mr: 2 }}>
-              <MonetizationOn />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#f57f17" }}
-              >
-                $85
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#fbc02d" }}>
-                Tips Today
-              </Typography>
-            </Box>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Assigned Tables */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-            <CardHeader
-              title="Assigned Tables"
-              sx={{ backgroundColor: "#8e24aa", color: "#fff" }}
-            />
-            <CardContent>
-              <List>
-                {assignedTables.map((table) => (
-                  <ListItem
-                    key={table.id}
-                    sx={{
-                      mb: 1.5,
-                      py: 1.5,
-                      px: 2,
-                      backgroundColor: "#f3e5f5",
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: "#6a1b9a" }}>
-                        Table {table.number}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "#4a148c" }}>
-                        Status: {table.status} • Orders: {table.orders}
-                      </Typography>
-                    </Box>
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Active Orders */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-            <CardHeader
-              title="Active Orders"
-              sx={{ backgroundColor: "#1976d2", color: "#fff" }}
-            />
-            <CardContent>
-              <List>
-                {activeOrders.map((order) => (
-                  <ListItem
-                    key={order.id}
-                    sx={{
-                      mb: 1.5,
-                      py: 1.5,
-                      px: 2,
-                      backgroundColor: "#e3f2fd",
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: "#0d47a1" }}>
-                        {order.item}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                        Table {order.table} • {order.status}
-                      </Typography>
-                    </Box>
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Notifications */}
-      <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-        <CardHeader
-          title="Table Requests / Notifications"
-          sx={{ backgroundColor: "#f57c00", color: "#fff" }}
-        />
-        <CardContent>
-          {notifications.length === 0 ? (
-            <Typography textAlign="center" sx={{ color: "#9e9e9e" }}>
-              No active requests
-            </Typography>
-          ) : (
-            <List>
-              {notifications.map((note) => (
-                <ListItem
-                  key={note.id}
-                  sx={{
-                    mb: 1.5,
-                    py: 1.5,
-                    px: 2,
-                    backgroundColor: "#fff3e0",
-                    borderRadius: 2,
-                  }}
-                >
-                  <Avatar sx={{ backgroundColor: "#f57c00", mr: 2 }}>
-                    <Notifications />
-                  </Avatar>
-                  <Box>
-                    <Typography sx={{ fontWeight: 600, color: "#e65100" }}>
-                      Table {note.table}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#ef6c00" }}>
-                      {note.message}
-                    </Typography>
-                  </Box>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
-  );
+  ],
+  tipsToday: "$85",
 };
 
 export default WaiterDashboard;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Grid,
@@ -9,6 +9,11 @@ import {
   Avatar,
   List,
   ListItem,
+  Chip,
+  IconButton,
+  Stack,
+  Divider,
+  LinearProgress,
 } from "@mui/material";
 import {
   LocalBar,
@@ -17,195 +22,306 @@ import {
   Warning,
   MonetizationOn,
   Notifications,
+  BarChart as BarIcon,
+  PieChart as PieIcon,
+  InsertChart,
 } from "@mui/icons-material";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  BarChart,
+  Bar,
+} from "recharts";
 
-const BartenderDashboard = () => {
-  // Dummy data
-  const activeDrinks = [
-    { id: 1, drink: "Mojito", table: 4, status: "Mixing" },
-    { id: 2, drink: "Old Fashioned", table: 8, status: "Shaking" },
+// BartenderDashboardPro (JSX) — flat cards, consistent with other dashboards
+const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336"];
+
+export default function BartenderDashboardPro({
+  activeDrinks = [],
+  readyDrinks = [],
+  specialRequests = [],
+  inventoryAlerts = [],
+  notifications = [],
+  tipsToday = 0,
+  completedCount = 0,
+  throughputSeries = null, // [{time: '10:00', served: 5}, ...]
+}) {
+  // sensible defaults for charts
+  const defaultSeries = [
+    { time: "10:00", served: 2 },
+    { time: "11:00", served: 6 },
+    { time: "12:00", served: 14 },
+    { time: "13:00", served: 10 },
+    { time: "14:00", served: 8 },
+    { time: "15:00", served: 12 },
   ];
 
-  const readyDrinks = [
-    { id: 3, drink: "Margarita", table: 2 },
-    { id: 4, drink: "Gin & Tonic", table: 6 },
-  ];
+  const series = throughputSeries || defaultSeries;
 
-  const specialRequests = [
-    { id: 1, drink: "Custom Cocktail", note: "Less sugar" },
-    { id: 2, drink: "Whiskey Sour", note: "Extra lemon" },
-  ];
+  // small aggregations
+  const totals = useMemo(() => {
+    const pending = activeDrinks.length;
+    const ready = readyDrinks.length;
+    const special = specialRequests.length;
+    const alerts = inventoryAlerts.length;
+    const served = completedCount;
+    const tips = tipsToday;
+    return { pending, ready, special, alerts, served, tips };
+  }, [
+    activeDrinks,
+    readyDrinks,
+    specialRequests,
+    inventoryAlerts,
+    completedCount,
+    tipsToday,
+  ]);
 
-  const notifications = [
-    { id: 1, message: "Low stock: Tequila" },
-    { id: 2, message: "Bar area requested cleaning" },
-  ];
+  // top drinks breakdown
+  const breakdown = useMemo(() => {
+    const map = {};
+    [...activeDrinks, ...readyDrinks, ...specialRequests].forEach((d) => {
+      const name = d.drink || d.item || "Unknown";
+      map[name] = (map[name] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [activeDrinks, readyDrinks, specialRequests]);
+
+  // mock top sellers if none
+  const topSellers = useMemo(() => {
+    if (breakdown.length)
+      return breakdown.slice(0, 5).sort((a, b) => b.value - a.value);
+    return [
+      { name: "Mojito", value: 24 },
+      { name: "Old Fashioned", value: 18 },
+      { name: "Margarita", value: 12 },
+    ];
+  }, [breakdown]);
 
   return (
     <Box>
-      {/* Summary Cards */}
+      <Box
+        sx={{
+          p: 3,
+          borderRadius: 2,
+          mb: 3,
+          background:
+            "linear-gradient(135deg,rgb(37, 144, 156)0%,rgb(142, 77, 255) 100%)",
+          color: "#fff",
+        }}
+      >
+        <Typography variant="h5" fontWeight={800}>
+          Welcome Bartender 👨‍🍳
+        </Typography>
+        <Typography variant="body2">
+          Manage the line, monitor stations, and keep the kitchen running
+          smoothly.
+        </Typography>
+      </Box>
+      {/* KPI strip — flat cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#fce4ec",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#c2185b", mr: 2 }}>
-              <LocalBar />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#880e4f" }}
-              >
-                {activeDrinks.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#ad1457" }}>
-                Pending Drinks
-              </Typography>
-            </Box>
+          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
+                <LocalBar />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  {totals.pending}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Pending Drinks
+                </Typography>
+              </Box>
+            </Stack>
           </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#e8f5e9",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#2e7d32", mr: 2 }}>
-              <DoneAll />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#1b5e20" }}
-              >
-                25
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#388e3c" }}>
-                Completed Drinks
-              </Typography>
-            </Box>
+          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
+                <DoneAll />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  {totals.served}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Completed Drinks
+                </Typography>
+              </Box>
+            </Stack>
           </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#fff3e0",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#ef6c00", mr: 2 }}>
-              <Star />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#e65100" }}
-              >
-                {specialRequests.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#ef6c00" }}>
-                Special Requests
-              </Typography>
-            </Box>
+          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
+                <Star />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  {totals.special}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Special Requests
+                </Typography>
+              </Box>
+            </Stack>
           </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#fffde7",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#fbc02d", mr: 2 }}>
-              <Warning />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#f57f17" }}
-              >
-                2
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#f9a825" }}>
-                Inventory Alerts
-              </Typography>
-            </Box>
+          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
+                <Warning />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  {totals.alerts}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Inventory Alerts
+                </Typography>
+              </Box>
+            </Stack>
           </Card>
         </Grid>
+
         <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 2,
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 3,
-              backgroundColor: "#e3f2fd",
-            }}
-          >
-            <Avatar sx={{ backgroundColor: "#1976d2", mr: 2 }}>
-              <MonetizationOn />
-            </Avatar>
-            <Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#0d47a1" }}
-              >
-                $42
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#1565c0" }}>
-                Tips Today
-              </Typography>
-            </Box>
+          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
+                <MonetizationOn />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  ${totals.tips}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Tips Today
+                </Typography>
+              </Box>
+            </Stack>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Active Drinks */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+      {/* Summary + Charts */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={8}>
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
             <CardHeader
-              title="Active Drink Orders"
-              sx={{ backgroundColor: "#c2185b", color: "#fff" }}
+              title="Throughput (drinks served)"
+              action={
+                <IconButton>
+                  <BarIcon />
+                </IconButton>
+              }
             />
             <CardContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Hourly throughput helps spot service peaks and staffing needs.
+              </Typography>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer>
+                  <LineChart data={series}>
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <RTooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="served"
+                      stroke="#1976d2"
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
+            <CardHeader
+              title="Drink Mix Breakdown"
+              action={
+                <IconButton>
+                  <PieIcon />
+                </IconButton>
+              }
+            />
+            <CardContent>
+              <Box sx={{ height: 220 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={breakdown}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      innerRadius={36}
+                      label
+                    >
+                      {breakdown.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend verticalAlign="bottom" height={36} />
+                    <RTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Lists + Top sellers */}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
+            <CardHeader title="Active Drink Orders" />
+            <CardContent>
               <List>
+                {activeDrinks.length === 0 && (
+                  <Typography color="text.secondary" align="center">
+                    No active orders
+                  </Typography>
+                )}
                 {activeDrinks.map((drink) => (
                   <ListItem
                     key={drink.id}
-                    sx={{
-                      mb: 1.5,
-                      py: 1.5,
-                      px: 2,
-                      backgroundColor: "#fce4ec",
-                      borderRadius: 2,
-                    }}
+                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
                   >
                     <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: "#880e4f" }}>
-                        {drink.drink}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: "#ad1457" }}>
+                      <Typography fontWeight={700}>{drink.drink}</Typography>
+                      <Typography variant="body2" color="text.secondary">
                         Table {drink.table} • {drink.status}
                       </Typography>
                     </Box>
+                    <Stack direction="row" spacing={1}>
+                      <Chip
+                        label="Mark Ready"
+                        color="success"
+                        size="small"
+                        clickable
+                      />
+                      <Chip label="Delay" size="small" />
+                    </Stack>
                   </ListItem>
                 ))}
               </List>
@@ -213,33 +329,102 @@ const BartenderDashboard = () => {
           </Card>
         </Grid>
 
-        {/* Ready Drinks */}
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-            <CardHeader
-              title="Ready for Pickup"
-              sx={{ backgroundColor: "#2e7d32", color: "#fff" }}
-            />
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
+            <CardHeader title="Top Sellers (today)" />
             <CardContent>
               <List>
-                {readyDrinks.map((drink) => (
+                {topSellers.map((s, i) => (
                   <ListItem
-                    key={drink.id}
+                    key={s.name}
                     sx={{
-                      mb: 1.5,
-                      py: 1.5,
-                      px: 2,
-                      backgroundColor: "#e8f5e9",
-                      borderRadius: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      bgcolor: "grey.50",
+                      mb: 1,
+                      borderRadius: 1,
                     }}
                   >
+                    <Box>
+                      <Typography fontWeight={700}>{s.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {s.value} sold
+                      </Typography>
+                    </Box>
+                    <Typography fontWeight={700}>
+                      {Math.round(
+                        (s.value /
+                          (topSellers.reduce((a, b) => a + b.value, 0) || 1)) *
+                          100
+                      )}
+                      %
+                    </Typography>
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Inventory Alerts + Notifications */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
+            <CardHeader title="Inventory Alerts" />
+            <CardContent>
+              <List>
+                {inventoryAlerts.length === 0 && (
+                  <Typography color="text.secondary" align="center">
+                    No inventory alerts
+                  </Typography>
+                )}
+                {inventoryAlerts.map((a, idx) => (
+                  <ListItem
+                    key={idx}
+                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
+                  >
                     <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: "#1b5e20" }}>
-                        {drink.drink}
+                      <Typography fontWeight={700}>{a.item}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {a.detail || "Low stock"}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: "#388e3c" }}>
-                        Table {drink.table}
-                      </Typography>
+                    </Box>
+                    {typeof a.level === "number" && (
+                      <Box sx={{ width: 120 }}>
+                        <LinearProgress variant="determinate" value={a.level} />
+                      </Box>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
+            <CardHeader title="Bar Notifications" />
+            <CardContent>
+              <List>
+                {notifications.length === 0 && (
+                  <Typography color="text.secondary" align="center">
+                    No notifications
+                  </Typography>
+                )}
+                {notifications.map((n) => (
+                  <ListItem
+                    key={n.id}
+                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
+                  >
+                    <Avatar sx={{ bgcolor: "transparent", mr: 2 }}>
+                      <Notifications />
+                    </Avatar>
+                    <Box>
+                      <Typography fontWeight={700}>{n.message}</Typography>
+                      {n.time && (
+                        <Typography variant="caption" color="text.secondary">
+                          {n.time}
+                        </Typography>
+                      )}
                     </Box>
                   </ListItem>
                 ))}
@@ -249,79 +434,12 @@ const BartenderDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Special Requests */}
-      <Card sx={{ mb: 3, borderRadius: 3, boxShadow: 2 }}>
-        <CardHeader
-          title="Special Drink Requests"
-          sx={{ backgroundColor: "#ef6c00", color: "#fff" }}
-        />
-        <CardContent>
-          <List>
-            {specialRequests.map((req) => (
-              <ListItem
-                key={req.id}
-                sx={{
-                  mb: 1.5,
-                  py: 1.5,
-                  px: 2,
-                  backgroundColor: "#fff3e0",
-                  borderRadius: 2,
-                }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontWeight: 600, color: "#e65100" }}>
-                    {req.drink}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "#ef6c00" }}>
-                    {req.note}
-                  </Typography>
-                </Box>
-              </ListItem>
-            ))}
-          </List>
-        </CardContent>
-      </Card>
-
-      {/* Notifications */}
-      <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
-        <CardHeader
-          title="Bar Notifications"
-          sx={{ backgroundColor: "#1976d2", color: "#fff" }}
-        />
-        <CardContent>
-          {notifications.length === 0 ? (
-            <Typography textAlign="center" sx={{ color: "#9e9e9e" }}>
-              No notifications
-            </Typography>
-          ) : (
-            <List>
-              {notifications.map((note) => (
-                <ListItem
-                  key={note.id}
-                  sx={{
-                    mb: 1.5,
-                    py: 1.5,
-                    px: 2,
-                    backgroundColor: "#e3f2fd",
-                    borderRadius: 2,
-                  }}
-                >
-                  <Avatar sx={{ backgroundColor: "#1976d2", mr: 2 }}>
-                    <Notifications />
-                  </Avatar>
-                  <Box>
-                    <Typography sx={{ fontWeight: 600, color: "#0d47a1" }}>
-                      {note.message}
-                    </Typography>
-                  </Box>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </CardContent>
-      </Card>
+      <Box sx={{ mt: 3, textAlign: "center" }}>
+        <Typography variant="caption" color="text.secondary">
+          Tip: connect this dashboard to your POS and inventory system to
+          populate charts in real-time.
+        </Typography>
+      </Box>
     </Box>
   );
-};
-
-export default BartenderDashboard;
+}
