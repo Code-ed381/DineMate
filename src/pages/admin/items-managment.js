@@ -23,11 +23,11 @@ import Swal from "sweetalert2";
 import useMenuItemsStore from "../../lib/menuItemsStore";
 import { supabase } from "../../lib/supabase";
 import useRestaurantStore from "../../lib/restaurantStore";
-import CategoryItem from "../ui/category";
-import AdminHeader from "../ui/admin-header";
+import CategoryItem from "../../components/category";
+import AdminHeader from "../../components/admin-header";
 import useAppStore from "../../lib/appstore";
-import FAB from "../ui/fab";
-import DataTable from "../ui/data-table";
+import FAB from "../../components/fab";
+import DataTable from "../../components/data-table";
 
 const columns = [
   {

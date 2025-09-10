@@ -13,9 +13,9 @@ import {
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import AdminHeader from "../ui/admin-header";
-import FAB from "../ui/fab";
-import DataTable from "../ui/data-table";
+import AdminHeader from "../../components/admin-header";
+import FAB from "../../components/fab";
+import DataTable from "../../components/data-table";
 
 import Swal from "sweetalert2";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";

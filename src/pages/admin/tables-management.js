@@ -46,10 +46,10 @@ import {
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 import useTableManagementStore from "../../lib/tableManagementStore";
-import AdminHeader from "../ui/admin-header";
-import FAB from "../ui/fab";
+import AdminHeader from "../../components/admin-header";
+import FAB from "../../components/fab";
 import useAppStore from "../../lib/appstore";
-import DataTable from "../ui/data-table";
+import DataTable from "../../components/data-table";
 
 const statusColors = {
   available: { color: "success", icon: CheckCircleIcon },

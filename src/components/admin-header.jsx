@@ -1,5 +1,5 @@
 import { Box, Typography, ToggleButtonGroup, ToggleButton, Divider } from "@mui/material";
-import useAppStore from "../../lib/appstore";
+import useAppStore from "../lib/appstore";
 
 export default function AdminHeader({ title, description }) { 
     const { viewMode, setViewMode } = useAppStore();
