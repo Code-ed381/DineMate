@@ -51,6 +51,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import DashboardHeader from "../../components/dashboard-header";
 
 /**
  * CashierReports_Pro.jsx
@@ -272,6 +273,12 @@ export default function CashierReportsPro({ initialTransactions, salesData }) {
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* Header */}
+      <DashboardHeader
+        title="Cashier Reports"
+        description="Clean, consistent view — filters on the left, visual insights on the right."
+        background="linear-gradient(135deg, rgb(25, 187, 31) 0%, rgb(199, 128, 102) 100%)"
+        color="#fff"
+      />
       <Stack direction="row" alignItems="center" spacing={1} mb={3}>
         <CompactIcon>
           <Insights sx={{ color: "primary.main" }} />

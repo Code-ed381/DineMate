@@ -49,6 +49,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import DashboardHeader from "../../components/dashboard-header";
 import useAuthStore from "../../lib/authStore";
 
 // ————————————————————————————————————————————
@@ -157,23 +158,12 @@ export default function OwnerDashboard() {
 
   return (
     <Box className="owner-dashboard" sx={{ p: 3, display: "grid", gap: 3 }}>
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 2,
-          mb: 3,
-          background: "linear-gradient(135deg, #232526 0%, #414345 100%)",
-          color: "#fff",
-        }}
-      >
-        <Typography variant="h5" fontWeight={800}>
-          Welcome {user?.user?.user_metadata?.firstName}
-        </Typography>
-        <Typography variant="body2">
-          Quick overview on your restaurant. Snapshots of your restaurant's
-          performance, orders, and more.
-        </Typography>
-      </Box>
+      <DashboardHeader
+        title="Owner Dashboard"
+        description="Quick overview on your restaurant. Snapshots of your restaurant's performance, orders, and more."
+        background="linear-gradient(135deg, #232526 0%, #414345 100%)"
+        color="#fff"
+      />
       {/* Header / Filters */}
       <Box
         sx={{

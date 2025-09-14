@@ -6,30 +6,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
 import useAuthStore from "../../../lib/authStore";
 
-const products = [
-  {
-    name: "Professional plan",
-    desc: "Monthly subscription",
-    price: "$15.00",
-  },
-  {
-    name: "Dedicated support",
-    desc: "Included in the Professional plan",
-    price: "Free",
-  },
-  {
-    name: "Hardware",
-    desc: "Devices needed for development",
-    price: "$69.99",
-  },
-  {
-    name: "Landing page template",
-    desc: "License",
-    price: "$49.99",
-  },
-];
-
-function Info({ totalPrice }) {
+function Info() {
   const { subscription, personalInfo, restaurantInfo } = useAuthStore();
 
   const address = `${restaurantInfo.address_line_1}, ${restaurantInfo.address_line_2}, ${restaurantInfo.city}, ${restaurantInfo.state}, ${restaurantInfo.zip_code}, ${restaurantInfo.country}`;

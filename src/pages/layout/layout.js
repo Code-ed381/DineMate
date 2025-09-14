@@ -1,6 +1,10 @@
 import { Outlet } from "react-router-dom";
 import * as React from "react";
-import { styled, createTheme, ThemeProvider } from "@mui/material/styles";
+import {
+  styled,
+  experimental_extendTheme as extendTheme,
+  useColorScheme,
+} from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiDrawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
@@ -27,7 +31,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import CachedIcon from "@mui/icons-material/Cached";
 
 import { MainListItems, SecondaryListItems } from "./list-items";
-import Tooltip from "@mui/material/Tooltip";
+import TooltipComponent from "../../components/tooltip";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import { useEffect, useState } from "react";
@@ -37,6 +41,7 @@ import useDashboardStore from "../../lib/dashboardStore";
 import useAuthStore from "../../lib/authStore";
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
+import ThemeToggle from "../../components/theme-toggle";
 
 function Copyright(props) {
   return (
@@ -101,18 +106,10 @@ const Drawer = styled(MuiDrawer, {
   },
 }));
 
-const mdTheme = createTheme();
 
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#1976d2",
-    },
-  },
-});
 
 const Layout = () => {
+  const { mode, setMode } = useColorScheme();
   const [open, setOpen] = React.useState(false);
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -130,6 +127,15 @@ const Layout = () => {
 
   const first_name = user.user.user_metadata.firstName;
   const last_name = user.user.user_metadata.lastName;
+
+  useEffect(() => {
+    console.log(mode);
+    if (mode === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }, [mode]);
 
   useEffect(() => {
     getRestaurants(user.user.id);
@@ -197,208 +203,206 @@ const Layout = () => {
   return (
     <>
       {selectedRestaurant && (
-        <ThemeProvider theme={mdTheme}>
-          <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
-            <CssBaseline />
-            <ThemeProvider theme={darkTheme}>
-              <AppBar position="absolute" open={open}>
-                <Toolbar sx={{ pr: "20px" }}>
-                  <IconButton
-                    edge="start"
-                    color="inherit"
-                    aria-label="open drawer"
-                    onClick={toggleDrawer}
-                    sx={{
-                      marginRight: "30px",
-                      ...(open && { display: "none" }),
-                    }}
-                  >
-                    <MenuIcon />
-                  </IconButton>
+        <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
+          <CssBaseline />
+          
+            <AppBar position="absolute" open={open}>
+              <Toolbar sx={{ pr: "20px" }}>
+                <IconButton
+                  edge="start"
+                  color="inherit"
+                  aria-label="open drawer"
+                  onClick={toggleDrawer}
+                  sx={{
+                    marginRight: "30px",
+                    ...(open && { display: "none" }),
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
 
-                  <img
-                    src={logo}
-                    alt="Logo"
-                    style={{ height: "40px", marginRight: "16px" }}
-                  />
+                <img
+                  src={logo}
+                  alt="Logo"
+                  style={{ height: "40px", marginRight: "16px" }}
+                />
 
+                <Typography
+                  component="h1"
+                  variant="h5"
+                  color="inherit"
+                  noWrap
+                  sx={{ mr: 2, fontWeight: "900" }}
+                >
+                  {selectedRestaurant?.restaurants?.name}{" "}
+                  <span style={{ fontWeight: "normal", fontSize: "14px" }}>
+                    * {breadcrumb}
+                  </span>
+                </Typography>
+
+                {/* Centered Time & Date */}
+                <Box sx={{ mx: "auto" }}>
                   <Typography
-                    component="h1"
-                    variant="h5"
+                    variant="title"
                     color="inherit"
+                    sx={{ fontWeight: "900" }}
                     noWrap
-                    sx={{ mr: 2, fontWeight: "900" }}
                   >
-                    {selectedRestaurant?.restaurants?.name}{" "}
-                    <span style={{ fontWeight: "normal", fontSize: "14px" }}>
-                      * {breadcrumb}
-                    </span>
+                    {formatDate(currentTime)}
                   </Typography>
+              </Box>
 
-                  {/* Centered Time & Date */}
-                  <Box sx={{ mx: "auto" }}>
-                    <Typography
-                      variant="title"
-                      color="inherit"
-                      sx={{ fontWeight: "900" }}
-                      noWrap
-                    >
-                      {formatDate(currentTime)}
-                    </Typography>
-                  </Box>
-
-                  {restaurants.length > 1 && (
-                    <Tooltip title="Switch Restaurant">
-                      <IconButton
-                        size="large"
-                        aria-label="show 17 new notifications"
-                        color="inherit"
-                        onClick={() => navigate("/restaurant-selection")}
-                      >
-                        <CachedIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-
-                  <Tooltip title="Notifications">
+              <ThemeToggle />
+              
+                {restaurants.length > 1 && (
+                <TooltipComponent title="Switch Restaurant">
                     <IconButton
                       size="large"
                       aria-label="show 17 new notifications"
                       color="inherit"
-                      onClick={handleClick}
+                      onClick={() => navigate("/restaurant-selection")}
                     >
-                      <Badge badgeContent={17} color="error">
-                        <NotificationsIcon />
-                      </Badge>
+                      <CachedIcon />
                     </IconButton>
-                    <Popover
-                      id={id}
-                      open={openNotification}
-                      anchorEl={anchorEl}
-                      onClose={handleClose}
-                      anchorOrigin={{
-                        vertical: "bottom",
-                        horizontal: "left",
-                      }}
-                    >
-                      <Typography sx={{ p: 2 }}>
-                        The content of the Popover.The content of the Popover.
-                      </Typography>
-                    </Popover>
-                  </Tooltip>
+                  </TooltipComponent>
+                )}
 
-                  <IconButton color="inherit">
-                    <Box sx={{ flexGrow: 0 }}>
-                      <Tooltip title="Open settings">
-                        <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                          <Avatar
-                            alt="Remy Sharp"
-                            src={user?.user?.user_metadata?.profileAvatar}
-                          />
-                        </IconButton>
-                      </Tooltip>
-                      <Menu
-                        sx={{ mt: "45px" }}
-                        id="menu-appbar"
-                        anchorEl={anchorElUser}
-                        anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                        keepMounted
-                        transformOrigin={{
-                          vertical: "top",
-                          horizontal: "right",
-                        }}
-                        open={Boolean(anchorElUser)}
-                        onClose={handleCloseUserMenu}
-                      >
-                        <MenuItem disabled>
-                          <Typography
-                            variant="title"
-                            color="inherit"
-                            sx={{ fontWeight: "900" }}
-                            noWrap
-                          >
-                            {first_name + " " + last_name}
-                          </Typography>
-                        </MenuItem>
-                        <Divider />
-                        <MenuItem
-                          onClick={() => {
-                            handleCloseUserMenu();
-                            navigate("dashboard");
-                          }}
-                        >
-                          <DashboardIcon sx={{ mr: 1 }} />
-                          <Typography textAlign="center">Dashboard</Typography>
-                        </MenuItem>
-                        <MenuItem
-                          onClick={() => {
-                            handleCloseUserMenu();
-                            navigate("profile");
-                            setBreadcrumb("Profile");
-                          }}
-                        >
-                          <PersonIcon sx={{ mr: 1 }} />
-                          <Typography textAlign="center">Profile</Typography>
-                        </MenuItem>
-                        {selectedRestaurant.role === "owner" && (
-                          <MenuItem
-                            onClick={() => {
-                              handleCloseUserMenu();
-                              navigate("settings");
-                              setBreadcrumb("Settings");
-                            }}
-                          >
-                            <SettingsIcon sx={{ mr: 1 }} />
-                            <Typography textAlign="center">Settings</Typography>
-                          </MenuItem>
-                        )}
-                        <Divider component="li" />
-                        <MenuItem onClick={logout}>
-                          <LogoutIcon sx={{ mr: 1 }} />
-                          <Typography textAlign="center">Logout</Typography>
-                        </MenuItem>
-                      </Menu>
-                    </Box>
+                <TooltipComponent title="Notifications">
+                  <IconButton
+                    size="large"
+                    aria-label="show 17 new notifications"
+                    color="inherit"
+                    onClick={handleClick}
+                  >
+                    <Badge badgeContent={17} color="error">
+                      <NotificationsIcon />
+                    </Badge>
                   </IconButton>
-                </Toolbar>
-              </AppBar>
-            </ThemeProvider>
-            <Drawer variant="permanent" open={open}>
-              <Toolbar
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  px: [1],
-                }}
-              >
-                <IconButton onClick={toggleDrawer}>
-                  <ChevronLeftIcon />
+                  <Popover
+                    id={id}
+                    open={openNotification}
+                    anchorEl={anchorEl}
+                    onClose={handleClose}
+                    anchorOrigin={{
+                      vertical: "bottom",
+                      horizontal: "left",
+                    }}
+                  >
+                    <Typography sx={{ p: 2 }}>
+                      The content of the Popover.The content of the Popover.
+                    </Typography>
+                  </Popover>
+                </TooltipComponent>
+
+                <IconButton color="inherit">
+                  <Box sx={{ flexGrow: 0 }}>
+                    <TooltipComponent title="Open settings">
+                      <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                        <Avatar
+                          alt="Remy Sharp"
+                          src={user?.user?.user_metadata?.profileAvatar}
+                        />
+                      </IconButton>
+                    </TooltipComponent>
+                    <Menu
+                      sx={{ mt: "45px" }}
+                      id="menu-appbar"
+                      anchorEl={anchorElUser}
+                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                      keepMounted
+                      transformOrigin={{
+                        vertical: "top",
+                        horizontal: "right",
+                      }}
+                      open={Boolean(anchorElUser)}
+                      onClose={handleCloseUserMenu}
+                    >
+                      <MenuItem disabled>
+                        <Typography
+                          variant="title"
+                          color="inherit"
+                          sx={{ fontWeight: "900" }}
+                          noWrap
+                        >
+                          {first_name + " " + last_name}
+                        </Typography>
+                      </MenuItem>
+                      <Divider />
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseUserMenu();
+                          navigate("dashboard");
+                        }}
+                      >
+                        <DashboardIcon sx={{ mr: 1 }} />
+                        <Typography textAlign="center">Dashboard</Typography>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseUserMenu();
+                          navigate("profile");
+                          setBreadcrumb("Profile");
+                        }}
+                      >
+                        <PersonIcon sx={{ mr: 1 }} />
+                        <Typography textAlign="center">Profile</Typography>
+                      </MenuItem>
+                      {selectedRestaurant.role === "owner" && (
+                        <MenuItem
+                          onClick={() => {
+                            handleCloseUserMenu();
+                            navigate("settings");
+                            setBreadcrumb("Settings");
+                          }}
+                        >
+                          <SettingsIcon sx={{ mr: 1 }} />
+                          <Typography textAlign="center">Settings</Typography>
+                        </MenuItem>
+                      )}
+                      <Divider component="li" />
+                      <MenuItem onClick={logout}>
+                        <LogoutIcon sx={{ mr: 1 }} />
+                        <Typography textAlign="center">Logout</Typography>
+                      </MenuItem>
+                    </Menu>
+                  </Box>
                 </IconButton>
               </Toolbar>
-              <Divider />
-              <List component="nav">
-                <MainListItems />
-                <Divider sx={{ my: 1 }} />
-                <SecondaryListItems />
-              </List>
-            </Drawer>
-            <Box
-              component="main"
+            </AppBar>
+          <Drawer variant="permanent" open={open}>
+            <Toolbar
               sx={{
-                backgroundColor: "#f5f6fa",
-                flexGrow: 1,
-                overflow: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                px: [1],
               }}
             >
-              <Toolbar />
-              <Box sx={{ minHeight: "90vh", padding: "20px", flexGrow: 1 }}>
-                <Outlet />
-              </Box>
-              <Copyright sx={{ pt: 4 }} />
+              <IconButton onClick={toggleDrawer}>
+                <ChevronLeftIcon />
+              </IconButton>
+            </Toolbar>
+            <Divider />
+            <List component="nav">
+              <MainListItems />
+              <Divider sx={{ my: 1 }} />
+              <SecondaryListItems />
+            </List>
+          </Drawer>
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              overflow: "auto",
+            }}
+          >
+            <Toolbar />
+            <Box sx={{ minHeight: "90vh", padding: "20px", flexGrow: 1 }}>
+              <Outlet />
             </Box>
+            <Copyright sx={{ pt: 4 }} />
           </Box>
-        </ThemeProvider>
+        </Box>
       )}
     </>
   );

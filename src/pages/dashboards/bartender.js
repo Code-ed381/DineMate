@@ -40,6 +40,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import DashboardHeader from "../../components/dashboard-header";
 
 // BartenderDashboardPro (JSX) — flat cards, consistent with other dashboards
 const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336"];
@@ -106,25 +107,13 @@ export default function BartenderDashboardPro({
   }, [breakdown]);
 
   return (
-    <Box>
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 2,
-          mb: 3,
-          background:
-            "linear-gradient(135deg,rgb(37, 144, 156)0%,rgb(142, 77, 255) 100%)",
-          color: "#fff",
-        }}
-      >
-        <Typography variant="h5" fontWeight={800}>
-          Welcome Bartender 👨‍🍳
-        </Typography>
-        <Typography variant="body2">
-          Manage the line, monitor stations, and keep the kitchen running
-          smoothly.
-        </Typography>
-      </Box>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
+      <DashboardHeader
+        title="Bartender Dashboard"
+        description="Here’s a quick summary of your restaurant’s performance today."
+        background="linear-gradient(135deg, rgba(25,118,210,1) 0%, rgba(0,200,150,1) 100%)"
+        color="#fff"
+      />
       {/* KPI strip — flat cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={2.4}>

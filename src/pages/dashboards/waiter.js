@@ -31,6 +31,7 @@ import {
   MoreVert,
 } from "@mui/icons-material";
 import useAuthStore from "../../lib/authStore";
+import DashboardHeader from "../../components/dashboard-header";
 
 /**
  * WaiterDashboard_Pro.jsx
@@ -150,24 +151,13 @@ const WaiterDashboard = ({
 
   return (
     <Box sx={{ p: 2 }}>
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 2,
-          mb: 3,
-          background:
-            "linear-gradient(135deg,rgb(5, 146, 165) 0%, rgb(224, 21, 140) 100%)",
-          color: "#fff",
-        }}
-      >
-        <Typography variant="h5" fontWeight={800}>
-          Welcome Waiter 👨
-        </Typography>
-        <Typography variant="body2">
-          Manage the line, monitor stations, and keep the kitchen running
-          smoothly.
-        </Typography>
-      </Box>
+      <DashboardHeader
+        title="Waiter Dashboard"
+        description="Manage the line, monitor stations, and keep the kitchen running smoothly."
+        background="linear-gradient(135deg,rgb(5, 146, 165) 0%, rgb(224, 21, 140) 100%)"
+        color="#fff"
+      />
+
       {/* Top: Greeting + quick actions */}
       <Box
         sx={{

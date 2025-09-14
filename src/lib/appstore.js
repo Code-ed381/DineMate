@@ -4,6 +4,9 @@ import { supabase } from './supabase';
 const useAppStore = create((set) => ({
   viewMode: "card",
   setViewMode: (viewMode) => set({ viewMode }),
+
+  darkMode: false,
+  setDarkMode: (darkMode) => set({ darkMode }),
   
   user: null,
   profile_image: null,

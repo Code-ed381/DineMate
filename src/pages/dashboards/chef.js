@@ -33,6 +33,7 @@ import {
   Notifications,
   MoreHoriz,
 } from "@mui/icons-material";
+import DashboardHeader from "../../components/dashboard-header";
 
 /**
  * ChefDashboard_Pro.jsx
@@ -127,24 +128,57 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Box sx={{ p: 3, borderRadius: 2, mb: 3, background: "linear-gradient(135deg,#ff6b6b 0%, #ffb74d 100%)", color: "#fff" }}>
-        <Typography variant="h5" fontWeight={800}>Welcome Chef 👨‍🍳</Typography>
-        <Typography variant="body2">Manage the line, monitor stations, and keep the kitchen running smoothly.</Typography>
-      </Box>
+      <DashboardHeader
+        title="Chef Dashboard"
+        description="Here’s a quick summary of your restaurant’s performance today."
+        background="linear-gradient(135deg,#ff6b6b 0%, #ffb74d 100%)"
+        color="#fff"
+      />
 
       {/* KPI strip */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={3}><SmallStat icon={<Restaurant />} label="Pending Orders" value={pending} accent="#ffe6e6" /></Grid>
-        <Grid item xs={12} md={3}><SmallStat icon={<AccessTime />} label="In Progress" value={preparing} accent="#fff3e0" /></Grid>
-        <Grid item xs={12} md={3}><SmallStat icon={<Timer />} label="Avg Prep" value={avgPrep} accent="#e8f5e9" /></Grid>
-        <Grid item xs={12} md={3}><SmallStat icon={<Warning />} label="Low Stock Alerts" value={lowStock} accent="#e3f2fd" /></Grid>
+        <Grid item xs={12} md={3}>
+          <SmallStat
+            icon={<Restaurant />}
+            label="Pending Orders"
+            value={pending}
+            accent="#ffe6e6"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <SmallStat
+            icon={<AccessTime />}
+            label="In Progress"
+            value={preparing}
+            accent="#fff3e0"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <SmallStat
+            icon={<Timer />}
+            label="Avg Prep"
+            value={avgPrep}
+            accent="#e8f5e9"
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <SmallStat
+            icon={<Warning />}
+            label="Low Stock Alerts"
+            value={lowStock}
+            accent="#e3f2fd"
+          />
+        </Grid>
       </Grid>
 
       <Grid container spacing={3}>
         {/* Left: Live Order Queue */}
         <Grid item xs={12} lg={7}>
           <Card sx={{ borderRadius: 2 }}>
-            <CardHeader title={`Live Order Queue (${orders.length})`} subheader={`Completed today: ${completedToday}`} />
+            <CardHeader
+              title={`Live Order Queue (${orders.length})`}
+              subheader={`Completed today: ${completedToday}`}
+            />
             <CardContent>
               <List>
                 {orders.map((order) => {
@@ -155,39 +189,98 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
                     <React.Fragment key={order.id}>
                       <ListItem sx={{ alignItems: "flex-start", py: 2 }}>
                         <Box sx={{ flex: 1 }}>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography sx={{ fontWeight: 700 }}>{order.item}</Typography>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography sx={{ fontWeight: 700 }}>
+                              {order.item}
+                            </Typography>
                             <StatusChip status={order.status} />
-                            {isLate && <Chip label={`${elapsed}m`} size="small" color="error" />}
+                            {isLate && (
+                              <Chip
+                                label={`${elapsed}m`}
+                                size="small"
+                                color="error"
+                              />
+                            )}
                           </Stack>
 
-                          <Typography variant="body2" color="text.secondary">{order.table} • {order.notes || "—"}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {order.table} • {order.notes || "—"}
+                          </Typography>
 
-                          <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "center" }}>
-                            <Typography variant="caption" color="text.secondary">Placed {elapsed} minutes ago</Typography>
-                            <LinearProgress sx={{ width: 160, ml: 1, height: 8, borderRadius: 1 }} variant="determinate" value={Math.min(100, (elapsed / sla) * 100)} />
+                          <Box
+                            sx={{
+                              mt: 1,
+                              display: "flex",
+                              gap: 1,
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Placed {elapsed} minutes ago
+                            </Typography>
+                            <LinearProgress
+                              sx={{
+                                width: 160,
+                                ml: 1,
+                                height: 8,
+                                borderRadius: 1,
+                              }}
+                              variant="determinate"
+                              value={Math.min(100, (elapsed / sla) * 100)}
+                            />
                           </Box>
                         </Box>
 
                         <Stack direction="row" spacing={1}>
                           {order.status === "Pending" && (
                             <Tooltip title="Start cooking">
-                              <Button size="small" variant="contained" onClick={() => startCooking(order.id)} startIcon={<Kitchen />}>Start</Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => startCooking(order.id)}
+                                startIcon={<Kitchen />}
+                              >
+                                Start
+                              </Button>
                             </Tooltip>
                           )}
 
                           {order.status !== "Completed" && (
                             <Tooltip title="Mark complete">
-                              <Button size="small" variant="outlined" color="success" onClick={() => completeOrder(order.id)} startIcon={<CheckCircle />}>Complete</Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="success"
+                                onClick={() => completeOrder(order.id)}
+                                startIcon={<CheckCircle />}
+                              >
+                                Complete
+                              </Button>
                             </Tooltip>
                           )}
 
                           <Tooltip title="Delay order">
-                            <Button size="small" variant="outlined" color="warning" onClick={() => delayOrder(order.id)}>Delay</Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="warning"
+                              onClick={() => delayOrder(order.id)}
+                            >
+                              Delay
+                            </Button>
                           </Tooltip>
 
                           <Tooltip title="More">
-                            <IconButton><MoreHoriz /></IconButton>
+                            <IconButton>
+                              <MoreHoriz />
+                            </IconButton>
                           </Tooltip>
                         </Stack>
                       </ListItem>
@@ -198,7 +291,10 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
 
                 {orders.length === 0 && (
                   <ListItem>
-                    <ListItemText primary="No active orders" secondary="All clear — great job!" />
+                    <ListItemText
+                      primary="No active orders"
+                      secondary="All clear — great job!"
+                    />
                   </ListItem>
                 )}
               </List>
@@ -212,36 +308,89 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
             <Card sx={{ borderRadius: 2 }}>
               <CardHeader title="Kitchen Health" />
               <CardContent>
-                <Typography variant="subtitle2" color="text.secondary">Stations</Typography>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Stations
+                </Typography>
                 <Box sx={{ mt: 1 }}>
                   {stations.map((s) => (
-                    <Box key={s.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 1 }}>
+                    <Box
+                      key={s.id}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        py: 1,
+                      }}
+                    >
                       <Box>
-                        <Typography sx={{ fontWeight: 700 }}>{s.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">{s.staffAssigned || "Unassigned"}</Typography>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {s.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {s.staffAssigned || "Unassigned"}
+                        </Typography>
                       </Box>
                       <Box sx={{ textAlign: "right" }}>
-                        <Typography variant="body2" color={s.status === "OK" ? "success.main" : "warning.main"}>{s.status}</Typography>
-                        {s.stockWarning && <Chip label="Low stock" size="small" color="warning" sx={{ mt: 0.5 }} />}
+                        <Typography
+                          variant="body2"
+                          color={
+                            s.status === "OK" ? "success.main" : "warning.main"
+                          }
+                        >
+                          {s.status}
+                        </Typography>
+                        {s.stockWarning && (
+                          <Chip
+                            label="Low stock"
+                            size="small"
+                            color="warning"
+                            sx={{ mt: 0.5 }}
+                          />
+                        )}
                       </Box>
                     </Box>
                   ))}
                 </Box>
 
                 <Divider sx={{ my: 1 }} />
-                <Typography variant="subtitle2" color="text.secondary">Staff on shift</Typography>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Staff on shift
+                </Typography>
                 <Box sx={{ mt: 1 }}>
                   {staff.map((p) => (
-                    <Box key={p.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
-                      <Box><Typography sx={{ fontWeight: 700 }}>{p.name}</Typography><Typography variant="caption" color="text.secondary">{p.role}</Typography></Box>
-                      <Chip label={p.status} size="small" color={p.status === "Active" ? "success" : "default"} />
+                    <Box
+                      key={p.id}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        py: 1,
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {p.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {p.role}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={p.status}
+                        size="small"
+                        color={p.status === "Active" ? "success" : "default"}
+                      />
                     </Box>
                   ))}
                 </Box>
 
                 <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                  <Button startIcon={<LocalDining />} variant="contained">View Recipes</Button>
-                  <Button startIcon={<RoomService />} variant="outlined">Request Runner</Button>
+                  <Button startIcon={<LocalDining />} variant="contained">
+                    View Recipes
+                  </Button>
+                  <Button startIcon={<RoomService />} variant="outlined">
+                    Request Runner
+                  </Button>
                 </Box>
               </CardContent>
             </Card>
@@ -251,12 +400,38 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
               <CardContent>
                 <List>
                   {alerts.map((a) => (
-                    <ListItem key={a.id} secondaryAction={<Button size="small" onClick={() => acknowledgeAlert(a.id)}>Acknowledge</Button>}>
-                      <ListItemText primary={<Typography sx={{ fontWeight: 700 }}>{a.title}</Typography>} secondary={<Typography variant="caption" color="text.secondary">{a.detail}</Typography>} />
+                    <ListItem
+                      key={a.id}
+                      secondaryAction={
+                        <Button
+                          size="small"
+                          onClick={() => acknowledgeAlert(a.id)}
+                        >
+                          Acknowledge
+                        </Button>
+                      }
+                    >
+                      <ListItemText
+                        primary={
+                          <Typography sx={{ fontWeight: 700 }}>
+                            {a.title}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            {a.detail}
+                          </Typography>
+                        }
+                      />
                     </ListItem>
                   ))}
                   {alerts.length === 0 && (
-                    <ListItem><ListItemText primary="No active alerts" secondary="Kitchen running smoothly" /></ListItem>
+                    <ListItem>
+                      <ListItemText
+                        primary="No active alerts"
+                        secondary="Kitchen running smoothly"
+                      />
+                    </ListItem>
                   )}
                 </List>
               </CardContent>
@@ -266,7 +441,10 @@ export default function ChefDashboardPro({ initialOrders, stations, staff, notif
       </Grid>
 
       <Box sx={{ mt: 3, textAlign: "center" }}>
-        <Typography variant="caption" color="text.secondary">Pro tip: integrate with printers and kitchen display systems (KDS) for fastest throughput.</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Pro tip: integrate with printers and kitchen display systems (KDS) for
+          fastest throughput.
+        </Typography>
       </Box>
     </Box>
   );

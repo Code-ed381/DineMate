@@ -37,6 +37,7 @@ import {
   Bar,
   Legend,
 } from "recharts";
+import DashboardHeader from "../../components/dashboard-header";
 
 // Dummy Data
 const salesData = [
@@ -67,25 +68,14 @@ const COLORS = ["#1976d2", "#ff9800", "#4caf50", "#f44336"];
 
 export default function AdminDashboard() {
   return (
-    <Box sx={{ p: 3, bgcolor: "#f4f7fb", minHeight: "100vh" }}>
+    <Box sx={{ p: 3, minHeight: "100vh" }}>
       {/* Header Section */}
-      <Box
-        sx={{
-          p: 3,
-          borderRadius: 3,
-          mb: 4,
-          background:
-            "linear-gradient(135deg, rgba(25,118,210,1) 0%, rgba(0,200,150,1) 100%)",
-          color: "#fff",
-        }}
-      >
-        <Typography variant="h5" fontWeight="bold">
-          Welcome Back, Admin 👋
-        </Typography>
-        <Typography variant="body2">
-          Here’s a quick summary of your restaurant’s performance today.
-        </Typography>
-      </Box>
+      <DashboardHeader
+        title="Admin Dashboard"
+        description="Here’s a quick summary of your restaurant’s performance today."
+        background="linear-gradient(135deg, rgba(25,118,210,1) 0%, rgba(0,200,150,1) 100%)"
+        color="#fff"
+      />
 
       {/* KPI Cards */}
       <Grid container spacing={3}>

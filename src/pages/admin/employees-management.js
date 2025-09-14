@@ -640,8 +640,6 @@ const EmployeeManagement = () => {
               <Card
                 sx={{
                   borderRadius: 1,
-                  border: "1px solid #ddd",
-                  // boxShadow: 4,
                   display: "flex",
                   height: 250, // taller card
                   overflow: "hidden",

@@ -428,12 +428,11 @@ export default function MenuItemsManagement() {
       <Box sx={{ display: "flex", height: "100vh" }}>
         {/* Sidebar for Categories */}
         <Box
-          sx={{
+          sx={((theme)=>({
             width: 300,
             borderRight: "1px solid #eee",
             p: 2,
-            backgroundColor: "#fafafa",
-          }}
+          }))}
         >
           <Box
             sx={{

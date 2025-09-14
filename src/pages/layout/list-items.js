@@ -15,7 +15,7 @@ import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import useRestaurantStore from "../../lib/restaurantStore";
 import LocalBarIcon from "@mui/icons-material/LocalBar";
 import SettingsIcon from "@mui/icons-material/Settings";
-import Tooltip from "@mui/material/Tooltip";
+import TooltipComponent from "../../components/tooltip";
 
 export const MainListItems = () => {
   const { selectedRestaurant } = useRestaurantStore();
@@ -23,10 +23,9 @@ export const MainListItems = () => {
 
   return (
     <React.Fragment>
-      <Tooltip title="Dashboard">
         <Link
           to="/app/dashboard"
-          style={{ textDecoration: "none", color: "#000" }}
+          style={{ textDecoration: "none", color: "inherit" }}
           onClick={() => setBreadcrumb("Dashboard")}
         >
           <ListItemButton>
@@ -36,13 +35,11 @@ export const MainListItems = () => {
             <ListItemText primary="Dashboard" />
           </ListItemButton>
         </Link>
-      </Tooltip>
       {selectedRestaurant.role === "waiter" && (
         <>
-          <Tooltip title="Menu">
             <Link
               to="/app/menu"
-              style={{ textDecoration: "none", color: "#000" }}
+              style={{ textDecoration: "none", color: "inherit" }}
               onClick={() => setBreadcrumb("Menu")}
             >
               <ListItemButton>
@@ -52,11 +49,9 @@ export const MainListItems = () => {
                 <ListItemText primary="Menu" />
               </ListItemButton>
             </Link>
-          </Tooltip>
-          <Tooltip title="Tables">
             <Link
               to="/app/tables"
-              style={{ textDecoration: "none", color: "#000" }}
+              style={{ textDecoration: "none", color: "inherit" }}
               onClick={() => setBreadcrumb("Tables")}
             >
               <ListItemButton>
@@ -66,15 +61,13 @@ export const MainListItems = () => {
                 <ListItemText primary="Tables" />
               </ListItemButton>
             </Link>
-          </Tooltip>
         </>
       )}
       {selectedRestaurant.role === "bartender" && (
         <>
-          <Tooltip title="Bar">
             <Link
               to="/app/bar"
-              style={{ textDecoration: "none", color: "#000" }}
+              style={{ textDecoration: "none", color: "inherit" }}
               onClick={() => setBreadcrumb("Menu")}
             >
               <ListItemButton>
@@ -84,14 +77,12 @@ export const MainListItems = () => {
                 <ListItemText primary="Bar" />
               </ListItemButton>
             </Link>
-          </Tooltip>
         </>
       )}
       {selectedRestaurant.role === "chef" && (
-        <Tooltip title="Kitchen">
           <Link
             to="/app/kitchen"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Kitchen")}
           >
             <ListItemButton>
@@ -101,13 +92,11 @@ export const MainListItems = () => {
               <ListItemText primary="Kitchen" />
             </ListItemButton>
           </Link>
-        </Tooltip>
       )}
       {selectedRestaurant.role === "cashier" && (
-        <Tooltip title="Cashier">
           <Link
             to="/app/cashier"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Cashier")}
           >
             <ListItemButton>
@@ -117,7 +106,6 @@ export const MainListItems = () => {
               <ListItemText primary="Cashier" />
             </ListItemButton>
           </Link>
-        </Tooltip>
       )}
     </React.Fragment>
   );
@@ -134,7 +122,7 @@ export const SecondaryListItems = () => {
         <>
           <Link
             to="/app/employees"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Employees Management")}
           >
             <ListItemButton>
@@ -146,7 +134,7 @@ export const SecondaryListItems = () => {
           </Link>
           <Link
             to="/app/menu-items-management"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Items Management")}
           >
             <ListItemButton>
@@ -158,7 +146,7 @@ export const SecondaryListItems = () => {
           </Link>
           <Link
             to="/app/tables-management"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Tables Management")}
           >
             <ListItemButton>
@@ -176,7 +164,7 @@ export const SecondaryListItems = () => {
         <>
           <Link
             to="/app/report"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Reports")}
           >
             <ListItemButton>
@@ -194,7 +182,7 @@ export const SecondaryListItems = () => {
         <>
           <Link
             to="/app/settings"
-            style={{ textDecoration: "none", color: "#000" }}
+            style={{ textDecoration: "none", color: "inherit" }}
             onClick={() => setBreadcrumb("Settings")}
           >
             <ListItemButton>

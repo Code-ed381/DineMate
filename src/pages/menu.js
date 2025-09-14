@@ -258,13 +258,14 @@ const Menu = () => {
         </Box>
       ) : (
         <div className="row">
-          <div className="col-8">
-            <Box
-              display="flex"
-              justifyContent="center"
-              mb={1}
-              sx={{ backgroundColor: "#fff", padding: 2, borderRadius: 2 }}
-            >
+            <div className="col-8">
+              <Card>
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  mb={1}
+                  sx={{ padding: 2 }}
+                >
               <>
                 {assignedTablesLoaded === false ? (
                   <>
@@ -288,10 +289,11 @@ const Menu = () => {
                 )}
               </>
             </Box>
+          </Card>
 
             {tableSelected === true && menuItems.length > 0 && (
               <TextField
-                sx={{ backgroundColor: "#fff", borderColor: "#fff", mt: 2 }}
+                sx={{ borderColor: "#fff", mt: 2 }}
                 onChange={(e) => searchMeals(e.target.value)}
                 value={searchMealValue}
                 fullWidth
@@ -317,7 +319,6 @@ const Menu = () => {
                     display: "flex",
                     flexWrap: "wrap",
                     gap: 2,
-                    backgroundColor: "#fff",
                     borderRadius: 2,
                     mt: 2,
                     p: 2,
@@ -335,7 +336,6 @@ const Menu = () => {
                             display: "flex",
                             flexWrap: "wrap",
                             gap: 2,
-                            backgroundColor: "#fff",
                             borderRadius: 2,
                             mt: 2,
                             p: 2,
@@ -360,7 +360,6 @@ const Menu = () => {
                         display: "flex",
                         flexWrap: "wrap",
                         gap: 2,
-                        backgroundColor: "#fff",
                         borderRadius: 2,
                         mt: 2,
                         p: 2,

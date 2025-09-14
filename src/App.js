@@ -1,3 +1,4 @@
+// App.js
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/layout/layout";
 import Dashboard from "./pages/dashboard";
