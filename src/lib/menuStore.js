@@ -50,6 +50,70 @@ const useMenuStore = create((set, get) => ({
   bill_printed: false,
   searchMealValue: "",
   searchDrinkValue: "",
+  selectedCategory: "",
+  menuItems: [],
+  filteredMenuItems: [],
+  originalMenuItems: [],
+  menuItemsLoaded: false,
+  loadingMenuItems: false,
+  categories: [],
+  loadingCategories: false,
+  chosenTableSession: [],
+
+  // Fetch categories
+  fetchCategories: async () => {
+    set({ loadingCategories: true });
+    try {
+      const { data, error } = await supabase
+        .from("menu_categories")
+        .select("*")
+        .eq(
+          "restaurant_id",
+          useRestaurantStore.getState().selectedRestaurant.restaurants.id
+        );
+      if (error) throw error;
+      set({ categories: data });
+    } catch (error) {
+      Swal.fire("Error", "Failed to fetch categories.", "error");
+    } finally {
+      set({ loadingCategories: false });
+    }
+  },
+
+  // Fetch menu items
+  fetchMenuItems: async () => {
+    set({ loadingMenuItems: true });
+    try {
+      const restaurantId =
+        useRestaurantStore.getState().selectedRestaurant?.restaurants?.id;
+      if (!restaurantId) throw new Error("No restaurant selected");
+
+      const { data, error } = await supabase
+        .from("menu_items_with_category")
+        .select("*")
+        .eq("restaurant_id", restaurantId);
+
+      if (error) throw error;
+      console.log(data);
+      set({
+        menuItems: data || [],
+        filteredMenuItems: data || [],
+        menuItemsLoaded: true,
+        originalMenuItems: data || [],
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.fire("Error", "Failed to fetch menu items.", "error");
+      set({
+        menuItems: [],
+        filteredMenuItems: [],
+        menuItemsLoaded: false,
+        originalMenuItems: [],
+      }); // 👈 fallback
+    } finally {
+      set({ loadingMenuItems: false });
+    }
+  },
 
   setBillPrinted: (value) => set({ bill_printed: value }),
 
@@ -274,9 +338,9 @@ const useMenuStore = create((set, get) => ({
   getOrders: async () => {
     try {
       const { data, error } = await supabase
-        .from("orders")
-        .select(`*, waiter(*), table(*)`)
-        .eq("status", "pending") // Fetch only pending orders
+        .from("waiter_orders_overview")
+        .select("*")
+        .or(`session_status.eq.open,session_status.eq.billed`) // Fetch open and billed orders
         .order("id", { ascending: true }); // Order by id in ascending order
       if (error) throw error;
       set({ orders: data, originalOrders: data, orderLoaded: true });
@@ -478,10 +542,19 @@ const useMenuStore = create((set, get) => ({
 
   // Set the selected table
   setChosenTable: async (table) => {
-    const { chosenTable, originalOrders, resetStepper } = get(); // Access the current chosen table, original orders, and resetStepper
+    const {
+      chosenTable,
+      originalOrders,
+      resetStepper,
+      filterActiveSessionByTableNumber,
+    } = get(); // Access the current chosen table, original orders, and resetStepper
+
+    set({ chosenTable: table.table_number });
+
+    filterActiveSessionByTableNumber(table.table_number);
 
     // Check if the table is already selected
-    if (chosenTable === table.table_no) {
+    if (chosenTable === table.table_number) {
       // Unselect the table and reset the state
       set({
         chosenTable: null,
@@ -500,7 +573,7 @@ const useMenuStore = create((set, get) => ({
 
     // If a new table is selected
     set({
-      chosenTable: table.table_no,
+      chosenTable: table.table_number,
       tableSelected: true,
       proceedToCheckOut: false,
     }); // Set the chosen table and reset checkout state
@@ -605,131 +678,117 @@ const useMenuStore = create((set, get) => ({
 
   // Function to add or update an order item
   addOrUpdateObject: async (orderItem) => {
-    const { orderItems, orderId, bill_printed, setBillPrinted } = get();
-    const isDrink = orderItem.type === "drink";
-
-    if (bill_printed === true) {
-      // Update locally in selectedTableOrders
-      const updatedOrders = orderItems.map((item) => ({
-        ...item,
-        orders: {
-          ...item.orders,
-          bill_printed: false,
+    const { data, error } = await supabase
+      .from("order_items")
+      .insert([
+        {
+          order_id: orderItem.id,
+          menu_item_id: orderItem.id,
+          quantity: 1,
+          price: orderItem.price,
+          type: orderItem.type,
         },
-      }));
-      set({ orderItems: updatedOrders });
-
-      // Update Supabase for all matching orders
-      const { error } = await supabase
-        .from("orders")
-        .update({ bill_printed: false })
-        .eq("id", orderId)
-        .select();
-      if (error) {
-        handleError(error); // Handle error if updating Supabase fails
-      }
-
-      setBillPrinted(false);
-    }
+      ])
+      .select();
 
     // Find existing item index in the selected table orders
-    const existingIndex = orderItems.findIndex((item) => {
-      return isDrink
-        ? item.drinks && item.drinks.id === Number(orderItem.id)
-        : item.menuItems && item.menuItems.id === Number(orderItem.id);
-    });
+    // const existingIndex = orderItems.findIndex((item) => {
+    //   return isDrink
+    //     ? item.drinks && item.drinks.id === Number(orderItem.id)
+    //     : item.menuItems && item.menuItems.id === Number(orderItem.id);
+    // });
 
-    if (existingIndex !== -1) {
-      // If the item already exists, update its quantity and total
-      const updatedItems = [...orderItems];
-      updatedItems[existingIndex].quantity += 1;
-      updatedItems[existingIndex].total =
-        updatedItems[existingIndex].quantity *
-        (isDrink
-          ? updatedItems[existingIndex].drinks.price
-          : updatedItems[existingIndex].menuItems.price);
+    // if (existingIndex !== -1) {
+    //   // If the item already exists, update its quantity and total
+    //   const updatedItems = [...orderItems];
+    //   updatedItems[existingIndex].quantity += 1;
+    //   updatedItems[existingIndex].total =
+    //     updatedItems[existingIndex].quantity *
+    //     (isDrink
+    //       ? updatedItems[existingIndex].drinks.price
+    //       : updatedItems[existingIndex].menuItems.price);
 
-      // Update state
-      const totalQuantity = updatedItems.reduce(
-        (acc, cur) => acc + cur.quantity,
-        0
-      );
-      const totalPrice = updatedItems.reduce((acc, cur) => acc + cur.total, 0);
+    //   // Update state
+    //   const totalQuantity = updatedItems.reduce(
+    //     (acc, cur) => acc + cur.quantity,
+    //     0
+    //   );
+    //   const totalPrice = updatedItems.reduce((acc, cur) => acc + cur.total, 0);
 
-      set({
-        orderItems: updatedItems,
-        totalOrdersQty: totalQuantity,
-        totalOrdersPrice: totalPrice.toFixed(2),
-      });
+    //   set({
+    //     orderItems: updatedItems,
+    //     totalOrdersQty: totalQuantity,
+    //     totalOrdersPrice: totalPrice.toFixed(2),
+    //   });
 
-      // Update Supabase
-      const { error } = await supabase
-        .from("ordersItems")
-        .update({
-          quantity: updatedItems[existingIndex].quantity,
-          total: updatedItems[existingIndex].total.toFixed(2),
-        })
-        .eq("id", updatedItems[existingIndex].id)
-        .select();
+    //   // Update Supabase
+    //   const { error } = await supabase
+    //     .from("ordersItems")
+    //     .update({
+    //       quantity: updatedItems[existingIndex].quantity,
+    //       total: updatedItems[existingIndex].total.toFixed(2),
+    //     })
+    //     .eq("id", updatedItems[existingIndex].id)
+    //     .select();
 
-      if (error) {
-        handleError(error);
-      }
-    } else {
-      // If the item does not exist, create a new one
-      const { data: lastItem, error: fetchError } = await supabase
-        .from("ordersItems")
-        .select("id")
-        .order("id", { ascending: false })
-        .limit(1)
-        .single();
+    //   if (error) {
+    //     handleError(error);
+    //   }
+    // } else {
+    //   // If the item does not exist, create a new one
+    //   const { data: lastItem, error: fetchError } = await supabase
+    //     .from("ordersItems")
+    //     .select("id")
+    //     .order("id", { ascending: false })
+    //     .limit(1)
+    //     .single();
 
-      if (fetchError) {
-        handleError(fetchError);
-        return;
-      }
+    //   if (fetchError) {
+    //     handleError(fetchError);
+    //     return;
+    //   }
 
-      const nextId = lastItem ? lastItem.id + 1 : 1;
+    //   const nextId = lastItem ? lastItem.id + 1 : 1;
 
-      const newItem = {
-        id: nextId,
-        created_at: new Date().toISOString(),
-        ...(isDrink ? { drinks: orderItem } : { menuItems: orderItem }),
-        order_no: orderId,
-        quantity: 1,
-        total: orderItem.price,
-        type: orderItem.type,
-      };
+    //   const newItem = {
+    //     id: nextId,
+    //     created_at: new Date().toISOString(),
+    //     ...(isDrink ? { drinks: orderItem } : { menuItems: orderItem }),
+    //     order_no: orderId,
+    //     quantity: 1,
+    //     total: orderItem.price,
+    //     type: orderItem.type,
+    //   };
 
-      const updatedItems = [...orderItems, newItem];
-      const totalQuantity = updatedItems.reduce(
-        (acc, cur) => acc + cur.quantity,
-        0
-      );
-      const totalPrice = updatedItems.reduce((acc, cur) => acc + cur.total, 0);
+    //   const updatedItems = [...orderItems, newItem];
+    //   const totalQuantity = updatedItems.reduce(
+    //     (acc, cur) => acc + cur.quantity,
+    //     0
+    //   );
+    //   const totalPrice = updatedItems.reduce((acc, cur) => acc + cur.total, 0);
 
-      set({
-        orderItems: updatedItems,
-        totalOrdersQty: totalQuantity,
-        totalOrdersPrice: totalPrice.toFixed(2),
-      });
+    //   set({
+    //     orderItems: updatedItems,
+    //     totalOrdersQty: totalQuantity,
+    //     totalOrdersPrice: totalPrice.toFixed(2),
+    //   });
 
-      // Add new item to Supabase
-      const { error } = await supabase
-        .from("ordersItems")
-        .insert({
-          ...(isDrink ? { drinks: orderItem.id } : { item: orderItem.id }), // Replace key names as per schema
-          order_no: orderId,
-          quantity: newItem.quantity,
-          total: newItem.total,
-          type: orderItem.type,
-        })
-        .select();
+    //   // Add new item to Supabase
+    //   const { error } = await supabase
+    //     .from("ordersItems")
+    //     .insert({
+    //       ...(isDrink ? { drinks: orderItem.id } : { item: orderItem.id }), // Replace key names as per schema
+    //       order_no: orderId,
+    //       quantity: newItem.quantity,
+    //       total: newItem.total,
+    //       type: orderItem.type,
+    //     })
+    //     .select();
 
-      if (error) {
-        handleError(error);
-      }
-    }
+    //   if (error) {
+    //     handleError(error);
+    //   }
+    // }
   },
 
   // Function to delete an order item
@@ -768,7 +827,7 @@ const useMenuStore = create((set, get) => ({
   },
 
   // Check if a table is selected
-  isSelectedTable: (table) => get().chosenTable === table.table_no,
+  isSelectedTable: (table) => get().chosenTable === table.table_number,
 
   // Function to get active session by restaurant
   getActiveSessionByRestaurant: async () => {
@@ -793,14 +852,54 @@ const useMenuStore = create((set, get) => ({
     } catch (error) {
       handleError(error);
     }
-    },
-  
+  },
+
+  // filter active session by table number
+  filterActiveSessionByTableNumber: async (tableNumber) => {
+    try {
+      let { data: waiter_orders_overview, error } = await supabase
+        .from("waiter_orders_overview")
+        .select("*")
+        .eq("table_number", tableNumber)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      console.log(waiter_orders_overview);
+
+      set({
+        chosenTableSession: waiter_orders_overview,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  },
+
   setSelectedCategory: (category) => {
-    set({ selectedCategory: category });
+    set({ selectedCategory: category.name });
+
+    get().filterMenuItemsByCategory();
   },
 
   // Check if a category is selected
-  isSelectedCategory: (category) => get().selectedCategory === category,
+  isSelectedCategory: (category) => get().selectedCategory === category.name,
+
+  // Function to filter menu items by category
+  filterMenuItemsByCategory: () => {
+    const { selectedCategory, menuItems } = get();
+
+    if (!selectedCategory) return;
+    set({
+      filteredMenuItems: menuItems.filter(
+        (item) =>
+          item.category_name?.toLowerCase() === selectedCategory.toLowerCase()
+      ),
+    });
+  },
+
+  setFilteredMenuItems: (menuItems) => {
+    set({ filteredMenuItems: menuItems });
+  },
 }));
 
 export default useMenuStore;

@@ -12,6 +12,8 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import useMenuItemsStore from "../lib/menuItemsStore";
+
 
 const CategoryItem = ({
   category,
@@ -19,6 +21,10 @@ const CategoryItem = ({
   handleDeleteCategory,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const {
+    setSelectedCategory,
+    isSelectedCategory,
+  } = useMenuItemsStore();
 
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -31,8 +37,8 @@ const CategoryItem = ({
   return (
     <ListItem disablePadding sx={{ py: 1 }}>
       <ListItemButton
-        // selected={selectedCategory === category.name}
-        // onClick={() => setSelectedCategory(category.name)}
+        selected={isSelectedCategory(category.name)}
+        onClick={() => setSelectedCategory(category.name)}
       >
         <ListItemText primary={category.name} />
       </ListItemButton>
@@ -42,11 +48,7 @@ const CategoryItem = ({
           <MoreVertIcon />
         </IconButton>
 
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
+        <Menu open={Boolean(anchorEl)} onClose={handleMenuClose}>
           <MenuItem
             onClick={() => {
               handleEditCategory(category.id);

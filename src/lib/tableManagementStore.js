@@ -6,6 +6,7 @@ import useMenuStore from './menuStore';
 import useRestaurantStore from './restaurantStore';
 import useAuthStore from './authStore';
 
+
 const useTableManagementStore = create((set, get) => ({
   open: false,
   openAvailable: false,
@@ -24,6 +25,11 @@ const useTableManagementStore = create((set, get) => ({
   totalQty: 0,
   totalPrice: 0,
   tableOverview: [],
+  snackbar: {
+    open: false,
+    message: "",
+    severity: "success",
+  },
 
   // Set assign employee
   setAssignEmployee: (employee) => set({ assignEmployee: employee }),
@@ -83,6 +89,7 @@ const useTableManagementStore = create((set, get) => ({
         )
         .order("table_number", { ascending: true });
 
+      // Filter tables by waiter
       if (employee.role === "waiter") {
         query = query.or(`assign.eq.${employee.id},status.eq.available`);
       }
@@ -227,20 +234,7 @@ const useTableManagementStore = create((set, get) => ({
 
   // Assign a table to a waiter
   handleStatusChange: async (table, status) => {
-    if (status === "available") {
-      const { data, error } = await supabase
-        .from("table_sessions")
-        .insert([
-          {
-            table_id: table.table_id,
-            waiter_id: useAuthStore.getState().user.user.id,
-            restaurant_id: useRestaurantStore.getState().selectedRestaurant.restaurants.id,
-          },
-        ])
-      .select();
-
-      if (error) throw error;
-
+    if (status === "reserve table") {
       const { error: tablesError } = await supabase
         .from("restaurant_tables")
         .update({ status: "reserved" })
@@ -252,11 +246,57 @@ const useTableManagementStore = create((set, get) => ({
 
       get().getTablesOverview();
       set({ openAvailable: false });
-      // Swal.fire({ showConfirmButton: false, icon: "success", timer: 2000 });
-    } else if (status === "available") {
-      
+
+      return { message: "reserved"};
     }
-    else if (status === "reserved") {
+    if (status === "cancel reservation") {
+      const { error: tablesError } = await supabase
+        .from("restaurant_tables")
+        .update({ status: "available" })
+        .eq("id", table.table_id)
+        .eq(
+          "restaurant_id",
+          useRestaurantStore.getState().selectedRestaurant.restaurants.id
+        )
+        .select();
+
+      if (tablesError) throw tablesError;
+
+      get().getTablesOverview();
+      set({ openAvailable: false });
+
+      return { message: "cancelled"};
+    }
+    if (status === "start ordering") {
+      const { data: session, error: sessionError } = await supabase
+        .from("table_sessions")
+        .insert([{
+          table_id: table.table_id,
+          restaurant_id: useRestaurantStore.getState().selectedRestaurant.restaurants.id,
+          waiter_id: useAuthStore.getState().user.user.id,
+          opened_at: new Date(),
+          status: "open"
+        }])
+        .select();
+      
+      if (sessionError) throw sessionError;
+
+      console.log(session);
+
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .insert([{
+          restaurant_id: useRestaurantStore.getState().selectedRestaurant.restaurants.id,
+          total: 0,
+          session_id: session[0].id,
+          status: "pending"
+        }])
+        .select();
+          
+
+      if (orderError) throw orderError;
+
       const { error: tablesError } = await supabase
         .from("restaurant_tables")
         .update({ status: "occupied" })
@@ -269,7 +309,16 @@ const useTableManagementStore = create((set, get) => ({
 
       if (tablesError) throw tablesError;
 
+      useMenuStore.getState().setChosenTable(table);
+
       get().getTablesOverview();
+
+      return { message: "ordering"};
+    }
+    if (status === "view order") { 
+      set({ open: true });
+
+      return { message: "viewing"};
     }
   },
 
@@ -376,7 +425,7 @@ const useTableManagementStore = create((set, get) => ({
 
   // Close modals
   handleClose: () => {
-    set({ open: false, itemsLoading: true });
+    set({ open: false });
   },
 
   // Close available modal
@@ -408,6 +457,11 @@ const useTableManagementStore = create((set, get) => ({
   // Set tables
   setTables: (tables) => {
     set({ tables });
+  },
+
+  // Set snackbar
+  setSnackbar: (snackbar) => {
+    set({ snackbar });
   },
 }));
 

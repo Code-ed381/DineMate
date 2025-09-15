@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   TableContainer,
   Paper,
   CardMedia,
   CardActions,
-  Table, TableHead, TableRow, TableCell, TableBody, TableFooter, Alert, AlertTitle, OutlinedInput, InputLabel, FormControl, ToggleButton, ToggleButtonGroup, TextField, Stepper, Step, StepLabel, Typography, Stack, Box, InputAdornment, IconButton, Card, CardContent, CardActionArea, Button, CircularProgress, LinearProgress
+  CardHeader,
+  Table,
+  TableHead,
+  Grid,
+  TableRow, TableCell, TableBody, TableFooter, Alert, AlertTitle, OutlinedInput, InputLabel, FormControl, ToggleButton, ToggleButtonGroup, TextField, Stepper, Step, StepLabel, Typography, Stack, Box, InputAdornment, IconButton, Card, CardContent, CardActionArea, Button, CircularProgress, LinearProgress
 } from '@mui/material';
 import { Search as SearchIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import useMenuStore from  "../lib/menuStore";
@@ -17,33 +22,23 @@ import CreditScoreIcon from '@mui/icons-material/CreditScore';
 import CurrencyPoundIcon from '@mui/icons-material/CurrencyPound';
 import { printBillOnly, printForKitchen } from "../components/PrintWindow";
 import { format } from 'date-fns';
-import useMenuItemsStore from "../lib/menuItemsStore";
+import useAuthStore from "../lib/authStore";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
+import TableRestaurantIcon from "@mui/icons-material/TableRestaurant";
 
 
 const Menu = () => {
+  const navigate = useNavigate();
   const {
     assignedTables,
-    getAssigendTables,
     chosenTable,
     setChosenTable,
     isSelectedTable,
     assignedTablesLoaded,
     tableSelected,
-    drinks,
-    getDrinks,
-    meals,
     orders,
-    getMeals,
-    mealsColor,
-    mealsBackgroundColor,
     orderTime,
-    filterMealsByCategory,
-    filterDrinksByCategory,
-    drinksColor,
-    drinksBackgroundColor,
     searchMeals,
-    searchDrinks,
-    getOrders,
     totalOrdersPrice,
     totalOrdersQty,
     orderItems,
@@ -68,22 +63,28 @@ const Menu = () => {
     getActiveSessionByRestaurant,
     setSelectedCategory,
     selectedCategory,
-  } = useMenuStore();
-
-  const {
+    filterMenuItemsByCategory,
+    menuItems,
+    menuItemsLoaded,
+    loadingMenuItems,
     categories,
     fetchCategories,
     loadingCategories,
-    menuItems,
+    filteredMenuItems,
     fetchMenuItems,
-    loadingMenuItems,
-  } = useMenuItemsStore();
+    isSelectedCategory,
+    setFilteredMenuItems,
+    chosenTableSession,
+  } = useMenuStore();
+
+  const { user } = useAuthStore();
 
   useEffect(() => {
     const controller = new AbortController();
     getActiveSessionByRestaurant();
     fetchCategories();
     fetchMenuItems();
+    console.log(user)
     return () => {
       controller.abort();
     };
@@ -97,9 +98,12 @@ const Menu = () => {
     }
   };
 
+  // Format date and time
   function formatDateTime(isoString) {
+    if (!isoString) return "N/A"; // or return an empty string if you prefer
     const date = new Date(isoString);
-    return format(date, "EEE dd MMM yy, hh:mm a").toUpperCase();;
+    if (isNaN(date)) return "Invalid date";
+    return format(date, "EEE dd MMM yy, hh:mm a").toUpperCase();
   }
 
   // Define the content for each step
@@ -108,87 +112,117 @@ const Menu = () => {
       case 0:
         return (
           <>
-            <TableContainer component={Paper} sx={{ mt: 2, borderRadius: 2, boxShadow: 3 }}>
+            <TableContainer
+              component={Paper}
+              sx={{ mt: 2, borderRadius: 2, boxShadow: 3 }}
+            >
               <Table>
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: '#fff' }}>
-                    <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>#</TableCell>
-                    <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Product</TableCell>
-                    <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Price</TableCell>
-                    <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Qty</TableCell>
-                    <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Amount</TableCell>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: "bold" }}>#</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Product</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Price</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Qty</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
                   </TableRow>
                 </TableHead>
 
-                {orderItemsLoaded ? (
-                  <TableBody>
-                    {orderItems?.map((item, index) => {
-                      const isMenuItem = Boolean(item?.menuItems);
-                      const productName = isMenuItem
-                        ? `${item.menuItems.item_name?.toUpperCase()} ${item.menuItems.description?.toUpperCase()}`
-                        : item?.drinks?.name?.toUpperCase();
+                {assignedTablesLoaded ? (
+                  <>
+                    {assignedTables?.order_items?.length > 0 ? (
+                      <TableBody>
+                        {assignedTables?.order_items?.map((item, index) => {
+                          const isMenuItem = Boolean(item?.menuItems);
+                          const productName = isMenuItem
+                            ? `${item.menuItems.item_name?.toUpperCase()} ${item.menuItems.description?.toUpperCase()}`
+                            : item?.drinks?.name?.toUpperCase();
 
-                      const price = isMenuItem
-                        ? item.menuItems.price
-                        : item?.drinks?.price;
+                          const price = isMenuItem
+                            ? item.menuItems.price
+                            : item?.drinks?.price;
 
-                      const amount = isMenuItem
-                        ? item.menuItems.price * item.quantity
-                        : item.total;
+                          const amount = isMenuItem
+                            ? item.menuItems.price * item.quantity
+                            : item.total;
 
-                      return (
-                        <TableRow key={index}>
-                          <TableCell>
-                            {!item?.orders?.printed && (
-                              <IconButton onClick={() => handleRemoveItem(item)} color="error" size="small">
-                                <CancelIcon fontSize="small" />
-                              </IconButton>
-                            )}
+                          return (
+                            <TableRow key={index}>
+                              <TableCell>
+                                {!item?.orders?.printed && (
+                                  <IconButton
+                                    onClick={() => handleRemoveItem(item)}
+                                    color="error"
+                                    size="small"
+                                  >
+                                    <CancelIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </TableCell>
+                              <TableCell>{productName}</TableCell>
+                              <TableCell>{price?.toFixed(2)}</TableCell>
+                              <TableCell>{item.quantity}</TableCell>
+                              <TableCell>{amount?.toFixed(2)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    ) : (
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={5} align="center">
+                            <Typography variant="subtitle1" fontWeight="bold">
+                              No items in order
+                            </Typography>
                           </TableCell>
-                          <TableCell>{productName}</TableCell>
-                          <TableCell>{price?.toFixed(2)}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{amount?.toFixed(2)}</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
+                      </TableBody>
+                    )}
+                  </>
                 ) : (
                   <TableBody>
                     <TableRow>
                       <TableCell colSpan={5} align="center">
-                        <LinearProgress sx={{ width: '100%' }} />
+                        <LinearProgress sx={{ width: "100%" }} />
                       </TableCell>
                     </TableRow>
                   </TableBody>
                 )}
 
                 <TableFooter>
-                  <TableRow sx={{ backgroundColor: 'grey.100' }}>
+                  <TableRow>
                     <TableCell colSpan={3}>
-                      <Typography variant="subtitle1" fontWeight="bold">Total</Typography>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Total
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="subtitle1" fontWeight="bold">{totalOrdersQty}</Typography>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {totalOrdersQty}
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="subtitle1" fontWeight="bold">{totalOrdersPrice}</Typography>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {totalOrdersPrice}
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
             </TableContainer>
 
-            <Stack direction="row" spacing={4} mt={4} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="title">
-                  ORDER NO. {orders[0]?.id}
-                </Typography>
-                <Typography variant="title">
-                  {waiterName}
-                </Typography>
-                <Typography variant="body1">
-                  {formatDateTime(orderTime)}
-                </Typography>
+            <Stack
+              direction="row"
+              spacing={4}
+              mt={4}
+              sx={{ alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Typography variant="title">
+                ORDER NO. {chosenTableSession?.order_id}
+              </Typography>
+              {/* <Typography variant="title">{user?.user?.user_metadata?.firstName}</Typography> */}
+              <Typography variant="body1">
+                {formatDateTime(chosenTableSession?.opened_at)}
+              </Typography>
             </Stack>
           </>
         );
@@ -233,207 +267,225 @@ const Menu = () => {
     }
   };
 
-  const handleCategoryClick = (category) => {
-    setSelectedCategory(category);
+  const handleCategoryClick = async (category) => {
+    await setSelectedCategory(category);
+
+    if (category.name === selectedCategory) {
+      setFilteredMenuItems(menuItems);
+
+      setSelectedCategory('');
+    } else {
+      filterMenuItemsByCategory(category);
+    }
   };
   
   return (
-    <>
+    <Box m={2}>
       {assignedTables.length === 0 ? (
-        <Box
-          display="flex"
-          justifyContent="center"
-          mb={1}
-          sx={{ backgroundColor: "#fff", padding: 2, borderRadius: 2 }}
-        >
-          <Alert
-            severity="info"
-            variant="filled"
-            fullWidth
-            sx={{ width: "100%" }}
+        <Box sx={{ textAlign: "center", mt: 20 }}>
+          <TableRestaurantIcon
+            sx={{ fontSize: 150, color: "text.disabled", mb: 2 }}
+          />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No tables assigned to you
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Go to tables section to book tables
+          </Typography>
+          <Button
+            variant="contained"
+            color="info"
+            onClick={() => navigate("/app/tables")}
           >
-            <AlertTitle>NO TABLES ASSIGNED TO YOU</AlertTitle>
-            GO TO TABLE SECTION TO SELECT A TABLE
-          </Alert>
+            Book Tables
+          </Button>
         </Box>
       ) : (
         <div className="row">
-            <div className="col-8">
-              <Card>
-                <Box
-                  display="flex"
-                  justifyContent="center"
-                  mb={1}
-                  sx={{ padding: 2 }}
-                >
-              <>
-                {assignedTablesLoaded === false ? (
-                  <>
-                    <CircularProgress />
-                  </>
-                ) : (
-                  <>
-                    {assignedTables.map((table, i) => (
-                      <Button
-                        variant={
-                          isSelectedTable(table) ? "contained" : "outlined"
-                        }
-                        key={i}
-                        sx={{ padding: 4, marginRight: 1 }}
-                        onClick={() => setChosenTable(table)} // Update selected table
-                      >
-                        Table {table.table_number}
-                      </Button>
-                    ))}
-                  </>
-                )}
-              </>
-            </Box>
-          </Card>
-
-            {tableSelected === true && menuItems.length > 0 && (
-              <TextField
-                sx={{ borderColor: "#fff", mt: 2 }}
-                onChange={(e) => searchMeals(e.target.value)}
-                value={searchMealValue}
-                fullWidth
-                size="small"
-                label="Type keyword to search for item..."
-                id="search-field-meals"
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            )}
-
-
-              {loadingMenuItems === true ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 2,
-                    borderRadius: 2,
-                    mt: 2,
-                    p: 2,
-                  }}
-                >
-                  <LinearProgress />
-                </Box>
-              ) : (
+          <div className="col-8">
+            <Card>
+              <Box
+                display="flex"
+                justifyContent="center"
+                mb={1}
+                sx={{ padding: 2 }}
+              >
                 <>
-                  {tableSelected === true ? (
+                  {assignedTablesLoaded === false ? (
                     <>
-                      {categories?.length > 0 && (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 2,
-                            borderRadius: 2,
-                            mt: 2,
-                            p: 2,
-                          }}
-                        >
-                          {categories.map((category, i) => (
-                            <Button
-                              variant="outlined"
-                              key={i}
-                              sx={{ padding: 2, marginRight: 1 }}
-                              onClick={() => handleCategoryClick(category)}
-                            >
-                              {category.name}
-                            </Button>
-                          ))}
-                        </Box>
-                      )}
+                      <CircularProgress />
                     </>
                   ) : (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 2,
-                        borderRadius: 2,
-                        mt: 2,
-                        p: 2,
-                      }}
-                    >
-                      <Alert severity="info" variant="outlined" sx={{ width: "100%", textTransform: "uppercase" }}>Select a table to view menu items</Alert>
-                    </Box>
+                    <>
+                      {assignedTables.map((table, i) => (
+                        <Button
+                          variant={
+                            isSelectedTable(table) ? "contained" : "outlined"
+                          }
+                          key={i}
+                          sx={{ padding: 4, marginRight: 1 }}
+                          onClick={() => setChosenTable(table)} // Update selected table
+                        >
+                          Table {table.table_number}
+                        </Button>
+                      ))}
+                    </>
                   )}
                 </>
-              )}
+              </Box>
+            </Card>
+
+            {tableSelected === true && menuItems.length > 0 && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  mt: 4,
+                }}
+              >
+                {/* Top Row: Search */}
+                <TextField
+                  onChange={(e) => searchMeals(e.target.value)}
+                  value={searchMealValue}
+                  fullWidth
+                  size="small"
+                  label="Search for menu items... e.g. pasta"
+                  id="search-field-meals"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+
+                {/* Categories Row: Scrollable */}
+                {categories?.length > 0 && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      overflowX: "auto",
+                      gap: 1,
+                      pb: 1, // little padding for smooth scroll
+                      "&::-webkit-scrollbar": {
+                        display: "none", // hide scrollbar
+                      },
+                    }}
+                  >
+                    {categories.map((category, i) => (
+                      <Button
+                        key={i}
+                        variant={
+                          category.name === selectedCategory
+                            ? "contained"
+                            : "outlined"
+                        }
+                        onClick={() => handleCategoryClick(category)}
+                        sx={{
+                          flexShrink: 0, // prevents button from shrinking in scroll
+                        }}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
 
             {tableSelected === true && (
-              <Box
-                mt={2}
-                sx={{ backgroundColor: "#fff", padding: 2, borderRadius: 2 }}
-              >
-                <div class="row" style={{ width: "100%" }}>
-                  {menuItems?.length === 0 ? (
-                    <div class="col-12">
-                      <Alert
-                        severity="info"
-                        variant="filled"
-                        sx={{ width: "100%" }}
-                      >
-                        <AlertTitle variant="button">
-                          No Menu Item(s) Found
-                        </AlertTitle>
-                      </Alert>
-                    </div>
-                  ) : loadingMenuItems === true ? (
+              <Box mt={2} sx={{ width: "100%" }}>
+                {filteredMenuItems?.length === 0 ? (
+                  <Grid container>
+                    <Grid item xs={12}>
+                      <Box sx={{ textAlign: "center", mt: 20 }}>
+                        <MenuBookIcon
+                          sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                        />
+                        <Typography
+                          variant="h6"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          No menu items found
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 3 }}
+                        >
+                          Contact your restaurant owner/admin to add menu items
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                ) : loadingMenuItems === true ? (
+                  <Box sx={{ textAlign: "center", mt: 10 }}>
                     <CircularProgress />
-                  ) : (
-                    <>
-                      {menuItems?.map((item, i) => (
-                        <div class="col-3 mb-3" key={i}>
-                          <Card sx={{ maxWidth: 345 }}>
-                            <CardActionArea>
-                              <CardMedia
-                                component="img"
-                                height="140"
-                                image={item.image_url}
-                                alt={item.name}
-                              />
-                              <CardContent>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {filteredMenuItems?.map((item, i) => (
+                      <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+                        <Card sx={{ height: "100%" }}>
+                          <CardActionArea onClick={() => addOrUpdateObject(item)}>
+                            <CardMedia
+                              component="img"
+                              height="140"
+                              image={item.image_url}
+                              alt={item.name}
+                            />
+                            <CardContent>
+                              {/* Name + Price in one row */}
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
                                 <Typography
                                   gutterBottom
                                   variant="button"
                                   component="div"
+                                  sx={{
+                                    flex: 1,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    pr: 2, // some padding so text doesn't touch price
+                                  }}
                                 >
                                   {item.name}
                                 </Typography>
+
                                 <Typography
-                                  variant="body2"
-                                  sx={{ color: "text.secondary" }}
+                                  variant="body1"
+                                  fontWeight={900}
+                                  sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
                                 >
-                                  {item.description}
+                                  $ {item.price}
                                 </Typography>
-                              </CardContent>
-                            </CardActionArea>
-                            <CardActions sx={{ float: "right" }}>
+                              </Box>
+
+                              {/* Description below */}
                               <Typography
-                                variant="body1"
-                                fontWeight={900}
-                                sx={{ pr: 2 }}
+                                variant="body2"
+                                sx={{ color: "text.secondary", mt: 1 }}
                               >
-                                {item.price}
+                                {item.description}
                               </Typography>
-                            </CardActions>
-                          </Card>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
+                            </CardContent>
+                          </CardActionArea>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
               </Box>
             )}
           </div>
@@ -441,163 +493,144 @@ const Menu = () => {
           {!noTablesFound && (
             <div className="col-4">
               {tableSelected ? (
-                <div class="card">
-                  <div class="card-header">
-                    {totalOrdersPrice > 0 && (
-                      <Stack direction="row" spacing={1}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          disabled={proceedToCheckOut === true}
-                          sx={{ padding: 2 }}
-                          size="large"
-                          startIcon={<SoupKitchenIcon />}
-                          onClick={() =>
-                            printForKitchen(
-                              orderId,
-                              waiterName,
-                              chosenTable,
-                              orderItems
-                            )
-                          }
-                        >
-                          Print For Kitchen
-                        </Button>
+                <Card
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  {/* Header actions */}
+                  {totalOrdersPrice === 0 && (
+                    <CardHeader
+                      title={
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            disabled={proceedToCheckOut === true}
+                            sx={{ padding: 2 }}
+                            size="large"
+                            startIcon={<SoupKitchenIcon />}
+                            onClick={() =>
+                              printForKitchen(
+                                orderId,
+                                waiterName,
+                                chosenTable,
+                                orderItems
+                              )
+                            }
+                          >
+                            Print For Kitchen
+                          </Button>
 
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          sx={{ padding: 2 }}
-                          size="large"
-                          disabled={proceedToCheckOut === true}
-                          startIcon={<ReceiptLongIcon />}
-                          onClick={() =>
-                            printBillOnly(
-                              orderId,
-                              waiterName,
-                              chosenTable,
-                              totalOrdersQty,
-                              totalOrdersPrice,
-                              orderItems
-                            )
-                          }
-                        >
-                          Print Bill Only
-                        </Button>
-                      </Stack>
-                    )}
-                  </div>
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            sx={{ padding: 2 }}
+                            size="large"
+                            disabled={proceedToCheckOut === true}
+                            startIcon={<ReceiptLongIcon />}
+                            onClick={() =>
+                              printBillOnly(
+                                orderId,
+                                waiterName,
+                                chosenTable,
+                                totalOrdersQty,
+                                totalOrdersPrice,
+                                orderItems
+                              )
+                            }
+                          >
+                            Print Bill Only
+                          </Button>
+                        </Stack>
+                      }
+                    />
+                  )}
 
-                  <div class="card-body">
+                  {/* Body */}
+                  <CardContent sx={{ flexGrow: 1 }}>
                     <Box sx={{ width: "100%" }}>
                       <Stepper activeStep={activeStep}>
-                        {steps.map((label, index) => (
+                        {steps.map((label) => (
                           <Step key={label}>
                             <StepLabel>{label}</StepLabel>
                           </Step>
                         ))}
                       </Stepper>
+
                       {activeStep === steps.length ? (
-                        <React.Fragment>
-                          <Typography sx={{ mt: 2, mb: 1 }}>
-                            All steps completed - you&apos;re finished
-                          </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "row",
-                              pt: 2,
-                            }}
-                          >
-                            <Box sx={{ flex: "1 1 auto" }} />
-                            {/* <Button onClick={handleReset}>Reset</Button> */}
-                          </Box>
-                        </React.Fragment>
+                        <Typography sx={{ mt: 2, mb: 1 }}>
+                          All steps completed - you&apos;re finished
+                        </Typography>
                       ) : (
-                        <React.Fragment>
-                          <Box sx={{ mt: 2 }}>{getStepContent(activeStep)}</Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "row",
-                              pt: 2,
-                            }}
-                          >
-                            <Box sx={{ flex: "1 1 auto" }} />
-                          </Box>
-                        </React.Fragment>
+                        <Box sx={{ mt: 2 }}>{getStepContent(activeStep)}</Box>
                       )}
                     </Box>
-                  </div>
+                  </CardContent>
 
-                  <div class="card-footer text-body-secondary">
-                    {totalOrdersPrice > 0 && (
-                      <>
-                        {proceedToCheckOut ? (
-                          <Stack direction="row" spacing={1}>
-                            <Button
-                              fullWidth
-                              variant="contained"
-                              sx={{ padding: 2 }}
-                              size="large"
-                              color="warning"
-                              startIcon={<KeyboardBackspaceIcon />}
-                              onClick={handleBack}
-                            >
-                              Back
-                            </Button>
+                  {/* Footer */}
+                  {totalOrdersPrice > 0 && (
+                    <CardActions sx={{ flexDirection: "column", gap: 1 }}>
+                      {proceedToCheckOut ? (
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{ width: "100%" }}
+                        >
+                          <Button
+                            fullWidth
+                            variant="contained"
+                            sx={{ padding: 2 }}
+                            size="large"
+                            color="warning"
+                            startIcon={<KeyboardBackspaceIcon />}
+                            onClick={handleBack}
+                          >
+                            Back
+                          </Button>
 
-                            <Button
-                              fullWidth
-                              variant="contained"
-                              sx={{ padding: 2 }}
-                              size="large"
-                              color="success"
-                              endIcon={<PriceCheckIcon />}
-                              onClick={handleNext}
-                            >
-                              Confirm Payment
-                            </Button>
-                          </Stack>
-                        ) : (
                           <Button
                             fullWidth
                             variant="contained"
                             sx={{ padding: 2 }}
                             size="large"
                             color="success"
-                            disabled={bill_printed ? false : true}
-                            endIcon={<ShoppingCartCheckoutIcon />}
+                            endIcon={<PriceCheckIcon />}
                             onClick={handleNext}
                           >
-                            Proceed To CheckOut
+                            Confirm Payment
                           </Button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+                        </Stack>
+                      ) : (
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          sx={{ padding: 2 }}
+                          size="large"
+                          color="success"
+                          disabled={!bill_printed}
+                          endIcon={<ShoppingCartCheckoutIcon />}
+                          onClick={handleNext}
+                        >
+                          Proceed To CheckOut
+                        </Button>
+                      )}
+                    </CardActions>
+                  )}
+                </Card>
               ) : (
-                <Box
-                  display="flex"
-                  justifyContent="center"
-                  mb={1}
-                  sx={{ backgroundColor: "#fff", padding: 2, borderRadius: 2 }}
-                >
-                  <Alert
-                    severity="info"
-                    variant="filled"
-                    sx={{ width: "100%" }}
-                  >
-                    <h6>SELECT A TABLE TO OPEN RECEIPT</h6>
-                  </Alert>
-                </Box>
+                <Alert severity="info" sx={{ width: "100%" }}>
+                  <Typography variant="h6">
+                    SELECT A TABLE TO OPEN RECEIPT
+                  </Typography>
+                </Alert>
               )}
             </div>
           )}
         </div>
       )}
-    </>
+    </Box>
   );
 }
 

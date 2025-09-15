@@ -23,6 +23,22 @@ const useMenuItemsStore = create((set, get) => ({
   menuItems: [],
   filteredMenuItems: [],
   loadingMenuItems: true,
+  selectedCategory: "",
+
+  setSelectedCategory: (category) => {
+    set({ selectedCategory: category });
+    
+    get().filterMenuItemsByCategory();
+  },
+
+  isSelectedCategory: (category) => get().selectedCategory === category?.toLowerCase(),
+
+  filterMenuItemsByCategory: () => {
+    const { selectedCategory, menuItems } = get();
+
+    if (!selectedCategory) return;
+    set({ filteredMenuItems: menuItems.filter((item) => item.category_name?.toLowerCase() === selectedCategory.toLowerCase()) });
+  },
 
   // Fetch categories
   fetchCategories: async () => {

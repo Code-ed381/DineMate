@@ -13,10 +13,12 @@ import {
   Divider,
   List,
   Tooltip,
+  Skeleton,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
 import MenuBook from "@mui/icons-material/MenuBook";
 import Swal from "sweetalert2";
@@ -28,8 +30,18 @@ import AdminHeader from "../../components/admin-header";
 import useAppStore from "../../lib/appstore";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
+import Avatar from "@mui/material/Avatar";
 
 const columns = [
+  {
+    field: "image_url",
+    headerName: "Image",
+    width: 90,  
+    sortable: false,
+    renderCell: (params) => (
+      <Avatar alt={params.row.name} src={params.row.image_url} />
+    ),
+  },
   {
     field: "name",
     headerName: "Item",
@@ -126,8 +138,16 @@ const columns = [
 
 export default function MenuItemsManagement() {
   const [search, setSearch] = useState("");
-  const { categories, fetchCategories, fetchMenuItems, menuItems } =
-    useMenuItemsStore();
+  const {
+    categories,
+    fetchCategories,
+    fetchMenuItems,
+    menuItems,
+    setSelectedCategory,
+    selectedCategory,
+    filteredMenuItems,
+    loadingMenuItems,
+  } = useMenuItemsStore();
   const { selectedRestaurant } = useRestaurantStore();
   const { viewMode } = useAppStore();
 
@@ -322,6 +342,12 @@ export default function MenuItemsManagement() {
           icon: "success",
           title: "Item Added",
           text: `${newItem.name} has been created.`,
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+          allowOutsideClick: false,
+        }).then(() => {
+          fetchMenuItems();
         });
       }
     });
@@ -427,13 +453,7 @@ export default function MenuItemsManagement() {
       {/* Main Content */}
       <Box sx={{ display: "flex", height: "100vh" }}>
         {/* Sidebar for Categories */}
-        <Box
-          sx={((theme)=>({
-            width: 300,
-            borderRight: "1px solid #eee",
-            p: 2,
-          }))}
-        >
+        <Box sx={{ flex: "0 0 18%", borderRight: "1px solid #eee", p: 2 }}>
           <Box
             sx={{
               display: "flex",
@@ -480,10 +500,18 @@ export default function MenuItemsManagement() {
           <Box
             sx={{
               display: "flex",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
+              alignItems: "center",
               mb: 2,
             }}
           >
+            {selectedCategory && (
+              <IconButton size="small" sx={{ mr: 2 }} color="error" onClick={() => {setSelectedCategory(""); fetchMenuItems();}} >
+                <Typography variant="body2" sx={{ textTransform: "capitalize", mr: 1, fontWeight: "medium" }}>{selectedCategory}</Typography>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            )}
+
             <TextField
               size="small"
               placeholder="Search items..."
@@ -503,9 +531,9 @@ export default function MenuItemsManagement() {
           {/* Grid View */}
           {viewMode === "card" && (
             <Grid container spacing={3}>
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <Grid item xs={12} sm={6} md={3} key={item.id}>
-                  <Card
+                  {loadingMenuItems ? (<Skeleton variant="rectangular" width={300} height={400} />) : (<Card
                     sx={{
                       borderRadius: 3,
                       boxShadow: 3,
@@ -564,16 +592,26 @@ export default function MenuItemsManagement() {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          gap: 1,
                         }}
                       >
                         <Chip
                           size="small"
+                          sx={{
+                            flexGrow: 1,
+                            maxWidth: "50%",
+                            textAlign: "center",
+                          }}
                           label={item.category_name}
                           color="primary"
                         />
                         <Chip
                           size="small"
-                          sx={{ my: 1 }}
+                          sx={{
+                            flexGrow: 1,
+                            maxWidth: "50%",
+                            textAlign: "center",
+                          }}
                           label={item.available ? "Available" : "Out of Stock"}
                           color={item.available ? "success" : "error"}
                         />
@@ -631,7 +669,7 @@ export default function MenuItemsManagement() {
                         </Button>
                       </Box>
                     </CardContent>
-                  </Card>
+                  </Card>)}
                 </Grid>
               ))}
             </Grid>

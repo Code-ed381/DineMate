@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import ListSubheader from "@mui/material/ListSubheader";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import TableRestaurantIcon from "@mui/icons-material/TableRestaurant";
@@ -15,7 +14,6 @@ import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import useRestaurantStore from "../../lib/restaurantStore";
 import LocalBarIcon from "@mui/icons-material/LocalBar";
 import SettingsIcon from "@mui/icons-material/Settings";
-import TooltipComponent from "../../components/tooltip";
 
 export const MainListItems = () => {
   const { selectedRestaurant } = useRestaurantStore();

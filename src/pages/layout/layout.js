@@ -400,7 +400,7 @@ const Layout = () => {
             <Box sx={{ minHeight: "90vh", padding: "20px", flexGrow: 1 }}>
               <Outlet />
             </Box>
-            <Copyright sx={{ pt: 4 }} />
+            {/* <Copyright sx={{ pt: 4 }} /> */}
           </Box>
         </Box>
       )}

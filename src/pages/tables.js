@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Card,
@@ -26,9 +27,9 @@ import {
   Snackbar,
   Paper,
   Avatar,
+  Slide
 } from "@mui/material";
 import {
-  Add,
   Search,
   MoreVert,
   Edit,
@@ -42,9 +43,11 @@ import {
   LockClock,
   EventSeat,
   LocalDining,
+
 } from "@mui/icons-material";
-import useRestaurantStore from "../lib/restaurantStore";
 import useTableManagementStore from "../lib/tableManagementStore";
+import useMenuStore from "../lib/menuStore";
+import TransitionsModal from "../components/modal";
 
 const statusColors = {
   available: { color: "success", icon: CheckCircle, main: "success.main" },
@@ -70,13 +73,9 @@ export default function TableManagement() {
   const [editingTable, setEditingTable] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTable, setSelectedTable] = useState(null);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: "",
-    severity: "success",
-  });
-  const { selectedRestaurant, setSelectedRestaurant } = useRestaurantStore();
-  const { getTablesOverview, tables, setTables, handleStatusChange } = useTableManagementStore();
+  const { getTablesOverview, tables, setTables, handleStatusChange, setSnackbar, snackbar, open, handleClose } = useTableManagementStore();
+  const { chosenTable, setChosenTable, tableSelected } = useMenuStore();
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     number: "",
@@ -251,6 +250,36 @@ export default function TableManagement() {
     setCapacityFilter(newCapacity);
   };
 
+  const handleTableActionButtonClick = async (table, action) => { 
+    const result = await handleStatusChange(table, action);
+
+    if (result.message === "reserved") { 
+      setSnackbar({
+        open: true,
+        message: "Table reserved successfully",
+        severity: "success",
+      });
+    }
+
+    if (result.message === "cancelled") { 
+      setSnackbar({
+        open: true,
+        message: "Table cancelled successfully",
+        severity: "success",
+      });
+    }
+
+    if (result.message === "ordering") { 
+      setSnackbar({
+        open: true,
+        message: "Table ordered successfully",
+        severity: "success",
+      });
+
+      navigate("/app/menu");
+    }
+  }
+
   return (
     <Box sx={{ p: 2 }}>
       {/* Header */}
@@ -271,8 +300,6 @@ export default function TableManagement() {
                 p: 2,
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 3,
-                border: "1px solid #ddd",
               }}
             >
               <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}>
@@ -292,8 +319,6 @@ export default function TableManagement() {
                 p: 2,
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 3,
-                border: "1px solid #ddd",
               }}
             >
               <Avatar sx={{ bgcolor: "success.main", mr: 2 }}>
@@ -313,8 +338,6 @@ export default function TableManagement() {
                 p: 2,
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 3,
-                border: "1px solid #ddd",
               }}
             >
               <Avatar sx={{ bgcolor: "error.main", mr: 2 }}>
@@ -334,8 +357,6 @@ export default function TableManagement() {
                 p: 2,
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 3,
-                border: "1px solid #ddd",
               }}
             >
               <Avatar sx={{ bgcolor: "warning.main", mr: 2 }}>
@@ -353,66 +374,62 @@ export default function TableManagement() {
       </Box>
 
       {/* Search and Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-            justifyContent="space-between"
+      <Grid
+        container
+        spacing={2}
+        mb={4}
+        alignItems="center"
+        justifyContent="space-between"
+      >
+        {/* Filters on the right */}
+        <Grid item xs={12} md="auto">
+          <ToggleButtonGroup
+            exclusive
+            size="large"
+            value={statusFilter}
+            onChange={(_, value) =>
+              value &&
+              (value === "all"
+                ? setStatusFilter("all")
+                : handleStatusFilterChange(value))
+            }
+            sx={{
+              "& .MuiToggleButton-root": {
+                px: 3,
+                py: 1,
+                fontWeight: 600,
+                borderRadius: 2,
+                textTransform: "capitalize",
+              },
+            }}
           >
-            {/* Search + Clear */}
-            <Grid item xs={12} md={6} sx={{ display: "flex", gap: 1 }}>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search tables..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
-            </Grid>
+            <ToggleButton value="all">All</ToggleButton>
+            <ToggleButton value="available">Available</ToggleButton>
+            <ToggleButton value="occupied">Occupied</ToggleButton>
+            <ToggleButton value="reserved">Reserved</ToggleButton>
+          </ToggleButtonGroup>
+        </Grid>
 
-            {/* Filters on the right */}
-            <Grid item xs={12} md="auto">
-              <ToggleButtonGroup
-                exclusive
-                size="large"
-                value={statusFilter}
-                onChange={(_, value) =>
-                  value &&
-                  (value === "all"
-                    ? setStatusFilter("all")
-                    : handleStatusFilterChange(value))
-                }
-                sx={{
-                  "& .MuiToggleButton-root": {
-                    px: 3,
-                    py: 1,
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    border: "1px solid #ddd",
-                    textTransform: "capitalize",
-                  },
-                }}
-              >
-                <ToggleButton value="all">All</ToggleButton>
-                <ToggleButton value="available">Available</ToggleButton>
-                <ToggleButton value="occupied">Occupied</ToggleButton>
-                <ToggleButton value="reserved">Reserved</ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+        {/* Search + Clear */}
+        <Grid item xs={12} md={6} sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search tables..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+        </Grid>
+      </Grid>
 
       {/* Tables Grid */}
       <Grid container spacing={3}>
@@ -428,7 +445,6 @@ export default function TableManagement() {
                   display: "flex",
                   flexDirection: "column",
                   borderRadius: 3,
-                  border: "1px solid #eee",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
                   overflow: "hidden",
                   transition: "all 0.25s ease-in-out",
@@ -531,7 +547,7 @@ export default function TableManagement() {
                 </CardContent>
 
                 {/* Actions */}
-                <Box sx={{ p: 2, borderTop: "1px solid #f0f0f0" }}>
+                <Box sx={{ p: 2 }}>
                   <Stack direction="row" spacing={1.2}>
                     {table.table_status === "available" && (
                       <>
@@ -539,10 +555,10 @@ export default function TableManagement() {
                           fullWidth
                           size="small"
                           color="success"
-                          onClick={() => handleStatusChange(table, "available")}
+                          onClick={() => handleTableActionButtonClick(table, "reserve table")}
                           sx={{ fontWeight: 600, borderRadius: 2 }}
                         >
-                          Book table
+                          Reserve table
                         </Button>
                       </>
                     )}
@@ -552,7 +568,7 @@ export default function TableManagement() {
                         fullWidth
                         size="small"
                         color="error"
-                        onClick={() => handleStatusChange(table, "occupied")}
+                        onClick={() => handleTableActionButtonClick(table, "view order")}
                         sx={{ fontWeight: 600, borderRadius: 2 }}
                       >
                         View Order
@@ -560,15 +576,27 @@ export default function TableManagement() {
                     )}
 
                     {table.table_status === "reserved" && (
-                      <Button
-                        fullWidth
-                        size="small"
-                        color="warning"
-                        onClick={() => handleStatusChange(table, "reserved")}
-                        sx={{ fontWeight: 600, borderRadius: 2 }}
-                      >
-                        Start Order
-                      </Button>
+                      <>
+                        <Button
+                          fullWidth
+                          size="small"
+                          color="warning"
+                          onClick={() => handleTableActionButtonClick(table, "start ordering")}
+                          sx={{ fontWeight: 600, borderRadius: 2 }}
+                        >
+                          Start Ordering
+                        </Button>
+                        <Button
+                          fullWidth
+                          size="small"
+                          color="warning"
+                          variant="contained"
+                          onClick={() => handleTableActionButtonClick(table, "cancel reservation")}
+                          sx={{ fontWeight: 600, borderRadius: 2 }}
+                        >
+                          Cancel Reservation
+                        </Button>
+                      </>
                     )}
                   </Stack>
                 </Box>
@@ -579,7 +607,7 @@ export default function TableManagement() {
       </Grid>
 
       {filteredTables.length === 0 && (
-        <Box sx={{ textAlign: "center", py: 8 }}>
+        <Box sx={{ textAlign: "center", mt: 20 }}>
           <TableRestaurant
             sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
           />
@@ -699,17 +727,27 @@ export default function TableManagement() {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
+        autoHideDuration={2000}
         onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        Transition={Slide}
+        key={snackbar.id}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
         <Alert
           onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           sx={{ width: "100%" }}
+          variant="filled"
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <TransitionsModal
+        open={open}
+        handleClose={handleClose}
+        children={<h1>Viewing</h1>}
+      />
     </Box>
   );
 }
