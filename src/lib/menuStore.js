@@ -59,6 +59,7 @@ const useMenuStore = create((set, get) => ({
   categories: [],
   loadingCategories: false,
   chosenTableSession: [],
+  chosenTableOrderItems: [],
 
   // Fetch categories
   fetchCategories: async () => {
@@ -551,7 +552,9 @@ const useMenuStore = create((set, get) => ({
 
     set({ chosenTable: table.table_number });
 
-    filterActiveSessionByTableNumber(table.table_number);
+    await filterActiveSessionByTableNumber(table.table_number);
+
+    console.log(get().chosenTableOrderItems);
 
     // Check if the table is already selected
     if (chosenTable === table.table_number) {
@@ -678,18 +681,76 @@ const useMenuStore = create((set, get) => ({
 
   // Function to add or update an order item
   addOrUpdateObject: async (orderItem) => {
-    const { data, error } = await supabase
-      .from("order_items")
-      .insert([
-        {
-          order_id: orderItem.id,
-          menu_item_id: orderItem.id,
-          quantity: 1,
-          price: orderItem.price,
-          type: orderItem.type,
-        },
-      ])
-      .select();
+    const { chosenTableSession, chosenTableOrderItems } = get();
+
+    const match = chosenTableOrderItems.find(
+      (item) => item.menu_item_id === orderItem.id
+    );
+
+    if (match) {
+      console.log(match)
+
+      let orderTotal = chosenTableSession.order_total;
+      const newQuantity = match.quantity + 1;
+      orderTotal += match.price;
+
+      const { data, error } = await supabase
+        .from("order_items")
+        .update({
+          quantity: newQuantity,
+        })
+        .eq("id", match.id)
+        .select();
+
+      if (error) {
+        handleError(error);
+      }
+
+
+      const { data:orders, error:ordersError } = await supabase
+        .from("orders")
+        .update({ total: orderTotal })
+        .eq("id", chosenTableSession?.order_id)
+        .select();
+      
+      if (ordersError) {
+        handleError(ordersError);
+      }
+
+      get().getActiveSessionByRestaurant();
+      get().filterActiveSessionByTableNumber(get().chosenTable);
+
+    } else {
+      const { data, error } = await supabase
+        .from("order_items")
+        .insert([
+          {
+            order_id: chosenTableSession?.order_id,
+            menu_item_id: orderItem.id,
+            quantity: 1,
+            price: orderItem.price,
+            type: orderItem.type,
+          },
+        ])
+        .select();
+      
+      if (error) {
+        handleError(error);
+      }
+  
+      const { data: orders, error: ordersError } = await supabase.rpc("increment_total", {
+        session_id: chosenTableSession?.session_id,
+        amount: orderItem.price,
+      });
+  
+      if (ordersError) {
+        handleError(ordersError);
+      }
+  
+      get().getActiveSessionByRestaurant();
+      get().filterActiveSessionByTableNumber(get().chosenTable);
+    }
+
 
     // Find existing item index in the selected table orders
     // const existingIndex = orderItems.findIndex((item) => {
@@ -794,10 +855,10 @@ const useMenuStore = create((set, get) => ({
   // Function to delete an order item
   handleRemoveItem: async (itemId) => {
     try {
-      const { orderItems } = get();
+      const { chosenTableOrderItems } = get();
 
       // Step 1: Remove item from selectedTableOrders state
-      const updatedOrders = orderItems.filter(
+      const updatedOrders = chosenTableOrderItems.filter(
         (order) => order.id !== itemId?.id
       );
       const totalQuantity = updatedOrders.reduce(
@@ -807,20 +868,20 @@ const useMenuStore = create((set, get) => ({
       const total = updatedOrders.reduce((acc, cur) => acc + cur.total, 0);
 
       set({
-        orderItems: updatedOrders,
-        totalOrdersQty: totalQuantity,
-        totalOrdersPrice: total.toFixed(2),
+        chosenTableOrderItems: updatedOrders,
+        // totalOrdersQty: totalQuantity,
+        // totalOrdersPrice: total.toFixed(2),
       });
 
-      // Step 3: Update Supabase
-      const { error } = await supabase
-        .from("ordersItems")
-        .delete()
-        .eq("id", itemId?.id); // Delete the specific item by ID
+      // // Step 3: Update Supabase
+      // const { error } = await supabase
+      //   .from("ordersItems")
+      //   .delete()
+      //   .eq("id", itemId?.id); // Delete the specific item by ID
 
-      if (error) {
-        handleError(error);
-      }
+      // if (error) {
+      //   handleError(error);
+      // }
     } catch (error) {
       handleError(error);
     }
@@ -859,7 +920,7 @@ const useMenuStore = create((set, get) => ({
     try {
       let { data: waiter_orders_overview, error } = await supabase
         .from("waiter_orders_overview")
-        .select("*")
+        .select(`*`)
         .eq("table_number", tableNumber)
         .maybeSingle();
 
@@ -869,6 +930,7 @@ const useMenuStore = create((set, get) => ({
 
       set({
         chosenTableSession: waiter_orders_overview,
+        chosenTableOrderItems: waiter_orders_overview?.order_items
       });
     } catch (error) {
       handleError(error);
