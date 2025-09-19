@@ -60,6 +60,10 @@ const useMenuStore = create((set, get) => ({
   loadingCategories: false,
   chosenTableSession: [],
   chosenTableOrderItems: [],
+  loadingActiveSessionByTableNumber: false,
+  loadingActiveSessionByRestaurant: false,
+  activeSeesionByTableNumberLoaded: false,
+  activeSeesionByRestaurantLoaded: false,
 
   // Fetch categories
   fetchCategories: async () => {
@@ -351,30 +355,6 @@ const useMenuStore = create((set, get) => ({
     }
   },
 
-  // Fetch drinks from the database
-  getDrinks: async () => {
-    try {
-      const { data, error } = await supabase.from("drinks").select("*");
-      if (error) throw error;
-      set({ drinks: data, originalDrinks: data, drinksLoaded: true });
-    } catch (error) {
-      // Handle the error using the error handler
-      handleError(error);
-    }
-  },
-
-  // Fetch meals from the database
-  getMeals: async () => {
-    try {
-      const { data, error } = await supabase.from("menuItems").select("*");
-      if (error) throw error;
-      set({ meals: data, originalMeals: data, mealsLoaded: true }); // Store both original and filtered meals
-    } catch (error) {
-      // Handle the error using the error handler
-      handleError(error);
-    }
-  },
-
   // Fliter meals by category
   filterMealsByCategory: (category, color, backgroundColor) => {
     const { originalMeals } = get(); // Access the meals & originalMeals state using get()
@@ -481,80 +461,13 @@ const useMenuStore = create((set, get) => ({
     }
   },
 
-  // Toggle the search visibility
-  toggleSearchVisibility: () => {
-    set((state) => {
-      return { showSearch: !state.showSearch };
-    });
-  },
-
-  // Toggle the filter visibility
-  toggleFilterVisibility: () => {
-    set((state) => {
-      return { showFilter: !state.showFilter };
-    });
-  },
-
-  // Fetch assigned tables
-  getAssigendTables: async () => {
-    const stringifiedUser = localStorage.getItem("employee");
-    const user = stringifiedUser ? JSON.parse(stringifiedUser) : null;
-    if (!user) {
-      console.error("User not found in local storage");
-      return;
-    }
-    const { id } = user[0];
-
-    try {
-      const { data, error } = await supabase
-        .from("tables")
-        .select(
-          `
-                    *,
-                    assign!inner(id, name)
-                `
-        ) // Use `!inner` to join and filter the `assign` relationship
-        .eq("status", "occupied")
-        .eq("assign.id", id); // Filter by assign.id matching the user id
-      if (error) throw error;
-
-      // Check if any tables were found
-      if (data.length === 0) {
-        // No tables found
-        set({
-          assignedTables: [],
-          assignedTablesLoaded: true,
-          noTablesFound: true,
-          tableSelected: false,
-        });
-      } else {
-        // Tables found
-        set({
-          assignedTables: data,
-          assignedTablesLoaded: true,
-          noTablesFound: false,
-        });
-      }
-    } catch (error) {
-      // Handle the error using the error handler
-      handleError(error);
-    }
-  },
-
   // Set the selected table
   setChosenTable: async (table) => {
     const {
       chosenTable,
-      originalOrders,
       resetStepper,
       filterActiveSessionByTableNumber,
     } = get(); // Access the current chosen table, original orders, and resetStepper
-
-    set({ chosenTable: table.table_number });
-
-    await filterActiveSessionByTableNumber(table.table_number);
-
-    console.log(get().chosenTableOrderItems);
 
     // Check if the table is already selected
     if (chosenTable === table.table_number) {
@@ -582,50 +495,7 @@ const useMenuStore = create((set, get) => ({
     }); // Set the chosen table and reset checkout state
     resetStepper(); // Reset the stepper when a new table is chosen
 
-    // Filter orders based on the selected table
-    const filteredOrders = originalOrders.filter(
-      (order) => order.table?.id === Number(table.id)
-    );
-
-    if (filteredOrders.length > 0) {
-      try {
-        const { data: orderItems, error: itemsError } = await supabase
-          .from("ordersItems")
-          .select(`*, menuItems(*), drinks(*), orders(*, waiter(*), table(*))`)
-          .eq("order_no", filteredOrders[0].id); // Fetch order items for the selected table
-
-        if (itemsError) throw itemsError; // Handle error if fetching order items fails
-        const totalOrdersQty = orderItems.reduce(
-          (acc, item) => acc + item.quantity,
-          0
-        ); // Calculate total quantity
-        const totalOrdersPrice = orderItems.reduce(
-          (acc, item) => acc + item.total,
-          0
-        ); // Calculate total price
-
-        // Update the state with order items and totals
-        set({
-          orderItems: orderItems,
-          totalOrdersQty,
-          totalOrdersPrice,
-          orderTime: filteredOrders[0].created_at,
-          orderItemsLoaded: true,
-          waiterName: filteredOrders[0].waiter.name, // Set the waiter name from the first order
-          orderId: filteredOrders[0].id, // Set the order ID from the first order
-          bill_printed: filteredOrders[0].bill_printed,
-        });
-      } catch (error) {
-        // Handle the error using the error handler
-        handleError(error);
-      }
-    } else {
-      set({
-        orders: [], // Reset orders if no orders found for the selected table
-        totalOrdersQty: 0,
-        totalOrdersPrice: 0,
-      });
-    }
+    await filterActiveSessionByTableNumber(table.table_number);
   },
 
   // Function to update the printed status in the state and database
@@ -688,7 +558,7 @@ const useMenuStore = create((set, get) => ({
     );
 
     if (match) {
-      console.log(match)
+      console.log(match);
 
       let orderTotal = chosenTableSession.order_total;
       const newQuantity = match.quantity + 1;
@@ -706,20 +576,18 @@ const useMenuStore = create((set, get) => ({
         handleError(error);
       }
 
-
-      const { data:orders, error:ordersError } = await supabase
+      const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .update({ total: orderTotal })
         .eq("id", chosenTableSession?.order_id)
         .select();
-      
+
       if (ordersError) {
         handleError(ordersError);
       }
 
-      get().getActiveSessionByRestaurant();
+      // get().getActiveSessionByRestaurant();
       get().filterActiveSessionByTableNumber(get().chosenTable);
-
     } else {
       const { data, error } = await supabase
         .from("order_items")
@@ -733,24 +601,26 @@ const useMenuStore = create((set, get) => ({
           },
         ])
         .select();
-      
+
       if (error) {
         handleError(error);
       }
-  
-      const { data: orders, error: ordersError } = await supabase.rpc("increment_total", {
-        session_id: chosenTableSession?.session_id,
-        amount: orderItem.price,
-      });
-  
+
+      const { data: orders, error: ordersError } = await supabase.rpc(
+        "increment_total",
+        {
+          session_id: chosenTableSession?.session_id,
+          amount: orderItem.price,
+        }
+      );
+
       if (ordersError) {
         handleError(ordersError);
       }
-  
-      get().getActiveSessionByRestaurant();
+
+      // get().getActiveSessionByRestaurant();
       get().filterActiveSessionByTableNumber(get().chosenTable);
     }
-
 
     // Find existing item index in the selected table orders
     // const existingIndex = orderItems.findIndex((item) => {
@@ -853,13 +723,21 @@ const useMenuStore = create((set, get) => ({
   },
 
   // Function to delete an order item
-  handleRemoveItem: async (itemId) => {
+  handleRemoveItem: async (item) => {
+    const { chosenTableOrderItems, chosenTableSession } = get();
     try {
-      const { chosenTableOrderItems } = get();
+      const item_total = item?.quantity * item?.price;
+
+      let order_total = chosenTableSession?.order_total;
+
+      order_total -= item_total;
+
+      console.log(order_total);
+
 
       // Step 1: Remove item from selectedTableOrders state
       const updatedOrders = chosenTableOrderItems.filter(
-        (order) => order.id !== itemId?.id
+        (order) => order.id !== item?.id
       );
       const totalQuantity = updatedOrders.reduce(
         (acc, cur) => acc + cur.quantity,
@@ -873,15 +751,27 @@ const useMenuStore = create((set, get) => ({
         // totalOrdersPrice: total.toFixed(2),
       });
 
-      // // Step 3: Update Supabase
-      // const { error } = await supabase
-      //   .from("ordersItems")
-      //   .delete()
-      //   .eq("id", itemId?.id); // Delete the specific item by ID
+      // Step 3: Update Supabase
+      const { error: ordersItemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .eq("id", item?.id); // Delete the specific item by ID
 
-      // if (error) {
-      //   handleError(error);
-      // }
+      if (ordersItemsError) {
+        handleError(ordersItemsError);
+      }
+
+      const { error: ordersError } = await supabase
+        .from("orders")
+        .update({ total: order_total })
+        .eq("id", chosenTableSession?.order_id)
+        .select();
+
+      if (ordersError) {
+        handleError(ordersError);
+      }
+          
+      get().filterActiveSessionByTableNumber(get().chosenTable);
     } catch (error) {
       handleError(error);
     }
@@ -890,8 +780,11 @@ const useMenuStore = create((set, get) => ({
   // Check if a table is selected
   isSelectedTable: (table) => get().chosenTable === table.table_number,
 
-  // Function to get active session by restaurant
+  // Function to get active session by restaurant & waiter
   getActiveSessionByRestaurant: async () => {
+    set({
+      loadingActiveSessionByRestaurant: true,
+    });
     try {
       let { data: waiter_orders_overview, error } = await supabase
         .from("waiter_orders_overview")
@@ -908,15 +801,23 @@ const useMenuStore = create((set, get) => ({
 
       set({
         assignedTablesLoaded: true,
-        assignedTables: waiter_orders_overview,
+        assignedTables: waiter_orders_overview || [],
+        activeSeesionByRestaurantLoaded: true,
       });
     } catch (error) {
       handleError(error);
+    } finally {
+      set({
+        loadingActiveSessionByRestaurant: false,
+      });
     }
   },
 
   // filter active session by table number
   filterActiveSessionByTableNumber: async (tableNumber) => {
+    set({
+      loadingActiveSessionByTableNumber: true,
+    });
     try {
       let { data: waiter_orders_overview, error } = await supabase
         .from("waiter_orders_overview")
@@ -930,10 +831,15 @@ const useMenuStore = create((set, get) => ({
 
       set({
         chosenTableSession: waiter_orders_overview,
-        chosenTableOrderItems: waiter_orders_overview?.order_items
+        chosenTableOrderItems: waiter_orders_overview?.order_items,
+        activeSessionByTableNumberLoaded: true,
       });
     } catch (error) {
       handleError(error);
+    } finally {
+      set({
+        loadingActiveSessionByTableNumber: false,
+      });
     }
   },
 

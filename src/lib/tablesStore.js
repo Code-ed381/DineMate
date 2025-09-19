@@ -1,232 +1,237 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import { handleError } from '../components/Error';
-import Swal from 'sweetalert2';
 import useMenuStore from './menuStore';
-
+import useRestaurantStore from './restaurantStore';
+import useAuthStore from './authStore';
 
 const useTablesStore = create((set, get) => ({
-    tables: [],
-    employee: [],
-    tableStatus: 'all',
-    openAvailable: false,
+  open: false,
+  tables: [],
+  loadingTables: false,
+  tablesLoaded: false,
+  snackbar: {
     open: false,
-    selectedTable: null,
-    assignEmployee: 0,
-    order: [],
-    items: [],
-    totalQty: 0,
-    totalPrice: 0,
-    employees: [],
-    loading: true,
-    itemsLoading: true,
+    message: "",
+    severity: "success",
+  },
+  chosenTableSession: [],
+  chosenTableOrderItems: [],
+  loadingActiveSessionByTableNumber: false,
+  activeSeesionByTableNumberLoaded: false,
 
-    setTableStatus: (status) => set({ tableStatus: status }),
-    setOpenAvailable: (open) => set({ openAvailable: open }),
-    setOpen: (open) => set({ open: open }),
-    setSelectedTable: (table) => set({ selectedTable: table }),
-    setAssignEmployee: (employee) => set({ assignEmployee: employee }),
-    setOrder: (order) => set({ order: order }),
-    setItems: (items) => set({ items: items }),
-    setTotalQty: (qty) => set({ totalQty: qty }),
-    setTotalPrice: (price) => set({ totalPrice: price }),
-    setLoading: (loading) => set({ loading: loading }),
-    setItemsLoading: (loading) => set({ itemsLoading: loading }),
+  // Close modals
+  handleClose: () => {
+    set({ open: false });
+  },
 
-    preprocessTables: (tables) => {
-        return tables.map(table => ({
-            ...table,
-            waiterName: table.assign && table.assign.name ? table.assign.name : 'Unknown'
-        }));
-    },
+  // Set snackbar
+  setSnackbar: (snackbar) => {
+    set({ snackbar });
+  },
 
-    getTables: async () => {
-        try {
-            set({ loading: true });
-            const { employee } = get();
-            let query = supabase.from('tables').select(`*`).order('table_no', { ascending: true });
+  // Fetch tables  with session and table overview
+  getTablesOverview: async () => {
+    const { selectedRestaurant } = useRestaurantStore.getState();
+    set({ loadingTables: true });
 
-            if (employee.role === 'waiter') {
-                query = query.or(`assign.eq.${employee.id},status.eq.available`);
-            }
+    try {
+      const { data, error } = await supabase
+        .from("waiter_tables_overview")
+        .select("*")
+        .eq("restaurant_id", selectedRestaurant.restaurants.id)
+        .or(
+          `effective_status.eq.available,waiter_id.eq.${
+            useAuthStore.getState().user.user.id
+          }`
+        )
+        .order("table_number", { ascending: true });
 
-            let { data: tables, error } = await query;
+      if (error) throw error;
 
-            if (error) throw error;
-
-            set({ tables: get().preprocessTables(tables), loading: false });
-        } catch (error) {
-            handleError(error);
-            set({ loading: false });
-        }
-    },
-
-    getEmployee: async () => {
-        let employeeStringified = localStorage.getItem('employee');
-        const employeeParsed = JSON.parse(employeeStringified);
-        set({ employee: employeeParsed[0] });
-    },
-
-    getEmployees: async () => {
-        try {
-            let { data: employees, error } = await supabase.from('employees').select('*');
-            if (error) throw error;
-            set({ employees });
-        } catch (error) {
-            handleError(error);
-        }
-    },
-
-    getTablesByStatus: async (tableStatus) => {
-        try {
-            set({ loading: true });
-            const { employee } = get();
-            let query = supabase.from('tables').select(`*, assign(*)`).order('table_no', { ascending: true });
-
-            if (tableStatus !== 'all') {
-                query = query.eq('status', tableStatus);
-            }
-
-            if (employee.role === 'waiter') {
-                query = query.or(`assign.eq.${employee.id},status.eq.available`);
-            }
-
-            let { data: tables, error } = await query;
-
-            if (error) throw error;
-
-            set({ tables: get().preprocessTables(tables), loading: false });
-        } catch (error) {
-            handleError(error);
-            set({ loading: false });
-        }
-    },
-
-    handleAssign: async (table, employee) => {
-        if (employee.role === 'admin') {
-            set({ openAvailable: true, selectedTable: table });
-        } else if (employee.role === 'waiter') {
-            try {
-                const { error: tablesError } = await supabase
-                    .from('tables')
-                    .update({ status: 'occupied', assign: employee.id })
-                    .eq('table_no', table.table_no)
-                    .select();
-
-                if (tablesError) throw tablesError;
-                console.log(`Table ${table.table_no} assigned to ${employee.name}`)
-
-                const { error: ordersError } = await supabase
-                    .from('orders')
-                    .insert([{ table: table.id, waiter: employee.id }])
-                    .select();
-
-                if (ordersError) throw ordersError;
-
-                get().getTables();
-                Swal.fire({ showConfirmButton: false, icon: 'success', timer: 2000 });
-            } catch (error) {
-                handleError(error);
-            }
-        }
-    },
-
-    handleAssignAdmin: async (e) => {
-        const { selectedTable } = get();
-        try {
-            const { error: tablesError } = await supabase
-                .from('tables')
-                .update({ status: 'occupied', assign: e.target.value })
-                .eq('table_no', selectedTable.table_no)
-                .select();
-
-            if (tablesError) throw tablesError;
-
-            const { error: ordersError } = await supabase
-                .from('orders')
-                .insert([{ table: selectedTable.id, waiter: e.target.value }])
-                .select();
-
-            if (ordersError) throw ordersError;
-
-            get().getTables();
-            set({ openAvailable: false });
-            Swal.fire({ showConfirmButton: false, icon: 'success', timer: 2000 });
-        } catch (error) {
-            handleError(error);
-        }
-    },
-
-    handleResetTable: async (table) => {
-        // Access setTableSelected from menuStore
-        const setTableSelected = useMenuStore.getState().setTableSelected; 
-        
-        try {
-            await supabase.from('orders').delete().eq('table', table.id);
-            await supabase.from('tables').update({ status: 'available', assign: null }).eq('id', table.id).select();
-            get().getTables();
-            set({ open: false });
-            setTableSelected();
-            Swal.fire({ showConfirmButton: false, icon: 'success', timer: 2000 });
-        } catch (error) {
-            handleError(error);
-        }
-    },
-
-    handleOpenOccupied: async (item, employee) => {
-        set({ selectedTable: item, open: true, itemsLoading: true });
-
-        let { data: orders, error } = await supabase
-            .from('orders')
-            .select(`*, waiter(*)`)
-            .eq('table', item.id)
-            .eq('status', 'pending');
-
-        if (employee.status === 'waiter') {
-            orders = orders.filter(order => order.waiter.id === employee.id);
-        }
-
-        if (orders.length === 0 && employee.status === 'waiter') {
-            set({ open: false });
-            Swal.fire({ title: "Access Denied", text: "You cannot open orders assigned to other waiters.", icon: "error" });
-            return;
-        }
-
-        set({ order: orders[0] });
-
-        if (error) {
-            console.log(error);
-        } else {
-            if (orders.length === 0) {
-                set({ items: [], itemsLoading: false });
-            } else {
-                let { data: ordersItems, error } = await supabase
-                    .from('ordersItems')
-                    .select(`*, menuItems(*), drinks(*), orders!inner(*, waiter(*), table(*))`)
-                    .eq('order_no', orders[0].id);
-
-                if (error) handleError(error)
-
-                set({ items: ordersItems, itemsLoading: false });
-
-                const totalQuantity = ordersItems.reduce((acc, cur) => acc + cur.quantity, 0);
-                const total = ordersItems.reduce((acc, cur) => acc + cur.total, 0);
-                set({ totalQty: totalQuantity, totalPrice: total });
-            }
-        }
-    },
-
-    handleClose: () => {
-        set({ open: false, itemsLoading: true });
-    },
-
-    handleCloseAvailable: () => {
-        set({ openAvailable: false });
-    },
-
-    handleFilterTable: (tableStatus) => {
-        set({ tableStatus });
+      set({ tables: data || [], tablesLoaded: true });
+    } catch (error) {
+      handleError(error);
+    } finally {
+      set({ loadingTables: false });
     }
+  },
+
+  // Change table status and handle actions
+  handleStatusChange: async (table, status) => {
+    if (status === "reserve table") {
+      const { error: tablesError } = await supabase
+        .from("restaurant_tables")
+        .update({ status: "reserved" })
+        .eq("id", table.table_id)
+        .eq(
+          "restaurant_id",
+          useRestaurantStore.getState().selectedRestaurant.restaurants.id
+        )
+        .select();
+
+      if (tablesError) throw tablesError;
+
+      get().getTablesOverview();
+      set({ openAvailable: false });
+
+      return { message: "reserved" };
+    }
+    if (status === "cancel reservation") {
+      const { error: tablesError } = await supabase
+        .from("restaurant_tables")
+        .update({ status: "available" })
+        .eq("id", table.table_id)
+        .eq(
+          "restaurant_id",
+          useRestaurantStore.getState().selectedRestaurant.restaurants.id
+        )
+        .select();
+
+      if (tablesError) throw tablesError;
+
+      get().getTablesOverview();
+      set({ openAvailable: false });
+
+      return { message: "cancelled" };
+    }
+    if (status === "start ordering") {
+      const { data: session, error: sessionError } = await supabase
+        .from("table_sessions")
+        .insert([
+          {
+            table_id: table.table_id,
+            restaurant_id:
+              useRestaurantStore.getState().selectedRestaurant.restaurants.id,
+            waiter_id: useAuthStore.getState().user.user.id,
+            opened_at: new Date(),
+            status: "open",
+          },
+        ])
+        .select();
+
+      if (sessionError) throw sessionError;
+
+      console.log(session);
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          {
+            restaurant_id:
+              useRestaurantStore.getState().selectedRestaurant.restaurants.id,
+            total: 0,
+            session_id: session[0].id,
+            status: "pending",
+          },
+        ])
+        .select();
+
+      if (orderError) throw orderError;
+
+      const { error: tablesError } = await supabase
+        .from("restaurant_tables")
+        .update({ status: "occupied" })
+        .eq("id", table.table_id)
+        .eq(
+          "restaurant_id",
+          useRestaurantStore.getState().selectedRestaurant.restaurants.id
+        )
+        .select();
+
+      if (tablesError) throw tablesError;
+
+      useMenuStore.getState().setChosenTable(table);
+
+      get().getTablesOverview();
+
+      return { message: "ordering" };
+    }
+    if (status === "view order") {
+      get().filterActiveSessionByTableNumber(table.table_number);
+
+      set({ open: true });
+
+      return { message: "viewing" };
+    }
+  },
+
+  // filter active session by table number
+  filterActiveSessionByTableNumber: async (tableNumber) => {
+    set({
+      loadingActiveSessionByTableNumber: true,
+    });
+    try {
+      let { data: waiter_orders_overview, error } = await supabase
+        .from("waiter_orders_overview")
+        .select(`*`)
+        .eq("table_number", tableNumber)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      console.log(waiter_orders_overview);
+
+      set({
+        chosenTableSession: waiter_orders_overview,
+        chosenTableOrderItems: waiter_orders_overview?.order_items,
+        activeSessionByTableNumberLoaded: true,
+      });
+    } catch (error) {
+      handleError(error);
+    } finally {
+      set({
+        loadingActiveSessionByTableNumber: false,
+      });
+    }
+  },
+
+  // Function to delete an order item
+  handleRemoveItem: async (itemId) => {
+    try {
+      const { chosenTableOrderItems } = get();
+
+      // Step 1: Remove item from selectedTableOrders state
+      const updatedOrders = chosenTableOrderItems.filter(
+        (order) => order.id !== itemId?.id
+      );
+      const totalQuantity = updatedOrders.reduce(
+        (acc, cur) => acc + cur.quantity,
+        0
+      );
+      const total = updatedOrders.reduce((acc, cur) => acc + cur.total, 0);
+
+      set({
+        chosenTableOrderItems: updatedOrders,
+        // totalOrdersQty: totalQuantity,
+        // totalOrdersPrice: total.toFixed(2),
+      });
+
+      // Step 3: Update Supabase
+      const { error: ordersItemsError } = await supabase
+        .from("ordersItems")
+        .delete()
+        .eq("id", itemId?.id); // Delete the specific item by ID
+
+      if (ordersItemsError) {
+        handleError(ordersItemsError);
+      }
+
+
+      const { error: ordersError } = await supabase
+        .from("orders")
+        .update({ total: total })
+        .eq("id", itemId?.order_id)
+        .select();
+      
+      if (ordersError) {
+        handleError(ordersError);
+      }
+          
+    } catch (error) {
+      handleError(error);
+    }
+  },
 }));
 
 export default useTablesStore;

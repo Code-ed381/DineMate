@@ -1,52 +1,76 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { formatDistanceStrict } from "date-fns";
+
+// MUI Components
 import {
   TableContainer,
   Paper,
   CardMedia,
   CardActions,
-  CardHeader,
   Table,
   TableHead,
   Grid,
   Skeleton,
-  TableRow, TableCell, TableBody, TableFooter, Alert, AlertTitle, OutlinedInput, InputLabel, FormControl, ToggleButton, ToggleButtonGroup, TextField, Stepper, Step, StepLabel, Typography, Stack, Box, InputAdornment, IconButton, Card, CardContent, CardActionArea, Button, CircularProgress, LinearProgress
+  TableRow,
+  TableCell,
+  TableBody,
+  TableFooter,
+  Alert,
+  OutlinedInput,
+  InputLabel,
+  FormControl,
+  TextField,
+  Stepper,
+  Step,
+  StepLabel,
+  Typography,
+  Stack,
+  Box,
+  InputAdornment,
+  IconButton,
+  Card,
+  CardContent,
+  CardActionArea,
+  CardHeader,
+  Button,
+  LinearProgress
 } from '@mui/material';
-import { Search as SearchIcon, Cancel as CancelIcon } from '@mui/icons-material';
+
+// Icons
+import {
+  Search as SearchIcon,
+  Cancel as CancelIcon,
+  ShoppingCartCheckout as ShoppingCartCheckoutIcon,
+  KeyboardBackspace as KeyboardBackspaceIcon,
+  PriceCheck as PriceCheckIcon,
+  CreditScore as CreditScoreIcon,
+  CurrencyPound as CurrencyPoundIcon,
+  ProductionQuantityLimits as ProductionQuantityLimitsIcon,
+  MenuBook as MenuBookIcon,
+  TableRestaurant as TableRestaurantIcon,
+  Upload as UploadIcon,
+  ReceiptLong as ReceiptLongIcon,
+  SoupKitchen as SoupKitchenIcon,
+} from '@mui/icons-material';
+
+// Store
 import useMenuStore from  "../lib/menuStore";
-import ShoppingCartCheckoutIcon from '@mui/icons-material/ShoppingCartCheckout';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import SoupKitchenIcon from '@mui/icons-material/SoupKitchen';
-import KeyboardBackspaceIcon from '@mui/icons-material/KeyboardBackspace';
-import PriceCheckIcon from '@mui/icons-material/PriceCheck';
-import CreditScoreIcon from '@mui/icons-material/CreditScore';
-import CurrencyPoundIcon from '@mui/icons-material/CurrencyPound';
+
+// Components
 import { printBillOnly, printForKitchen } from "../components/PrintWindow";
-import { format } from 'date-fns';
-import useAuthStore from "../lib/authStore";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import TableRestaurantIcon from "@mui/icons-material/TableRestaurant";
-import { formatDistanceStrict } from "date-fns";
+import MenuSkeleton from "../components/menu-section-skeleton";
 
 
 const Menu = () => {
   const navigate = useNavigate();
   const {
     assignedTables,
-    chosenTable,
     setChosenTable,
     isSelectedTable,
     assignedTablesLoaded,
     tableSelected,
-    orders,
-    orderTime,
-    searchMeals,
     totalOrdersPrice,
-    totalOrdersQty,
-    orderItems,
-    orderItemsLoaded,
-    orderId,
-    waiterName,
     activeStep,
     steps,
     handleNext,
@@ -61,45 +85,34 @@ const Menu = () => {
     handleRemoveItem,
     noTablesFound,
     bill_printed,
-    searchMealValue,
     getActiveSessionByRestaurant,
     setSelectedCategory,
     selectedCategory,
     filterMenuItemsByCategory,
     menuItems,
-    menuItemsLoaded,
     loadingMenuItems,
     categories,
     fetchCategories,
-    loadingCategories,
     filteredMenuItems,
     fetchMenuItems,
-    isSelectedCategory,
     setFilteredMenuItems,
     chosenTableSession,
     chosenTableOrderItems,
+    activeSessionByTableNumberLoaded,
+    loadingActiveSessionByRestaurant,
+    loadingActiveSessionByTableNumber,
   } = useMenuStore();
-
-  const { user } = useAuthStore();
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
     getActiveSessionByRestaurant();
     fetchCategories();
     fetchMenuItems();
-    console.log(user)
     return () => {
       controller.abort();
     };
   }, [getActiveSessionByRestaurant, fetchCategories, fetchMenuItems]); // Functions included in the dependency array
-
-  const [activeTab, setActiveTab] = useState('meals'); // State to track active tab
-
-  const handleTabChange = (event, newTab) => {
-    if (newTab !== null) {
-        setActiveTab(newTab);
-    }
-  };
 
   // Format date and time
   function formatDateTime(isoString) {
@@ -119,21 +132,19 @@ const Menu = () => {
           <>
             <Stack
               direction="row"
-              spacing={2}
               mt={2}
-              sx={{ alignItems: "center", justifyContent: "space-between" }}
+              sx={{ alignItems: "center", justifyContent: "space-between", border: "2px double #ccc", borderRadius: 2, boxShadow: 3, p: 2 }}
             >
-              <Typography variant="title">
+              <Typography variant="title" fontWeight="bold">
                 ORDER NO. {chosenTableSession?.order_id}
               </Typography>
-              {/* <Typography variant="title">{user?.user?.user_metadata?.firstName}</Typography> */}
-              <Typography variant="body1">
+              <Typography variant="body1" fontWeight="bold">
                 {formatDateTime(chosenTableSession?.opened_at)}
               </Typography>
             </Stack>
             <TableContainer
               component={Paper}
-              sx={{ mt: 2, borderRadius: 2, boxShadow: 3 }}
+              sx={{ borderRadius: 2, boxShadow: 3 }}
             >
               <Table>
                 <TableHead>
@@ -146,7 +157,7 @@ const Menu = () => {
                   </TableRow>
                 </TableHead>
 
-                {assignedTablesLoaded ? (
+                {!loadingActiveSessionByTableNumber ? (
                   <>
                     {chosenTableOrderItems?.length > 0 ? (
                       <TableBody>
@@ -181,8 +192,9 @@ const Menu = () => {
                       <TableBody>
                         <TableRow>
                           <TableCell colSpan={5} align="center">
+                            <ProductionQuantityLimitsIcon fontSize="small" />
                             <Typography variant="subtitle1" fontWeight="bold">
-                              No items in order
+                              No order items
                             </Typography>
                           </TableCell>
                         </TableRow>
@@ -206,7 +218,10 @@ const Menu = () => {
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
                       <Typography variant="subtitle1">
-                        {chosenTableSession?.order_total?.toFixed(2)}
+                        {!loadingActiveSessionByTableNumber &&
+                        activeSessionByTableNumberLoaded
+                          ? chosenTableSession?.order_total?.toFixed(2)
+                          : 0.00}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -216,7 +231,10 @@ const Menu = () => {
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
                       <Typography variant="subtitle1">
-                        {chosenTableSession?.order_total?.toFixed(2)}
+                        {!loadingActiveSessionByTableNumber &&
+                        activeSessionByTableNumberLoaded
+                          ? chosenTableSession?.order_total?.toFixed(2)
+                          : 0.00}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -226,7 +244,10 @@ const Menu = () => {
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
                       <Typography variant="subtitle1">
-                        {chosenTableSession?.order_total?.toFixed(2)}
+                        {!loadingActiveSessionByTableNumber &&
+                        activeSessionByTableNumberLoaded
+                          ? chosenTableSession?.order_total?.toFixed(2)
+                          : 0.00}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -238,7 +259,10 @@ const Menu = () => {
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
                       <Typography variant="subtitle1" fontWeight="bold">
-                        {chosenTableSession?.order_total?.toFixed(2)}
+                        {!loadingActiveSessionByTableNumber &&
+                        activeSessionByTableNumberLoaded
+                          ? chosenTableSession?.order_total?.toFixed(2)
+                          : 0.00}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -288,6 +312,22 @@ const Menu = () => {
     }
   };
 
+  // search filtering logic
+  const searchFilter = useMemo(() => {
+    return filteredMenuItems.filter((item) => {
+      if (searchTerm === '') {
+        return true;
+      }
+
+      const matchesSearch =
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchesSearch;
+    });
+  }, [filteredMenuItems, searchTerm]);
+
+  // category handler
   const handleCategoryClick = async (category) => {
     await setSelectedCategory(category);
 
@@ -302,311 +342,336 @@ const Menu = () => {
   
   return (
     <Box m={2}>
-      {/* {assignedTables.length >  0 ? (
-        <Box sx={{ textAlign: "center", mt: 20 }}>
-          <TableRestaurantIcon
-            sx={{ fontSize: 150, color: "text.disabled", mb: 2 }}
-          />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No tables assigned to you
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Go to tables section to book tables
-          </Typography>
-          <Button
-            variant="contained"
-            color="info"
-            onClick={() => navigate("/app/tables")}
-          >
-            Book Tables
-          </Button>
-        </Box>
+      {loadingActiveSessionByRestaurant ? (
+        <MenuSkeleton />
       ) : (
-      )} */}
-      <div className="row">
-        <div className="col-8">
-          <Card>
-            {assignedTables.length >= 0 ? (
+        <Grid container spacing={2}>
+          <Grid item xs={8} md={8} lg={8}>
+            <Card>
+              {assignedTables.length > 0 ? (
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  mb={1}
+                  sx={{ padding: 2 }}
+                >
+                  <>
+                    {assignedTablesLoaded === false ? (
+                      <>
+                        <Skeleton
+                          variant="rectangular"
+                          width={125}
+                          height={65}
+                          sx={{ borderRadius: 2 }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {assignedTables.map((table, i) => (
+                          <Button
+                            variant={
+                              isSelectedTable(table)
+                                ? "contained"
+                                : "outlined"
+                            }
+                            key={i}
+                            sx={{ padding: 4, marginRight: 1 }}
+                            onClick={() => setChosenTable(table)} // Update selected table
+                          >
+                            Table {table.table_number}
+                          </Button>
+                        ))}
+                      </>
+                    )}
+                  </>
+                </Box>
+              ) : (
+                <Box
+                  display="flex"
+                  justifyContent="center"
+                  mb={1}
+                  sx={{ padding: 2 }}
+                >
+                  <Alert severity="info" variant="basic">
+                    No tables assigned to you
+                  </Alert>
+                </Box>
+              )}
+            </Card>
+
+            {assignedTables.length === 0 && (
+              <Box sx={{ textAlign: "center", mt: 10 }}>
+                <TableRestaurantIcon
+                  sx={{ fontSize: 100, color: "text.disabled", mb: 2 }}
+                />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No tables assigned to you
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="info"
+                  sx={{ mt: 2 }}
+                  size="large"
+                  onClick={() => navigate("/app/tables")}
+                >
+                  Book Tables
+                </Button>
+              </Box>
+            )}
+
+            {tableSelected === true && menuItems.length > 0 && (
               <Box
-                display="flex"
-                justifyContent="center"
-                mb={1}
-                sx={{ padding: 2 }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  mt: 4,
+                }}
               >
-                <>
-                  {assignedTablesLoaded === false ? (
-                    <>
-                      <Skeleton
-                        variant="rectangular"
-                        width={125}
-                        height={65}
-                        sx={{ borderRadius: 2 }}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      {assignedTables.map((table, i) => (
-                        <Button
-                          variant={
-                            isSelectedTable(table) ? "contained" : "outlined"
-                          }
-                          key={i}
-                          sx={{ padding: 4, marginRight: 1 }}
-                          onClick={() => setChosenTable(table)} // Update selected table
+                {/* Top Row: Search */}
+                <TextField
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchTerm}
+                  fullWidth
+                  size="small"
+                  label="Search for menu items... e.g. pasta"
+                  id="search-field-meals"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+
+                {/* Categories Row: Scrollable */}
+                {categories?.length > 0 ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      overflowX: "auto",
+                      gap: 1,
+                      pb: 1, // little padding for smooth scroll
+                      "&::-webkit-scrollbar": {
+                        display: "none", // hide scrollbar
+                      },
+                    }}
+                  >
+                    {categories.map((category, i) => (
+                      <Button
+                        key={i}
+                        variant={
+                          category.name === selectedCategory
+                            ? "contained"
+                            : "outlined"
+                        }
+                        onClick={() => handleCategoryClick(category)}
+                        sx={{
+                          flexShrink: 0, // prevents button from shrinking in scroll
+                        }}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </Box>
+                ) : (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ width: "100%", mb: 1 }}
+                  >
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ height: 50, width: 120, borderRadius: 4 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ height: 50, width: 120, borderRadius: 4 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ height: 50, width: 120, borderRadius: 4 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ height: 50, width: 120, borderRadius: 4 }}
+                    />
+                  </Stack>
+                )}
+              </Box>
+            )}
+
+            {tableSelected === true && assignedTables.length > 0 ? (
+              <Box
+                mt={2}
+                sx={{
+                  width: "100%",
+                  flexGrow: 1,
+                  height: "calc(100vh - 150px)", // adjust 150px depending on your header/footer height
+                  overflowY: "auto",
+                  pr: 1, // optional: adds padding so scrollbar doesn't overlap content
+                }}
+              >
+                {filteredMenuItems?.length === 0 ? (
+                  <Grid container>
+                    <Grid item xs={12}>
+                      <Box sx={{ textAlign: "center", mt: 20 }}>
+                        <MenuBookIcon
+                          sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                        />
+                        <Typography
+                          variant="h6"
+                          color="text.secondary"
+                          gutterBottom
                         >
-                          Table {table.table_number}
-                        </Button>
-                      ))}
-                    </>
-                  )}
-                </>
+                          No menu items found
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 3 }}
+                        >
+                          Contact your restaurant owner/admin to add menu
+                          items
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                ) : loadingMenuItems === true ? (
+                  <Stack direction="row" spacing={2} sx={{ width: "100%" }}>
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ flex: 1, height: 260, borderRadius: 2 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ flex: 1, height: 260, borderRadius: 2 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ flex: 1, height: 260, borderRadius: 2 }}
+                    />
+                    <Skeleton
+                      variant="rectangular"
+                      // animation="wave"
+                      sx={{ flex: 1, height: 260, borderRadius: 2 }}
+                    />
+                  </Stack>
+                ) : (
+                  <Grid container spacing={2}>
+                    {searchFilter.length > 0 ? (
+                      searchFilter.map((item, i) => (
+                        <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+                          <Card sx={{ height: "100%" }}>
+                            <CardActionArea
+                              onClick={() => addOrUpdateObject(item)}
+                            >
+                              <CardMedia
+                                component="img"
+                                height="140"
+                                image={item.image_url}
+                                alt={item.name}
+                              />
+                              <CardContent>
+                                {/* Name + Price in one row */}
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Typography
+                                    gutterBottom
+                                    variant="button"
+                                    component="div"
+                                    sx={{
+                                      flex: 1,
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      pr: 2,
+                                    }}
+                                  >
+                                    {item.name}
+                                  </Typography>
+
+                                  <Typography
+                                    variant="body1"
+                                    fontWeight={900}
+                                    sx={{
+                                      whiteSpace: "nowrap",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    $ {item.price}
+                                  </Typography>
+                                </Box>
+
+                                {/* Description below */}
+                                <Typography
+                                  variant="body2"
+                                  sx={{ color: "text.secondary", mt: 1 }}
+                                >
+                                  {item.description}
+                                </Typography>
+                              </CardContent>
+                            </CardActionArea>
+                          </Card>
+                        </Grid>
+                      ))
+                    ) : (
+                      <Grid item xs={12}>
+                        <Box
+                          sx={{
+                            textAlign: "center",
+                            py: 5,
+                            color: "text.secondary",
+                          }}
+                        >
+                          <CancelIcon sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
+                          <Typography variant="h6" gutterBottom>
+                            No results found
+                          </Typography>
+                          <Typography variant="body2">
+                            Try adjusting your search or browsing categories.
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                )}
               </Box>
             ) : (
               <Box
-                display="flex"
-                justifyContent="center"
-                mb={1}
-                sx={{ padding: 2 }}
+                sx={{
+                  textAlign: "center",
+                  mt: 10,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
               >
+                <UploadIcon sx={{ fontSize: 64, color: "text.disabled" }} />
                 <Alert severity="info" variant="basic">
-                  No tables assigned to you
+                  Select A Table Above to View Menu Items
                 </Alert>
               </Box>
             )}
-          </Card>
+          </Grid>
 
-          {assignedTables.length === 0 && (
-            <Box sx={{ textAlign: "center", mt: 10 }}>
-              <TableRestaurantIcon
-                sx={{ fontSize: 100, color: "text.disabled", mb: 2 }}
-              />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No tables assigned to you
-              </Typography>
-              <Button
-                variant="contained"
-                color="info"
-                sx={{ mt: 2 }}
-                size="large"
-                onClick={() => navigate("/app/tables")}
-              >
-                Book Tables
-              </Button>
-            </Box>
-          )}
-
-          {tableSelected === true && menuItems.length > 0 && (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-                mt: 4,
-              }}
-            >
-              {/* Top Row: Search */}
-              <TextField
-                onChange={(e) => searchMeals(e.target.value)}
-                value={searchMealValue}
-                fullWidth
-                size="small"
-                label="Search for menu items... e.g. pasta"
-                id="search-field-meals"
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-
-              {/* Categories Row: Scrollable */}
-              {categories?.length > 0 ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    overflowX: "auto",
-                    gap: 1,
-                    pb: 1, // little padding for smooth scroll
-                    "&::-webkit-scrollbar": {
-                      display: "none", // hide scrollbar
-                    },
-                  }}
-                >
-                  {categories.map((category, i) => (
-                    <Button
-                      key={i}
-                      variant={
-                        category.name === selectedCategory
-                          ? "contained"
-                          : "outlined"
-                      }
-                      onClick={() => handleCategoryClick(category)}
-                      sx={{
-                        flexShrink: 0, // prevents button from shrinking in scroll
-                      }}
-                    >
-                      {category.name}
-                    </Button>
-                  ))}
-                </Box>
-              ) : (
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ width: "100%", mb: 1 }}
-                >
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ height: 50, width: 120, borderRadius: 4 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ height: 50, width: 120, borderRadius: 4 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ height: 50, width: 120, borderRadius: 4 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ height: 50, width: 120, borderRadius: 4 }}
-                  />
-                </Stack>
-              )}
-            </Box>
-          )}
-
-          {tableSelected === true && (
-            <Box
-              mt={2}
-              sx={{
-                width: "100%",
-                flexGrow: 1,
-                height: "calc(100vh - 150px)", // adjust 150px depending on your header/footer height
-                overflowY: "auto",
-                pr: 1, // optional: adds padding so scrollbar doesn't overlap content
-              }}
-            >
-              {filteredMenuItems?.length === 0 ? (
-                <Grid container>
-                  <Grid item xs={12}>
-                    <Box sx={{ textAlign: "center", mt: 20 }}>
-                      <MenuBookIcon
-                        sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
-                      />
-                      <Typography
-                        variant="h6"
-                        color="text.secondary"
-                        gutterBottom
-                      >
-                        No menu items found
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 3 }}
-                      >
-                        Contact your restaurant owner/admin to add menu items
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              ) : loadingMenuItems === true ? (
-                <Stack direction="row" spacing={2} sx={{ width: "100%" }}>
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ flex: 1, height: 260, borderRadius: 2 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ flex: 1, height: 260, borderRadius: 2 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ flex: 1, height: 260, borderRadius: 2 }}
-                  />
-                  <Skeleton
-                    variant="rectangular"
-                    // animation="wave"
-                    sx={{ flex: 1, height: 260, borderRadius: 2 }}
-                  />
-                </Stack>
-              ) : (
-                <Grid container spacing={2}>
-                  {filteredMenuItems?.map((item, i) => (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
-                      <Card sx={{ height: "100%" }}>
-                        <CardActionArea onClick={() => addOrUpdateObject(item)}>
-                          <CardMedia
-                            component="img"
-                            height="140"
-                            image={item.image_url}
-                            alt={item.name}
-                          />
-                          <CardContent>
-                            {/* Name + Price in one row */}
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Typography
-                                gutterBottom
-                                variant="button"
-                                component="div"
-                                sx={{
-                                  flex: 1,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  pr: 2, // some padding so text doesn't touch price
-                                }}
-                              >
-                                {item.name}
-                              </Typography>
-
-                              <Typography
-                                variant="body1"
-                                fontWeight={900}
-                                sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
-                              >
-                                $ {item.price}
-                              </Typography>
-                            </Box>
-
-                            {/* Description below */}
-                            <Typography
-                              variant="body2"
-                              sx={{ color: "text.secondary", mt: 1 }}
-                            >
-                              {item.description}
-                            </Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </Box>
-          )}
-        </div>
-
-        {!noTablesFound && (
-          <div className="col-4">
+          <Grid item xs={4} md={4} lg={4}>
             {tableSelected ? (
               <Card
                 sx={{
@@ -615,25 +680,25 @@ const Menu = () => {
                 }}
               >
                 {/* Header actions */}
-                {/* {totalOrdersPrice === 0 && (
+                {totalOrdersPrice === 0 && (
                   <CardHeader
                     title={
                       <Stack direction="row" spacing={1}>
                         <Button
                           fullWidth
                           variant="outlined"
-                          disabled={proceedToCheckOut === true}
+                          // disabled={proceedToCheckOut === true}
                           sx={{ padding: 2 }}
                           size="large"
                           startIcon={<SoupKitchenIcon />}
-                          onClick={() =>
-                            printForKitchen(
-                              orderId,
-                              waiterName,
-                              chosenTable,
-                              orderItems
-                            )
-                          }
+                          // onClick={() =>
+                          //   printForKitchen(
+                          //     orderId,
+                          //     waiterName,
+                          //     chosenTable,
+                          //     orderItems
+                          //   )
+                          // }
                         >
                           Print For Kitchen
                         </Button>
@@ -643,25 +708,25 @@ const Menu = () => {
                           variant="contained"
                           sx={{ padding: 2 }}
                           size="large"
-                          disabled={proceedToCheckOut === true}
+                          // disabled={proceedToCheckOut === true}
                           startIcon={<ReceiptLongIcon />}
-                          onClick={() =>
-                            printBillOnly(
-                              orderId,
-                              waiterName,
-                              chosenTable,
-                              totalOrdersQty,
-                              totalOrdersPrice,
-                              orderItems
-                            )
-                          }
+                          // onClick={() =>
+                          //   printBillOnly(
+                          //     orderId,
+                          //     waiterName,
+                          //     chosenTable,
+                          //     totalOrdersQty,
+                          //     totalOrdersPrice,
+                          //     orderItems
+                          //   )
+                          // }
                         >
                           Print Bill Only
                         </Button>
                       </Stack>
                     }
                   />
-                )} */}
+                )}
 
                 {/* Body */}
                 <CardContent sx={{ flexGrow: 1 }}>
@@ -688,7 +753,11 @@ const Menu = () => {
                 {chosenTableOrderItems?.length > 0 && (
                   <CardActions sx={{ flexDirection: "column", gap: 1 }}>
                     {proceedToCheckOut ? (
-                      <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ width: "100%" }}
+                      >
                         <Button
                           fullWidth
                           variant="contained"
@@ -737,9 +806,9 @@ const Menu = () => {
                 </Typography>
               </Alert>
             )}
-          </div>
-        )}
-      </div>
+          </Grid>
+        </Grid>
+      )}
     </Box>
   );
 }

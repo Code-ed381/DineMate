@@ -30,29 +30,8 @@ const useTableManagementStore = create((set, get) => ({
     message: "",
     severity: "success",
   },
-
-  // Set assign employee
-  setAssignEmployee: (employee) => set({ assignEmployee: employee }),
-
-  // Get employee
-  getEmployee: async () => {
-    let employeeStringified = localStorage.getItem("employee");
-    const employeeParsed = JSON.parse(employeeStringified);
-    set({ employee: employeeParsed[0] });
-  },
-
-  // Get employees
-  getEmployees: async () => {
-    try {
-      let { data: employees, error } = await supabase
-        .from("employees")
-        .select("*");
-      if (error) throw error;
-      set({ employees });
-    } catch (error) {
-      handleError(error);
-    }
-  },
+  loadingTables: false,
+  tablesLoaded: false,
 
   // Set total quantity
   setTotalQty: (qty) => set({ totalQty: qty }),
@@ -63,9 +42,6 @@ const useTableManagementStore = create((set, get) => ({
   // Set order
   setOrder: (order) => set({ order: order }),
 
-  // Set items loading
-  setItemsLoading: (loading) => set({ itemsLoading: loading }),
-
   // Preprocess tables
   preprocessTables: (tables) => {
     return tables.map((table) => ({
@@ -73,36 +49,6 @@ const useTableManagementStore = create((set, get) => ({
       waiterName:
         table.assign && table.assign.name ? table.assign.name : "Unknown",
     }));
-  },
-
-  // Fetch tables
-  getTables: async () => {
-    try {
-      set({ loading: true });
-      const { employee } = get();
-      let query = supabase
-        .from("restaurant_tables_with_session")
-        .select("*")
-        .eq(
-          "restaurant_id",
-          useRestaurantStore.getState().selectedRestaurant.restaurants.id
-        )
-        .order("table_number", { ascending: true });
-
-      // Filter tables by waiter
-      if (employee.role === "waiter") {
-        query = query.or(`assign.eq.${employee.id},status.eq.available`);
-      }
-
-      let { data: tables, error } = await query;
-
-      if (error) throw error;
-
-      set({ tables: get().preprocessTables(tables), loading: false });
-    } catch (error) {
-      handleError(error);
-      set({ loading: false });
-    }
   },
 
   // Add a new table
@@ -316,6 +262,10 @@ const useTableManagementStore = create((set, get) => ({
       return { message: "ordering"};
     }
     if (status === "view order") { 
+      const filterActiveSessionByTableNumber = useMenuStore.getState().filterActiveSessionByTableNumber;
+
+      filterActiveSessionByTableNumber(table.table_number);
+      
       set({ open: true });
 
       return { message: "viewing"};
@@ -436,27 +386,25 @@ const useTableManagementStore = create((set, get) => ({
   // Fetch tables  with session and table overview
   getTablesOverview: async () => {
     const { selectedRestaurant } = useRestaurantStore.getState();
+    set({ loadingTables: true });
 
     try {
       const { data, error } = await supabase
         .from("waiter_tables_overview")
         .select("*")
-        .eq("restaurant_id", useRestaurantStore.getState().selectedRestaurant.restaurants.id)
+        .eq("restaurant_id", selectedRestaurant.restaurants.id)
         .or(`effective_status.eq.available,waiter_id.eq.${useAuthStore.getState().user.user.id}`)
         .order("table_number", { ascending: true });
 
       if (error) throw error;
 
-      console.log(data);
-      set({ tables: data });
+      set({ tables: data || [], tablesLoaded: true });
     } catch (error) {
       handleError(error);
     }
-  },
-
-  // Set tables
-  setTables: (tables) => {
-    set({ tables });
+    finally {
+      set({ loadingTables: false });
+    }
   },
 
   // Set snackbar

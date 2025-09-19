@@ -9,7 +9,7 @@ const style = {
   top: "50%",
   left: "50%",
   transform: "translate(-50%, -50%)",
-  width: 400,
+  width: "50%",
   bgcolor: "background.paper",
   border: "2px solid #000",
   boxShadow: 24,
@@ -19,8 +19,7 @@ const style = {
 export default function TransitionsModal({ open, handleClose, children }) {
 
   return (
-    <div>
-      <Modal
+    <Modal
         aria-labelledby="transition-modal-title"
         aria-describedby="transition-modal-description"
         open={open}
@@ -39,6 +38,5 @@ export default function TransitionsModal({ open, handleClose, children }) {
           </Box>
         </Fade>
       </Modal>
-    </div>
   );
 }
