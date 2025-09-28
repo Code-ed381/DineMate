@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Grid,
@@ -6,71 +6,53 @@ import {
   CardContent,
   CardHeader,
   Typography,
-  Avatar,
-  CircularProgress,
-  List,
-  ListItem,
-  Divider,
+  Avatar
 } from "@mui/material";
 import { PendingActions, DoneAll } from "@mui/icons-material";
 import AlarmOnIcon from "@mui/icons-material/AlarmOn";
-import RestaurantIcon from "@mui/icons-material/Restaurant";
 import RestaurantMenuIcon from "@mui/icons-material/RestaurantMenu";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-
-dayjs.extend(relativeTime);
+import useKitchenStore from "../lib/kitchenStore";
+import PendingMealsList from "./dashboards/components/pending-meals-list";
+import ReadyMealsList from "./dashboards/components/ready-meals-list";
+import ServedMealsList from "./dashboards/components/served-meals-list";
 
 const Kitchen = () => {
-  // Dummy data
-  const pendingMeals = [
-    {
-      id: 1,
-      menuItems: { item_name: "Grilled Chicken" },
-      order_no: "101",
-      orders: { tables: { table_no: "5" }, waiter: { name: "Alice" } },
-      status: "pending",
-      created_at: dayjs().subtract(15, "minute"),
-    },
-    {
-      id: 2,
-      menuItems: { item_name: "Pasta Alfredo" },
-      order_no: "102",
-      orders: { tables: { table_no: "2" }, waiter: { name: "Bob" } },
-      status: "cooking",
-      created_at: dayjs().subtract(25, "minute"),
-    },
-  ];
-  const readyMeals = [
-    {
-      id: 3,
-      menuItems: { item_name: "Caesar Salad" },
-      order_no: "103",
-      orders: { tables: { table_no: "8" }, waiter: { name: "Jane" } },
-      status: "ready",
-      created_at: dayjs().subtract(10, "minute"),
-    },
-  ];
-  const servedMeals = [
-    {
-      id: 4,
-      menuItems: { item_name: "Steak" },
-      order_no: "104",
-      orders: { tables: { table_no: "1" }, waiter: { name: "Tom" } },
-      status: "served",
-      created_at: dayjs().subtract(40, "minute"),
-      paid: true,
-    },
-    {
-      id: 5,
-      menuItems: { item_name: "Burger" },
-      order_no: "105",
-      orders: { tables: { table_no: "3" }, waiter: { name: "Lucy" } },
-      status: "served",
-      created_at: dayjs().subtract(60, "minute"),
-      paid: false,
-    },
-  ];
+  const {
+    pendingMeals,
+    readyMeals,
+    servedMeals,
+    handleFetchPendingMeals,
+    handleUpdateOrderItemStatus,
+    handleFetchReadyMeals,
+    handleFetchServedMeals,
+  } = useKitchenStore();
+  
+  dayjs.extend(relativeTime);
+
+  function elapsedMinutesSince(iso, maxMinutes) {
+    try {
+      const then = new Date(iso);
+      const diff = Date.now() - then.getTime();
+      const minutes = Math.floor(diff / 60000);
+      return maxMinutes ? Math.min(minutes, maxMinutes) : minutes;
+    } catch {
+      return 0;
+    }
+  }
+
+  function progressValue(iso, maxMinutes) {
+    const elapsed = elapsedMinutesSince(iso);
+    const ratio = Math.min(elapsed / maxMinutes, 1); // cap at 100%
+    return ratio * 100;
+  } 
+
+  useEffect(() => {
+    handleFetchPendingMeals();
+    handleFetchReadyMeals();
+    handleFetchServedMeals();
+  }, [handleFetchPendingMeals, handleFetchReadyMeals, handleFetchServedMeals]);
 
   const getTimeAgo = (timestamp) => dayjs(timestamp).fromNow();
 
@@ -105,7 +87,7 @@ const Kitchen = () => {
           </Box>
         </Box>
       </Box>
-      
+
       {/* Summary Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={4}>
@@ -127,7 +109,7 @@ const Kitchen = () => {
                 variant="h6"
                 sx={{ fontWeight: "bold", color: "#bf360c" }}
               >
-                {pendingMeals.length}
+                {pendingMeals?.length}
               </Typography>
               <Typography variant="body2" sx={{ color: "#bf360c" }}>
                 Pending Orders
@@ -154,7 +136,7 @@ const Kitchen = () => {
                 variant="h6"
                 sx={{ fontWeight: "bold", color: "#0d47a1" }}
               >
-                {readyMeals.length}
+                {readyMeals?.length}
               </Typography>
               <Typography variant="body2" sx={{ color: "#0d47a1" }}>
                 Ready Orders
@@ -181,7 +163,7 @@ const Kitchen = () => {
                 variant="h6"
                 sx={{ fontWeight: "bold", color: "#2e7d32" }}
               >
-                {servedMeals.length}
+                {servedMeals?.length}
               </Typography>
               <Typography variant="body2" sx={{ color: "#2e7d32" }}>
                 Served Orders
@@ -199,7 +181,8 @@ const Kitchen = () => {
             sx={{
               borderRadius: 3,
               boxShadow: 3,
-              height: "80vh",
+              maxHeight: "100vh",
+              overflowY: "auto",
               display: "flex",
               flexDirection: "column",
               position: "relative",
@@ -210,48 +193,18 @@ const Kitchen = () => {
               sx={{ backgroundColor: "#ff5722", color: "#fff" }}
             />
             <CardContent sx={{ overflowY: "auto", flexGrow: 1 }}>
-              {pendingMeals.length === 0 ? (
+              {pendingMeals?.length === 0 ? (
                 <Typography textAlign="center" sx={{ mt: 3, color: "#9e9e9e" }}>
                   No pending meals.
                 </Typography>
               ) : (
-                <List>
-                  {pendingMeals.map((dish) => (
-                    <ListItem
-                      key={dish.id}
-                      sx={{
-                        mb: 1.5,
-                        py: 2,
-                        px: 2,
-                        backgroundColor: "#fff3e0",
-                        borderRadius: 2,
-                        boxShadow: 1,
-                      }}
-                    >
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontWeight: 600, color: "#bf360c" }}>
-                          {dish.menuItems.item_name}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: "#6d4c41" }}>
-                          Order #{dish.order_no} • Table{" "}
-                          {dish.orders.tables.table_no} •{" "}
-                          {dish.orders.waiter.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "#6d4c41" }}>
-                          {getTimeAgo(dish.created_at)}
-                        </Typography>
-                      </Box>
-                      {dish.status === "pending" && (
-                        <Typography variant="caption" sx={{ color: "#bf360c" }}>
-                          TAP TO START
-                        </Typography>
-                      )}
-                      {dish.status === "cooking" && (
-                        <CircularProgress size={40} sx={{ color: "#ff5722" }} />
-                      )}
-                    </ListItem>
-                  ))}
-                </List>
+                  <PendingMealsList
+                    pendingMeals={pendingMeals}
+                    handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
+                    getTimeAgo={getTimeAgo}
+                    elapsedMinutesSince={elapsedMinutesSince}
+                    progressValue={progressValue}
+                  />
               )}
             </CardContent>
           </Card>
@@ -263,7 +216,8 @@ const Kitchen = () => {
             sx={{
               borderRadius: 3,
               boxShadow: 3,
-              height: "80vh",
+              maxHeight: "100vh",
+              overflowY: "auto",
               display: "flex",
               flexDirection: "column",
             }}
@@ -278,41 +232,11 @@ const Kitchen = () => {
                   No ready meals.
                 </Typography>
               ) : (
-                <List>
-                  {readyMeals.map((dish) => (
-                    <ListItem
-                      key={dish.id}
-                      sx={{
-                        mb: 1.5,
-                        py: 2,
-                        px: 2,
-                        backgroundColor: "#e3f2fd",
-                        borderRadius: 2,
-                        boxShadow: 1,
-                      }}
-                    >
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontWeight: 600, color: "#0d47a1" }}>
-                          {dish.menuItems.item_name}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: "#1976d2" }}>
-                          Order #{dish.order_no} • Table{" "}
-                          {dish.orders.tables.table_no} •{" "}
-                          {dish.orders.waiter.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "#1976d2" }}>
-                          {getTimeAgo(dish.created_at)}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 600, color: "#0d47a1" }}
-                      >
-                        TAP TO SERVE
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
+                  <ReadyMealsList
+                    readyMeals={readyMeals}
+                    handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
+                    getTimeAgo={getTimeAgo}
+                  />
               )}
             </CardContent>
           </Card>
@@ -324,59 +248,26 @@ const Kitchen = () => {
             sx={{
               borderRadius: 3,
               boxShadow: 3,
-              height: "80vh",
+              maxHeight: "100vh",
+              overflowY: "auto",
               display: "flex",
               flexDirection: "column",
             }}
           >
             <CardHeader
-              title="Served Orders"
+              title="Served Orders (Last 24 hours)"
               sx={{ backgroundColor: "#4caf50", color: "#fff" }}
             />
             <CardContent sx={{ overflowY: "auto", flexGrow: 1 }}>
-              {servedMeals.length === 0 ? (
+              {servedMeals?.length === 0 ? (
                 <Typography textAlign="center" sx={{ mt: 3, color: "#9e9e9e" }}>
                   No served meals.
                 </Typography>
               ) : (
-                <List>
-                  {servedMeals.map((dish) => (
-                    <ListItem
-                      key={dish.id}
-                      sx={{
-                        mb: 1.5,
-                        py: 2,
-                        px: 2,
-                        backgroundColor: "#e8f5e9",
-                        borderRadius: 2,
-                        boxShadow: 1,
-                      }}
-                    >
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontWeight: 600, color: "#2e7d32" }}>
-                          {dish.menuItems.item_name}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: "#43a047" }}>
-                          Order #{dish.order_no} • Table{" "}
-                          {dish.orders.tables.table_no} •{" "}
-                          {dish.orders.waiter.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "#43a047" }}>
-                          {getTimeAgo(dish.created_at)}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontWeight: 600,
-                          color: dish.paid ? "#1b5e20" : "#b00020",
-                        }}
-                      >
-                        {dish.paid ? "PAID" : "NOT PAID"}
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
+                  <ServedMealsList
+                    servedMeals={servedMeals}
+                    getTimeAgo={getTimeAgo}
+                  />
               )}
             </CardContent>
           </Card>

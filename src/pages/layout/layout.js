@@ -109,7 +109,6 @@ const Drawer = styled(MuiDrawer, {
 
 
 const Layout = () => {
-  const { mode, setMode } = useColorScheme();
   const [open, setOpen] = React.useState(false);
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -129,15 +128,6 @@ const Layout = () => {
   const last_name = user.user.user_metadata.lastName;
 
   useEffect(() => {
-    console.log(mode);
-    if (mode === "dark") {
-      document.body.classList.add("dark");
-    } else {
-      document.body.classList.remove("dark");
-    }
-  }, [mode]);
-
-  useEffect(() => {
     getRestaurants(user.user.id);
   }, [getRestaurants]);
 
@@ -153,8 +143,6 @@ const Layout = () => {
     if (restaurants.length === 1 && !selectedRestaurant) {
       setSelectedRestaurant(restaurants[0]);
     }
-
-    console.log(selectedRestaurant);
   }, [restaurants, selectedRestaurant]);
 
   const formatDate = (date) => {
@@ -205,170 +193,170 @@ const Layout = () => {
       {selectedRestaurant && (
         <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
           <CssBaseline />
-          
-            <AppBar position="absolute" open={open}>
-              <Toolbar sx={{ pr: "20px" }}>
-                <IconButton
-                  edge="start"
-                  color="inherit"
-                  aria-label="open drawer"
-                  onClick={toggleDrawer}
-                  sx={{
-                    marginRight: "30px",
-                    ...(open && { display: "none" }),
-                  }}
-                >
-                  <MenuIcon />
-                </IconButton>
 
-                <img
-                  src={logo}
-                  alt="Logo"
-                  style={{ height: "40px", marginRight: "16px" }}
-                />
+          <AppBar position="absolute" open={open} >
+            <Toolbar sx={{ pr: "20px" }}>
+              <IconButton
+                edge="start"
+                color="inherit"
+                aria-label="open drawer"
+                onClick={toggleDrawer}
+                sx={{
+                  marginRight: "30px",
+                  ...(open && { display: "none" }),
+                }}
+              >
+                <MenuIcon />
+              </IconButton>
 
+              <img
+                src={selectedRestaurant?.restaurants?.logo}
+                alt="Logo"
+                style={{ height: "40px", marginRight: "16px" }}
+              />
+
+              <Typography
+                component="h1"
+                variant="h5"
+                color="inherit"
+                noWrap
+                sx={{ mr: 2, fontWeight: "900" }}
+              >
+                {selectedRestaurant?.restaurants?.name}{" "}
+                <span style={{ fontWeight: "normal", fontSize: "14px" }}>
+                  * {breadcrumb}
+                </span>
+              </Typography>
+
+              {/* Centered Time & Date */}
+              <Box sx={{ mx: "auto" }}>
                 <Typography
-                  component="h1"
-                  variant="h5"
+                  variant="title"
                   color="inherit"
+                  sx={{ fontWeight: "900" }}
                   noWrap
-                  sx={{ mr: 2, fontWeight: "900" }}
                 >
-                  {selectedRestaurant?.restaurants?.name}{" "}
-                  <span style={{ fontWeight: "normal", fontSize: "14px" }}>
-                    * {breadcrumb}
-                  </span>
+                  {formatDate(currentTime)}
                 </Typography>
-
-                {/* Centered Time & Date */}
-                <Box sx={{ mx: "auto" }}>
-                  <Typography
-                    variant="title"
-                    color="inherit"
-                    sx={{ fontWeight: "900" }}
-                    noWrap
-                  >
-                    {formatDate(currentTime)}
-                  </Typography>
               </Box>
 
               <ThemeToggle />
-              
-                {restaurants.length > 1 && (
-                <TooltipComponent title="Switch Restaurant">
-                    <IconButton
-                      size="large"
-                      aria-label="show 17 new notifications"
-                      color="inherit"
-                      onClick={() => navigate("/restaurant-selection")}
-                    >
-                      <CachedIcon />
-                    </IconButton>
-                  </TooltipComponent>
-                )}
 
-                <TooltipComponent title="Notifications">
+              {restaurants.length > 1 && (
+                <TooltipComponent title="Switch Restaurant">
                   <IconButton
                     size="large"
                     aria-label="show 17 new notifications"
                     color="inherit"
-                    onClick={handleClick}
+                    onClick={() => navigate("/restaurant-selection")}
                   >
-                    <Badge badgeContent={17} color="error">
-                      <NotificationsIcon />
-                    </Badge>
+                    <CachedIcon />
                   </IconButton>
-                  <Popover
-                    id={id}
-                    open={openNotification}
-                    anchorEl={anchorEl}
-                    onClose={handleClose}
-                    anchorOrigin={{
-                      vertical: "bottom",
-                      horizontal: "left",
-                    }}
-                  >
-                    <Typography sx={{ p: 2 }}>
-                      The content of the Popover.The content of the Popover.
-                    </Typography>
-                  </Popover>
                 </TooltipComponent>
+              )}
 
-                <IconButton color="inherit">
-                  <Box sx={{ flexGrow: 0 }}>
-                    <TooltipComponent title="Open settings">
-                      <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar
-                          alt="Remy Sharp"
-                          src={user?.user?.user_metadata?.profileAvatar}
-                        />
-                      </IconButton>
-                    </TooltipComponent>
-                    <Menu
-                      sx={{ mt: "45px" }}
-                      id="menu-appbar"
-                      anchorEl={anchorElUser}
-                      anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                      keepMounted
-                      transformOrigin={{
-                        vertical: "top",
-                        horizontal: "right",
-                      }}
-                      open={Boolean(anchorElUser)}
-                      onClose={handleCloseUserMenu}
-                    >
-                      <MenuItem disabled>
-                        <Typography
-                          variant="title"
-                          color="inherit"
-                          sx={{ fontWeight: "900" }}
-                          noWrap
-                        >
-                          {first_name + " " + last_name}
-                        </Typography>
-                      </MenuItem>
-                      <Divider />
-                      <MenuItem
-                        onClick={() => {
-                          handleCloseUserMenu();
-                          navigate("dashboard");
-                        }}
-                      >
-                        <DashboardIcon sx={{ mr: 1 }} />
-                        <Typography textAlign="center">Dashboard</Typography>
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() => {
-                          handleCloseUserMenu();
-                          navigate("profile");
-                          setBreadcrumb("Profile");
-                        }}
-                      >
-                        <PersonIcon sx={{ mr: 1 }} />
-                        <Typography textAlign="center">Profile</Typography>
-                      </MenuItem>
-                      {selectedRestaurant.role === "owner" && (
-                        <MenuItem
-                          onClick={() => {
-                            handleCloseUserMenu();
-                            navigate("settings");
-                            setBreadcrumb("Settings");
-                          }}
-                        >
-                          <SettingsIcon sx={{ mr: 1 }} />
-                          <Typography textAlign="center">Settings</Typography>
-                        </MenuItem>
-                      )}
-                      <Divider component="li" />
-                      <MenuItem onClick={logout}>
-                        <LogoutIcon sx={{ mr: 1 }} />
-                        <Typography textAlign="center">Logout</Typography>
-                      </MenuItem>
-                    </Menu>
-                  </Box>
+              <TooltipComponent title="Notifications">
+                <IconButton
+                  size="large"
+                  aria-label="show 17 new notifications"
+                  color="inherit"
+                  onClick={handleClick}
+                >
+                  <Badge badgeContent={17} color="error">
+                    <NotificationsIcon />
+                  </Badge>
                 </IconButton>
-              </Toolbar>
-            </AppBar>
+                <Popover
+                  id={id}
+                  open={openNotification}
+                  anchorEl={anchorEl}
+                  onClose={handleClose}
+                  anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "left",
+                  }}
+                >
+                  <Typography sx={{ p: 2 }}>
+                    The content of the Popover.The content of the Popover.
+                  </Typography>
+                </Popover>
+              </TooltipComponent>
+
+              <IconButton color="inherit">
+                <Box sx={{ flexGrow: 0 }}>
+                  <TooltipComponent title="Open settings">
+                    <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                      <Avatar
+                        alt="Remy Sharp"
+                        src={user?.user?.user_metadata?.profileAvatar}
+                      />
+                    </IconButton>
+                  </TooltipComponent>
+                  <Menu
+                    sx={{ mt: "45px" }}
+                    id="menu-appbar"
+                    anchorEl={anchorElUser}
+                    anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                    keepMounted
+                    transformOrigin={{
+                      vertical: "top",
+                      horizontal: "right",
+                    }}
+                    open={Boolean(anchorElUser)}
+                    onClose={handleCloseUserMenu}
+                  >
+                    <MenuItem disabled>
+                      <Typography
+                        variant="title"
+                        color="inherit"
+                        sx={{ fontWeight: "900" }}
+                        noWrap
+                      >
+                        {first_name + " " + last_name}
+                      </Typography>
+                    </MenuItem>
+                    <Divider />
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseUserMenu();
+                        navigate("dashboard");
+                      }}
+                    >
+                      <DashboardIcon sx={{ mr: 1 }} />
+                      <Typography textAlign="center">Dashboard</Typography>
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseUserMenu();
+                        navigate("profile");
+                        setBreadcrumb("Profile");
+                      }}
+                    >
+                      <PersonIcon sx={{ mr: 1 }} />
+                      <Typography textAlign="center">Profile</Typography>
+                    </MenuItem>
+                    {selectedRestaurant.role === "owner" && (
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseUserMenu();
+                          navigate("settings");
+                          setBreadcrumb("Settings");
+                        }}
+                      >
+                        <SettingsIcon sx={{ mr: 1 }} />
+                        <Typography textAlign="center">Settings</Typography>
+                      </MenuItem>
+                    )}
+                    <Divider component="li" />
+                    <MenuItem onClick={logout}>
+                      <LogoutIcon sx={{ mr: 1 }} />
+                      <Typography textAlign="center">Logout</Typography>
+                    </MenuItem>
+                  </Menu>
+                </Box>
+              </IconButton>
+            </Toolbar>
+          </AppBar>
           <Drawer variant="permanent" open={open}>
             <Toolbar
               sx={{

@@ -4,7 +4,6 @@ import {
   Grid,
   Card,
   CardContent,
-  CardHeader,
   Typography,
   Avatar,
   List,
@@ -12,8 +11,8 @@ import {
   Chip,
   IconButton,
   Stack,
-  Divider,
   LinearProgress,
+  Divider,
 } from "@mui/material";
 import {
   LocalBar,
@@ -22,9 +21,9 @@ import {
   Warning,
   MonetizationOn,
   Notifications,
+  TrendingUp,
   BarChart as BarIcon,
   PieChart as PieIcon,
-  InsertChart,
 } from "@mui/icons-material";
 import {
   ResponsiveContainer,
@@ -37,12 +36,9 @@ import {
   Pie,
   Cell,
   Legend,
-  BarChart,
-  Bar,
 } from "recharts";
-import DashboardHeader from "../../components/dashboard-header";
+import DashboardHeader from "./components/dashboard-header";
 
-// BartenderDashboardPro (JSX) — flat cards, consistent with other dashboards
 const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336"];
 
 export default function BartenderDashboardPro({
@@ -53,9 +49,9 @@ export default function BartenderDashboardPro({
   notifications = [],
   tipsToday = 0,
   completedCount = 0,
-  throughputSeries = null, // [{time: '10:00', served: 5}, ...]
+  throughputSeries = null,
 }) {
-  // sensible defaults for charts
+  // default data
   const defaultSeries = [
     { time: "10:00", served: 2 },
     { time: "11:00", served: 6 },
@@ -64,18 +60,17 @@ export default function BartenderDashboardPro({
     { time: "14:00", served: 8 },
     { time: "15:00", served: 12 },
   ];
-
   const series = throughputSeries || defaultSeries;
 
-  // small aggregations
   const totals = useMemo(() => {
-    const pending = activeDrinks.length;
-    const ready = readyDrinks.length;
-    const special = specialRequests.length;
-    const alerts = inventoryAlerts.length;
-    const served = completedCount;
-    const tips = tipsToday;
-    return { pending, ready, special, alerts, served, tips };
+    return {
+      pending: activeDrinks.length,
+      ready: readyDrinks.length,
+      special: specialRequests.length,
+      alerts: inventoryAlerts.length,
+      served: completedCount,
+      tips: tipsToday,
+    };
   }, [
     activeDrinks,
     readyDrinks,
@@ -85,7 +80,6 @@ export default function BartenderDashboardPro({
     tipsToday,
   ]);
 
-  // top drinks breakdown
   const breakdown = useMemo(() => {
     const map = {};
     [...activeDrinks, ...readyDrinks, ...specialRequests].forEach((d) => {
@@ -95,7 +89,6 @@ export default function BartenderDashboardPro({
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [activeDrinks, readyDrinks, specialRequests]);
 
-  // mock top sellers if none
   const topSellers = useMemo(() => {
     if (breakdown.length)
       return breakdown.slice(0, 5).sort((a, b) => b.value - a.value);
@@ -107,123 +100,105 @@ export default function BartenderDashboardPro({
   }, [breakdown]);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box
+      sx={{
+        p: { xs: 2, md: 3 },
+        // background: "linear-gradient(180deg,#f9f9f9,#f1f5f9)",
+      }}
+    >
       <DashboardHeader
-        title="Bartender Dashboard"
-        description="Here’s a quick summary of your restaurant’s performance today."
-        background="linear-gradient(135deg, rgba(25,118,210,1) 0%, rgba(0,200,150,1) 100%)"
+        title="🍹 Bartender Dashboard"
+        description="Monitor drink orders, sales, and performance in real time."
+        background="linear-gradient(135deg,#1976d2,#43cea2)"
         color="#fff"
       />
-      {/* KPI strip — flat cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
-                <LocalBar />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  {totals.pending}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Drinks
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        </Grid>
 
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
-                <DoneAll />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  {totals.served}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Completed Drinks
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
-                <Star />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  {totals.special}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Special Requests
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
-                <Warning />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  {totals.alerts}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Inventory Alerts
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: "transparent", color: "text.primary" }}>
-                <MonetizationOn />
-              </Avatar>
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  ${totals.tips}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Tips Today
-                </Typography>
-              </Box>
-            </Stack>
-          </Card>
-        </Grid>
+      {/* KPI strip */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        {[
+          {
+            label: "Pending",
+            value: totals.pending,
+            icon: <LocalBar />,
+            color: "#ff9800",
+          },
+          {
+            label: "Completed",
+            value: totals.served,
+            icon: <DoneAll />,
+            color: "#4caf50",
+          },
+          {
+            label: "Special Requests",
+            value: totals.special,
+            icon: <Star />,
+            color: "#9c27b0",
+          },
+          {
+            label: "Inventory Alerts",
+            value: totals.alerts,
+            icon: <Warning />,
+            color: "#f44336",
+          },
+          {
+            label: "Tips Today",
+            value: `$${totals.tips}`,
+            icon: <MonetizationOn />,
+            color: "#2196f3",
+          },
+        ].map((kpi, i) => (
+          <Grid item xs={12} sm={6} md={2.4} key={i}>
+            <Card
+              sx={{
+                p: 2,
+                borderRadius: 3,
+                // background: "rgba(255,255,255,0.7)",
+                backdropFilter: "blur(8px)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                transition: "all .3s",
+                "&:hover": {
+                  transform: "translateY(-3px)",
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+                },
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar sx={{ bgcolor: kpi.color, color: "#fff" }}>
+                  {kpi.icon}
+                </Avatar>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    {kpi.value}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {kpi.label}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
-      {/* Summary + Charts */}
+      {/* Charts */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={8}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader
-              title="Throughput (drinks served)"
-              action={
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+            <CardContent>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ mb: 2 }}
+              >
+                <Typography variant="h6">
+                  📈 Throughput (drinks served)
+                </Typography>
                 <IconButton>
                   <BarIcon />
                 </IconButton>
-              }
-            />
-            <CardContent>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Hourly throughput helps spot service peaks and staffing needs.
-              </Typography>
-              <Box sx={{ height: 220 }}>
+              </Stack>
+              <Box sx={{ height: 250 }}>
                 <ResponsiveContainer>
                   <LineChart data={series}>
                     <XAxis dataKey="time" />
@@ -235,6 +210,7 @@ export default function BartenderDashboardPro({
                       stroke="#1976d2"
                       strokeWidth={3}
                       dot={{ r: 4 }}
+                      fill="url(#colorServed)"
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -244,25 +220,28 @@ export default function BartenderDashboardPro({
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader
-              title="Drink Mix Breakdown"
-              action={
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
+            <CardContent>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ mb: 2 }}
+              >
+                <Typography variant="h6">🥂 Drink Mix Breakdown</Typography>
                 <IconButton>
                   <PieIcon />
                 </IconButton>
-              }
-            />
-            <CardContent>
-              <Box sx={{ height: 220 }}>
+              </Stack>
+              <Box sx={{ height: 250 }}>
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie
                       data={breakdown}
                       dataKey="value"
                       nameKey="name"
-                      outerRadius={80}
-                      innerRadius={36}
+                      outerRadius={90}
+                      innerRadius={40}
                       label
                     >
                       {breakdown.map((_, i) => (
@@ -279,12 +258,14 @@ export default function BartenderDashboardPro({
         </Grid>
       </Grid>
 
-      {/* Lists + Top sellers */}
+      {/* Lists */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader title="Active Drink Orders" />
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
             <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                🕒 Active Drink Orders
+              </Typography>
               <List>
                 {activeDrinks.length === 0 && (
                   <Typography color="text.secondary" align="center">
@@ -294,9 +275,15 @@ export default function BartenderDashboardPro({
                 {activeDrinks.map((drink) => (
                   <ListItem
                     key={drink.id}
-                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
+                    sx={{
+                      bgcolor: "rgba(33,150,243,0.08)",
+                      mb: 1,
+                      borderRadius: 2,
+                      p: 2,
+                      justifyContent: "space-between",
+                    }}
                   >
-                    <Box sx={{ flex: 1 }}>
+                    <Box>
                       <Typography fontWeight={700}>{drink.drink}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         Table {drink.table} • {drink.status}
@@ -319,19 +306,22 @@ export default function BartenderDashboardPro({
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader title="Top Sellers (today)" />
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
             <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                ⭐ Top Sellers (today)
+              </Typography>
               <List>
-                {topSellers.map((s, i) => (
+                {topSellers.map((s) => (
                   <ListItem
                     key={s.name}
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
-                      bgcolor: "grey.50",
+                      bgcolor: "rgba(76,175,80,0.08)",
                       mb: 1,
-                      borderRadius: 1,
+                      borderRadius: 2,
+                      p: 2,
                     }}
                   >
                     <Box>
@@ -355,11 +345,12 @@ export default function BartenderDashboardPro({
           </Card>
         </Grid>
 
-        {/* Inventory Alerts + Notifications */}
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader title="Inventory Alerts" />
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
             <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                ⚠️ Inventory Alerts
+              </Typography>
               <List>
                 {inventoryAlerts.length === 0 && (
                   <Typography color="text.secondary" align="center">
@@ -369,9 +360,15 @@ export default function BartenderDashboardPro({
                 {inventoryAlerts.map((a, idx) => (
                   <ListItem
                     key={idx}
-                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
+                    sx={{
+                      bgcolor: "rgba(244,67,54,0.08)",
+                      mb: 1,
+                      borderRadius: 2,
+                      p: 2,
+                      justifyContent: "space-between",
+                    }}
                   >
-                    <Box sx={{ flex: 1 }}>
+                    <Box>
                       <Typography fontWeight={700}>{a.item}</Typography>
                       <Typography variant="caption" color="text.secondary">
                         {a.detail || "Low stock"}
@@ -390,9 +387,11 @@ export default function BartenderDashboardPro({
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 2, boxShadow: 1 }}>
-            <CardHeader title="Bar Notifications" />
+          <Card sx={{ borderRadius: 3, boxShadow: 2 }}>
             <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                🔔 Bar Notifications
+              </Typography>
               <List>
                 {notifications.length === 0 && (
                   <Typography color="text.secondary" align="center">
@@ -402,9 +401,14 @@ export default function BartenderDashboardPro({
                 {notifications.map((n) => (
                   <ListItem
                     key={n.id}
-                    sx={{ bgcolor: "grey.50", mb: 1, borderRadius: 1 }}
+                    sx={{
+                      bgcolor: "rgba(33,150,243,0.08)",
+                      mb: 1,
+                      borderRadius: 2,
+                      p: 2,
+                    }}
                   >
-                    <Avatar sx={{ bgcolor: "transparent", mr: 2 }}>
+                    <Avatar sx={{ bgcolor: "#2196f3", mr: 2, color: "#fff" }}>
                       <Notifications />
                     </Avatar>
                     <Box>
@@ -423,10 +427,10 @@ export default function BartenderDashboardPro({
         </Grid>
       </Grid>
 
-      <Box sx={{ mt: 3, textAlign: "center" }}>
+      <Divider sx={{ my: 4 }} />
+      <Box sx={{ textAlign: "center" }}>
         <Typography variant="caption" color="text.secondary">
-          Tip: connect this dashboard to your POS and inventory system to
-          populate charts in real-time.
+          💡 Tip: connect this dashboard to POS & inventory for live updates.
         </Typography>
       </Box>
     </Box>

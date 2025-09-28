@@ -49,7 +49,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import DashboardHeader from "../../components/dashboard-header";
+import DashboardHeader from "./components/dashboard-header";
 import useAuthStore from "../../lib/authStore";
 
 // ————————————————————————————————————————————

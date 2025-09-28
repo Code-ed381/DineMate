@@ -1,26 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
-  Grid,
   Typography,
-  Card,
-  CardContent,
-  Button,
-  Chip,
-  List,
-  ListItem,
-  ListItemText,
+  Divider
 } from "@mui/material";
-import {
-  LocalBar,
-  Schedule,
-  Done,
-  History,
-  HourglassTop,
-  Person,
-  Receipt,
-} from "@mui/icons-material";
 import LocalBarIcon from "@mui/icons-material/LocalBar";
+import useBarStore from "../lib/barStore";
+import OTCTabs from "../components/bar-over-the-counter-section";
+import BigOptionButtons from "../components/bar-option-buttons";
+import BartenderDineInPanel from "../components/bartender-dine-in-panel";
 
 const activeOrders = [
   {
@@ -56,6 +44,11 @@ const completedOrders = [
 
 export default function BartenderPanel() {
   const [orders, setOrders] = useState(activeOrders);
+  const { items, handleFetchItems, barOptionSelected } = useBarStore();
+
+  useEffect(() => {
+    handleFetchItems();
+  }, []);
 
   const markAsReady = (id) => {
     const order = orders.find((o) => o.id === id);
@@ -96,233 +89,15 @@ export default function BartenderPanel() {
           </Box>
         </Box>
       </Box>
+      
+      {/* Big Option Buttons */}
+      <BigOptionButtons />
 
-      <Grid container spacing={3}>
-        {/* Active Orders */}
-        <Grid item xs={12} md={6}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              border: "1px solid #ffa726",
-              bgcolor: "#fff8f0",
-            }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#ef6c00",
-                }}
-              >
-                <HourglassTop /> Active Drink Orders
-              </Typography>
-              <List>
-                {orders.map((order) => (
-                  <ListItem
-                    key={order.id}
-                    sx={{
-                      border: "1px solid #ffe0b2",
-                      borderRadius: 2,
-                      mb: 1,
-                      background: "#fff",
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {order.drinks.join(", ")}
-                        </Typography>
-                      }
-                      secondary={
-                        <>
-                          <Typography variant="body2" color="text.secondary">
-                            <Receipt fontSize="small" /> {order.id} •{" "}
-                            <Person fontSize="small" /> {order.source}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            <Schedule fontSize="small" /> {order.time}
-                          </Typography>
-                        </>
-                      }
-                    />
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color="warning"
-                      onClick={() => markAsReady(order.id)}
-                      startIcon={<Done />}
-                    >
-                      Mark Ready
-                    </Button>
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Dine In Panel */}
+      {barOptionSelected === "dine_in" && <BartenderDineInPanel />}
 
-        {/* Ready for Pickup */}
-        <Grid item xs={12} md={6}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              border: "1px solid #66bb6a",
-              bgcolor: "#f1f8f5",
-            }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#2e7d32",
-                }}
-              >
-                <LocalBar /> Ready for Pickup
-              </Typography>
-              {readyOrders.length > 0 ? (
-                <List>
-                  {readyOrders.map((order) => (
-                    <ListItem
-                      key={order.id}
-                      sx={{
-                        border: "1px solid #c8e6c9",
-                        borderRadius: 2,
-                        mb: 1,
-                        background: "#fff",
-                      }}
-                    >
-                      <ListItemText
-                        primary={`${order.drinks.join(", ")}`}
-                        secondary={`${order.id} • ${order.source}`}
-                      />
-                      <Chip label="Ready" color="success" size="small" />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Typography color="text.secondary">
-                  No ready drinks yet
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Completed Orders */}
-        <Grid item xs={12}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              border: "1px solid #42a5f5",
-              bgcolor: "#f0f7ff",
-            }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#1565c0",
-                }}
-              >
-                <History /> Recent Completed Orders
-              </Typography>
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                {completedOrders.map((order) => (
-                  <Chip
-                    key={order.id}
-                    label={`${order.drinks.join(", ")} • ${order.time}`}
-                    variant="outlined"
-                    color="primary"
-                    icon={<Done />}
-                  />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Quick Stats */}
-        <Grid item xs={12}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ borderRadius: 3, bgcolor: "#fff3e0" }}>
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Drinks Made Today
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="warning.main"
-                  >
-                    52
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ borderRadius: 3, bgcolor: "#e8f5e9" }}>
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary">
-                    Pending Orders
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="success.main"
-                  >
-                    7
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ borderRadius: 3, bgcolor: "#e3f2fd" }}>
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary">
-                    Average Prep Time
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="primary.main"
-                  >
-                    4 min
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ borderRadius: 3, bgcolor: "#fce4ec" }}>
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary">
-                    Most Popular Drink
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="secondary.main"
-                  >
-                    Mojito
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Grid>
-      </Grid>
+      {/* Takeaway Panel */}
+      {barOptionSelected === "takeaway" && <OTCTabs />}
     </Box>
   );
 }

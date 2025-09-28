@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import useRestaurantStore from '../lib/restaurantStore';
 import useAuthStore from '../lib/authStore';
 import { supabase } from './supabase';
@@ -8,7 +9,7 @@ import { printReceipt } from "../components/PrintWindow";
 import { database_logs } from './logActivities';
 
 // Create the menu store with zustand
-const useMenuStore = create((set, get) => ({
+const useMenuStore = create(persist((set, get) => ({
   activeSessionByRestaurant: [],
   assignedTablesLoaded: false,
   tableSelected: false,
@@ -65,6 +66,8 @@ const useMenuStore = create((set, get) => ({
   activeSeesionByTableNumberLoaded: false,
   activeSeesionByRestaurantLoaded: false,
 
+  setAssignedTables: (table) => set({ assignedTables: table }),
+
   // Fetch categories
   fetchCategories: async () => {
     set({ loadingCategories: true });
@@ -120,26 +123,8 @@ const useMenuStore = create((set, get) => ({
     }
   },
 
-  setBillPrinted: (value) => set({ bill_printed: value }),
-
   setTableSelected: () => {
     set({ tableSelected: false });
-  },
-
-  // Set cash value
-  setCash: (value) => {
-    if (/^\d{0,10}(\.\d{0,2})?$/.test(value)) {
-      // Regex to allow only numbers and up to 2 decimal places
-      set({ cash: value });
-    }
-  },
-
-  // Set card value
-  setCard: (value) => {
-    if (/^\d{0,10}(\.\d{0,2})?$/.test(value)) {
-      // Regex to allow only numbers and up to 2 decimal places
-      set({ card: value });
-    }
   },
 
   // Confirm payment function
@@ -405,61 +390,6 @@ const useMenuStore = create((set, get) => ({
     }
   },
 
-  // Search Meals
-  searchMeals: (searchTerm) => {
-    const { originalMeals } = get(); // Always use originalMeals to filter from full dataset
-
-    if (searchTerm === "") {
-      set({
-        meals: originalMeals,
-        searchMealValue: searchTerm,
-        mealsBackgroundColor: "#fff",
-      }); // Reset to original meals if search is empty
-    } else {
-      const filtered = originalMeals.filter((meal) => {
-        const values = Object.values(meal);
-        return values.some(
-          (value) =>
-            typeof value === "string" &&
-            value.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      });
-      set({
-        meals: filtered,
-        searchMealValue: searchTerm,
-        mealsBackgroundColor: "#fff",
-        mealsColor: "#00000",
-      });
-    }
-  },
-
-  // Search drinks
-  searchDrinks: (searchTerm) => {
-    const { originalDrinks } = get(); // Access the drinks state
-
-    if (searchTerm === "") {
-      set({
-        drinks: originalDrinks,
-        searchDrinkValue: searchTerm,
-        drinksBackgroundColor: "#fff",
-      }); // Reset to original drinks if search is empty
-    } else {
-      const filtered = originalDrinks.filter((drink) => {
-        const values = Object.values(drink);
-        return values.some(
-          (value) =>
-            typeof value === "string" &&
-            value.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      });
-      set({
-        drinks: filtered,
-        searchDrinkValue: searchTerm,
-        drinksBackgroundColor: "#fff",
-        drinksColor: "#00000",
-      });
-    }
-  },
 
   // Set the selected table
   setChosenTable: async (table) => {
@@ -482,6 +412,7 @@ const useMenuStore = create((set, get) => ({
         orderItemsLoaded: false,
         waiterName: null,
         orderId: null,
+        table: null,
       });
       resetStepper(); // Reset the stepper
       return; // Exit the function
@@ -492,6 +423,7 @@ const useMenuStore = create((set, get) => ({
       chosenTable: table.table_number,
       tableSelected: true,
       proceedToCheckOut: false,
+      table: table,
     }); // Set the chosen table and reset checkout state
     resetStepper(); // Reset the stepper when a new table is chosen
 
@@ -499,54 +431,25 @@ const useMenuStore = create((set, get) => ({
   },
 
   // Function to update the printed status in the state and database
-  updatePrintedStatus: async (orderId) => {
-    const { orderItems } = get(); // Access the order items state
-
-    // Update locally in selectedTableOrders
-    const updatedOrders = orderItems.map((item) => ({
-      ...item,
-      orders: {
-        ...item.orders,
-        printed: true, // Update the printed status
-      },
-    }));
-    set({ orderItems: updatedOrders });
-
-    // Update Supabase for all matching orders
-    const { error } = await supabase
-      .from("orders")
-      .update({ printed: true })
-      .eq("id", orderId)
+  updateSessionStatus: async (status) => {
+    const { chosenTableSession } = get();
+    const { data, error } = await supabase
+      .from("table_sessions")
+      .update({ status })
+      .eq("table_id", chosenTableSession.table_id)
+      .eq("restaurant_id", chosenTableSession.restaurant_id)
       .select();
+          
     if (error) {
-      handleError(error); // Handle error if updating Supabase fails
-    }
+      handleError(error);
+    } 
+
+    get().filterActiveSessionByTableNumber(get().chosenTable);
   },
 
   // Function to update the printed status in the state and database
-  updatePrintedBillStatus: async (orderId) => {
-    const { orderItems } = get(); // Access the order items state
-
-    // Update locally in selectedTableOrders
-    const updatedOrders = orderItems.map((item) => ({
-      ...item,
-      orders: {
-        ...item.orders,
-        printed: true, // Update the printed status
-        bill_printed: true,
-      },
-    }));
-    set({ orderItems: updatedOrders });
-
-    // Update Supabase for all matching orders
-    const { error } = await supabase
-      .from("orders")
-      .update({ printed: true, bill_printed: true })
-      .eq("id", orderId)
-      .select();
-    if (error) {
-      handleError(error); // Handle error if updating Supabase fails
-    }
+  handlePrintBill: async () => {
+    
   },
 
   // Function to add or update an order item
@@ -827,7 +730,7 @@ const useMenuStore = create((set, get) => ({
 
       if (error) throw error;
 
-      console.log(waiter_orders_overview);
+      console.log(waiter_orders_overview.order_items);
 
       set({
         chosenTableSession: waiter_orders_overview,
@@ -868,6 +771,17 @@ const useMenuStore = create((set, get) => ({
   setFilteredMenuItems: (menuItems) => {
     set({ filteredMenuItems: menuItems });
   },
-}));
+}),
+{
+  name: "menuStore",
+  version: 1,
+  partialize: (state) => ({
+    assignedTables: state.assignedTables,
+    chosenTable: state.chosenTable,
+    chosenTableOrderItems: state.chosenTableOrderItems,
+    chosenTableSession: state.chosenTableSession,
+  }),
+}
+));
 
 export default useMenuStore;

@@ -1,13 +1,16 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { supabase } from './supabase';
 import { handleError } from '../components/Error';
 import useMenuStore from './menuStore';
 import useRestaurantStore from './restaurantStore';
 import useAuthStore from './authStore';
+import { createJSONStorage } from 'zustand/middleware';
 
-const useTablesStore = create((set, get) => ({
+const useTablesStore = create(persist((set, get) => ({
   open: false,
   tables: [],
+  table: {},
   loadingTables: false,
   tablesLoaded: false,
   snackbar: {
@@ -19,6 +22,69 @@ const useTablesStore = create((set, get) => ({
   chosenTableOrderItems: [],
   loadingActiveSessionByTableNumber: false,
   activeSeesionByTableNumberLoaded: false,
+
+  // Set table
+  setTable: (table) => {
+    set({ table });
+  },
+
+  // set open
+  setOpen: (open) => {
+    set({ open });
+  },
+
+  // update table and delete order
+  handleCloseTableBtn: async (tableSession) => {
+    console.log("tableSession", tableSession);
+    const { getActiveSessionByRestaurant, setTableSelected, setAssignedTables } =
+      useMenuStore.getState();
+    
+    const { selectedRestaurant } = useRestaurantStore.getState();
+    // delete order
+    const { error: ordersError } = await supabase
+      .from("orders")
+      .delete()
+      .eq("session_id", tableSession?.session_id)
+      .eq(
+        "restaurant_id",
+        selectedRestaurant.restaurants.id
+      )
+      .select();
+
+    if (ordersError) throw ordersError;
+
+    // delete table session
+    const { error: tableSessionError } = await supabase
+      .from("table_sessions")
+      .delete()
+      .eq("id", tableSession.session_id)
+      .eq(
+        "restaurant_id",
+        selectedRestaurant.restaurants.id
+      )
+      .select();
+
+    if (tableSessionError) throw tableSessionError;
+
+    // update table status
+    const { error: tablesError } = await supabase
+      .from("restaurant_tables")
+      .update({ status: "available" })
+      .eq("id", tableSession.table_id)
+      .eq(
+        "restaurant_id",
+        selectedRestaurant.restaurants.id
+      )
+      .select();
+
+    if (tablesError) throw tablesError;
+
+    get().getTablesOverview();
+    getActiveSessionByRestaurant();
+    set({ open: false, table: {}, chosenTableSession: [], chosenTableOrderItems: [] });
+    setTableSelected(false);
+    setAssignedTables([]);
+  },
 
   // Close modals
   handleClose: () => {
@@ -59,6 +125,7 @@ const useTablesStore = create((set, get) => ({
 
   // Change table status and handle actions
   handleStatusChange: async (table, status) => {
+    get().setTable(table);
     if (status === "reserve table") {
       const { error: tablesError } = await supabase
         .from("restaurant_tables")
@@ -149,7 +216,7 @@ const useTablesStore = create((set, get) => ({
     }
     if (status === "view order") {
       get().filterActiveSessionByTableNumber(table.table_number);
-
+      console.log("table", table);
       set({ open: true });
 
       return { message: "viewing" };
@@ -158,6 +225,7 @@ const useTablesStore = create((set, get) => ({
 
   // filter active session by table number
   filterActiveSessionByTableNumber: async (tableNumber) => {
+    console.log("tableNumber", tableNumber);
     set({
       loadingActiveSessionByTableNumber: true,
     });
@@ -232,6 +300,21 @@ const useTablesStore = create((set, get) => ({
       handleError(error);
     }
   },
-}));
+}),
+  {
+    name: "tables",
+    partialize: (state) => ({
+      table: state.table,
+      tables: state.tables,
+      open: state.open,
+      snackbar: state.snackbar,
+      chosenTableSession: state.chosenTableSession,
+      chosenTableOrderItems: state.chosenTableOrderItems,
+      loadingActiveSessionByTableNumber: state.loadingActiveSessionByTableNumber,
+      activeSessionByTableNumberLoaded: state.activeSessionByTableNumberLoaded,
+    }),
+    version: 1,
+  }
+));
 
 export default useTablesStore;

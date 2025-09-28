@@ -37,13 +37,14 @@ import {
   Block,
   LockClock,
   EventSeat,
-  LocalDining
+  LocalDining,
+  Add
 } from "@mui/icons-material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import useMenuStore from "../lib/menuStore";
 import TransitionsModal from "../components/modal";
 import ErrorIcon from "@mui/icons-material/Error";
-import TableSectionSkeleton from "../components/table-section-skeleton";
+import TableSectionSkeleton from "../components/skeletons/table-section-skeleton";
 import useTablesStore from "../lib/tablesStore";
 
 const statusColors = {
@@ -59,6 +60,7 @@ export default function TableManagement() {
   const {
     getTablesOverview,
     tables,
+    table,
     handleStatusChange,
     setSnackbar,
     snackbar,
@@ -71,7 +73,13 @@ export default function TableManagement() {
     handleRemoveItem,
     loadingActiveSessionByTableNumber,
     activeSessionByTableNumberLoaded,
+    setOpen,
+    handleCloseTableBtn,
   } = useTablesStore();
+
+  const setTableSelected = useMenuStore((state) => state.setTableSelected);
+  const setChosenTable = useMenuStore((state) => state.setChosenTable);
+
   const navigate = useNavigate();
 
   // single filtering logic
@@ -141,6 +149,13 @@ export default function TableManagement() {
 
       navigate("/app/menu");
     }
+  }
+
+  const handleAddOrderItemBtn = () => {
+    setTableSelected(true);
+    setChosenTable(table);
+    handleClose();
+    navigate("/app/menu");
   }
 
   return (
@@ -467,7 +482,12 @@ export default function TableManagement() {
                           )}
 
                           {table.table_status === "reserved" && (
-                            <Stack direction="row" spacing={1.2} key={table.id}>
+                            <Stack
+                              direction="row"
+                              spacing={1.2}
+                              key={table.id}
+                              sx={{ width: "100%" }}
+                            >
                               <Button
                                 fullWidth
                                 size="small"
@@ -493,7 +513,7 @@ export default function TableManagement() {
                                     "cancel reservation"
                                   )
                                 }
-                                sx={{ fontWeight: 600, borderRadius: 2 }}
+                                sx={{ width: "100%" }}
                               >
                                 Cancel Reservation
                               </Button>
@@ -555,12 +575,15 @@ export default function TableManagement() {
           <>
             {/* Orders */}
             {!loadingActiveSessionByTableNumber ? (
-              activeSessionByTableNumberLoaded && chosenTableOrderItems?.length > 0 ? (
+              activeSessionByTableNumberLoaded &&
+              chosenTableOrderItems?.length > 0 ? (
                 <TableContainer>
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: "bold" }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>
+                          <CancelIcon fontSize="small" color="error"/>
+                        </TableCell>
                         <TableCell sx={{ fontWeight: "bold" }}>
                           Product
                         </TableCell>
@@ -576,16 +599,14 @@ export default function TableManagement() {
                         return (
                           <TableRow key={index}>
                             <TableCell>
-                              {chosenTableSession?.session_status ===
-                                "open" && (
-                                <IconButton
-                                  onClick={() => handleRemoveItem(item)}
-                                  color="error"
-                                  size="small"
-                                >
-                                  <CancelIcon fontSize="small" />
-                                </IconButton>
-                              )}
+                              <IconButton
+                                onClick={() => handleRemoveItem(item)}
+                                color="error"
+                                size="small"
+                                disabled={item?.status !== "pending" || chosenTableSession?.session_status !== "open"}
+                              >
+                                <CancelIcon fontSize="small" />
+                              </IconButton>
                             </TableCell>
                             <TableCell>
                               {item.menu_item?.name?.toUpperCase()}
@@ -651,10 +672,9 @@ export default function TableManagement() {
                 <Box
                   sx={{
                     display: "flex",
-                    flexDirection: "column", // 👈 stack vertically
                     justifyContent: "center",
                     alignItems: "center",
-                    textAlign: "center",
+                    flexDirection: "column",
                   }}
                 >
                   <ErrorIcon
@@ -662,20 +682,44 @@ export default function TableManagement() {
                   />
                   <Typography variant="h6" color="text.secondary" gutterBottom>
                     No order items found on table{" "}
-                    {chosenTableSession.table_number}
+                    {chosenTableSession?.table_number}
                   </Typography>
+                  <Stack
+                    spacing={2}
+                    direction="row"
+                    justifyContent="center"
+                    mt={2}
+                  >
+                    <Button
+                      startIcon={<Add />}
+                      variant="contained"
+                      color="primary"
+                      onClick={handleAddOrderItemBtn}
+                    >
+                      Add Order Item
+                    </Button>
+                    <Button
+                      startIcon={<CancelIcon />}
+                      variant="contained"
+                      color="error"
+                      onClick={() => handleCloseTableBtn(chosenTableSession)}
+                    >
+                      Close Table
+                    </Button>
+                  </Stack>
                 </Box>
-              )) : (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <CircularProgress />
-                </Box>
-              )}
+              )
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            )}
           </>
         }
       />

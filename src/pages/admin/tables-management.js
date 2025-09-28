@@ -64,7 +64,7 @@ const statusColors = {
 };
 
 export default function TableManagement() {
-  const { getTables, addTable, tables } = useTableManagementStore();
+  const { getTablesOverview, addTable, tables, loadingTables } = useTableManagementStore();
   const { viewMode } = useAppStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -203,10 +203,8 @@ export default function TableManagement() {
   });
 
   useEffect(() => {
-    getTables();
-  }, [getTables]);
-
-  console.log(tables);
+    getTablesOverview();
+  }, [getTablesOverview]);
 
   const filteredTables = useMemo(() => {
     const normalize = (val) => val?.toString().toLowerCase() ?? "";
@@ -530,7 +528,7 @@ export default function TableManagement() {
               display: "flex",
               alignItems: "center",
               borderRadius: 3,
-              border: "1px solid #ddd",
+              // border: "1px solid #ddd",
             }}
           >
             <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}>
@@ -551,7 +549,7 @@ export default function TableManagement() {
               display: "flex",
               alignItems: "center",
               borderRadius: 3,
-              border: "1px solid #ddd",
+              // border: "1px solid #ddd",
             }}
           >
             <Avatar sx={{ bgcolor: "success.main", mr: 2 }}>
@@ -572,7 +570,7 @@ export default function TableManagement() {
               display: "flex",
               alignItems: "center",
               borderRadius: 3,
-              border: "1px solid #ddd",
+              // border: "1px solid #ddd",
             }}
           >
             <Avatar sx={{ bgcolor: "error.main", mr: 2 }}>
@@ -585,7 +583,7 @@ export default function TableManagement() {
               </Typography>
             </Box>
           </Paper>
-        </Grid>
+        </Grid> 
         <Grid item xs={12} sm={6} md={3}>
           <Paper
             sx={{
@@ -593,7 +591,7 @@ export default function TableManagement() {
               display: "flex",
               alignItems: "center",
               borderRadius: 3,
-              border: "1px solid #ddd",
+              // border: "1px solid #ddd",
             }}
           >
             <Avatar sx={{ bgcolor: "warning.main", mr: 2 }}>
@@ -688,7 +686,7 @@ export default function TableManagement() {
                     display: "flex",
                     flexDirection: "column",
                     borderRadius: 3,
-                    border: "1px solid #eee",
+                    // border: "1px solid #eee",
                     boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
                     overflow: "hidden",
                     transition: "all 0.25s ease-in-out",
@@ -818,8 +816,8 @@ export default function TableManagement() {
                   <Box
                     sx={{
                       p: 1.5,
-                      borderTop: "1px solid #f0f0f0",
-                      bgcolor: "grey.50",
+                      // borderTop: "1px solid #f0f0f0",
+                      // bgcolor: "grey.50",
                     }}
                   >
                     <Stack direction="row" spacing={1.2}>

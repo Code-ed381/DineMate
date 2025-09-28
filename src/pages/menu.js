@@ -32,7 +32,6 @@ import {
   Card,
   CardContent,
   CardActionArea,
-  CardHeader,
   Button,
   LinearProgress
 } from '@mui/material';
@@ -58,8 +57,8 @@ import {
 import useMenuStore from  "../lib/menuStore";
 
 // Components
-import { printBillOnly, printForKitchen } from "../components/PrintWindow";
-import MenuSkeleton from "../components/menu-section-skeleton";
+import { printReceipt } from "../components/PrintWindow";
+import MenuSkeleton from "../components/skeletons/menu-section-skeleton";
 
 
 const Menu = () => {
@@ -70,7 +69,6 @@ const Menu = () => {
     isSelectedTable,
     assignedTablesLoaded,
     tableSelected,
-    totalOrdersPrice,
     activeStep,
     steps,
     handleNext,
@@ -83,8 +81,6 @@ const Menu = () => {
     setCard,
     addOrUpdateObject,
     handleRemoveItem,
-    noTablesFound,
-    bill_printed,
     getActiveSessionByRestaurant,
     setSelectedCategory,
     selectedCategory,
@@ -101,6 +97,7 @@ const Menu = () => {
     activeSessionByTableNumberLoaded,
     loadingActiveSessionByRestaurant,
     loadingActiveSessionByTableNumber,
+    updateSessionStatus,
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -149,7 +146,7 @@ const Menu = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: "bold" }}>#</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}><CancelIcon fontSize="small" color="error" /></TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Product</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Price</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Qty</TableCell>
@@ -165,16 +162,14 @@ const Menu = () => {
                           return (
                             <TableRow key={index}>
                               <TableCell>
-                                {chosenTableSession?.session_status ===
-                                  "open" && (
-                                  <IconButton
-                                    onClick={() => handleRemoveItem(item)}
-                                    color="error"
-                                    size="small"
-                                  >
-                                    <CancelIcon fontSize="small" />
-                                  </IconButton>
-                                )}
+                                <IconButton
+                                  onClick={() => handleRemoveItem(item)}
+                                  color="error"
+                                  size="small"
+                                  disabled={chosenTableSession?.session_status !== "open" || item?.item_status != "pending"}
+                                >
+                                  <CancelIcon fontSize="small" />
+                                </IconButton>
                               </TableCell>
                               <TableCell>
                                 {item.menu_item?.name?.toUpperCase()}
@@ -214,7 +209,7 @@ const Menu = () => {
                 <TableFooter>
                   <TableRow sx={{ border: "none" }}>
                     <TableCell colSpan={4} sx={{ py: 0.5 }}>
-                      <Typography variant="subtitle1">Order Total</Typography>
+                      <Typography variant="subtitle1">Subtotal</Typography>
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
                       <Typography variant="subtitle1">
@@ -253,12 +248,12 @@ const Menu = () => {
                   </TableRow>
                   <TableRow sx={{ border: "none" }}>
                     <TableCell colSpan={4} sx={{ py: 0.5 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="bold" color="success">
                         Total
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="bold" color="success">
                         {!loadingActiveSessionByTableNumber &&
                         activeSessionByTableNumberLoaded
                           ? chosenTableSession?.order_total?.toFixed(2)
@@ -276,7 +271,7 @@ const Menu = () => {
           <>
             <Stack justifyContent='center' alignItems='center' spacing={3} mt={4}>
               <Typography variant="h6">Total Amount</Typography>
-              <Typography variant='h2'><strong>&#163; {formatCashInput(totalOrdersPrice)}</strong></Typography>
+              <Typography variant='h2'><strong>&#163; {formatCashInput(chosenTableSession?.order_total)}</strong></Typography>
 
               <FormControl fullWidth sx={{ m: 1 }}>
                 <InputLabel htmlFor="outlined-adornment-amount">Card</InputLabel>
@@ -339,6 +334,13 @@ const Menu = () => {
       filterMenuItemsByCategory(category);
     }
   };
+
+  // print bill
+  const handlePrintReceipt = async (status) => {
+    await updateSessionStatus(status);
+    
+    printReceipt(status);
+  };
   
   return (
     <Box m={2}>
@@ -370,9 +372,7 @@ const Menu = () => {
                         {assignedTables.map((table, i) => (
                           <Button
                             variant={
-                              isSelectedTable(table)
-                                ? "contained"
-                                : "outlined"
+                              isSelectedTable(table) && tableSelected ? "contained" : "outlined"
                             }
                             key={i}
                             sx={{ padding: 4, marginRight: 1 }}
@@ -508,7 +508,7 @@ const Menu = () => {
               </Box>
             )}
 
-            {tableSelected === true && assignedTables.length > 0 ? (
+            {tableSelected === true && assignedTables.length > 0 && (
               <Box
                 mt={2}
                 sx={{
@@ -538,8 +538,7 @@ const Menu = () => {
                           color="text.secondary"
                           sx={{ mb: 3 }}
                         >
-                          Contact your restaurant owner/admin to add menu
-                          items
+                          Contact your restaurant owner/admin to add menu items
                         </Typography>
                       </Box>
                     </Grid>
@@ -639,7 +638,9 @@ const Menu = () => {
                             color: "text.secondary",
                           }}
                         >
-                          <CancelIcon sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
+                          <CancelIcon
+                            sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                          />
                           <Typography variant="h6" gutterBottom>
                             No results found
                           </Typography>
@@ -652,7 +653,9 @@ const Menu = () => {
                   </Grid>
                 )}
               </Box>
-            ) : (
+            )}
+
+            {tableSelected === false && assignedTables.length > 0 && (
               <Box
                 sx={{
                   textAlign: "center",
@@ -679,55 +682,6 @@ const Menu = () => {
                   flexDirection: "column",
                 }}
               >
-                {/* Header actions */}
-                {totalOrdersPrice === 0 && (
-                  <CardHeader
-                    title={
-                      <Stack direction="row" spacing={1}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          // disabled={proceedToCheckOut === true}
-                          sx={{ padding: 2 }}
-                          size="large"
-                          startIcon={<SoupKitchenIcon />}
-                          // onClick={() =>
-                          //   printForKitchen(
-                          //     orderId,
-                          //     waiterName,
-                          //     chosenTable,
-                          //     orderItems
-                          //   )
-                          // }
-                        >
-                          Print For Kitchen
-                        </Button>
-
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          sx={{ padding: 2 }}
-                          size="large"
-                          // disabled={proceedToCheckOut === true}
-                          startIcon={<ReceiptLongIcon />}
-                          // onClick={() =>
-                          //   printBillOnly(
-                          //     orderId,
-                          //     waiterName,
-                          //     chosenTable,
-                          //     totalOrdersQty,
-                          //     totalOrdersPrice,
-                          //     orderItems
-                          //   )
-                          // }
-                        >
-                          Print Bill Only
-                        </Button>
-                      </Stack>
-                    }
-                  />
-                )}
-
                 {/* Body */}
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ width: "100%" }}>
@@ -753,11 +707,7 @@ const Menu = () => {
                 {chosenTableOrderItems?.length > 0 && (
                   <CardActions sx={{ flexDirection: "column", gap: 1 }}>
                     {proceedToCheckOut ? (
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{ width: "100%" }}
-                      >
+                      <Stack direction="row" spacing={1} sx={{ width: "100%" }}>
                         <Button
                           fullWidth
                           variant="contained"
@@ -783,28 +733,115 @@ const Menu = () => {
                         </Button>
                       </Stack>
                     ) : (
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        sx={{ padding: 2 }}
-                        size="large"
-                        color="success"
-                        disabled={!bill_printed}
-                        endIcon={<ShoppingCartCheckoutIcon />}
-                        onClick={handleNext}
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ width: "100%", m: 2 }}
                       >
-                        Proceed To CheckOut
-                      </Button>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          sx={{ padding: 4 }}
+                          size="large"
+                          // disabled={proceedToCheckOut === true}
+                          startIcon={<ReceiptLongIcon />}
+                          onClick={() => handlePrintReceipt("billed")}
+                        >
+                          Print Bill
+                        </Button>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          sx={{ padding: 4 }}
+                          size="large"
+                          color="success"
+                          disabled={
+                            chosenTableSession?.session_status != "billed"
+                          }
+                          endIcon={<ShoppingCartCheckoutIcon />}
+                          onClick={handleNext}
+                        >
+                          Proceed To CheckOut
+                        </Button>
+                      </Stack>
                     )}
                   </CardActions>
                 )}
               </Card>
             ) : (
-              <Alert severity="info" sx={{ width: "100%" }}>
-                <Typography variant="h6">
-                  SELECT A TABLE TO OPEN RECEIPT
-                </Typography>
-              </Alert>
+              <Card
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "100%",
+                }}
+              >
+                {/* Stepper */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    p: 2,
+                  }}
+                >
+                  <Skeleton variant="rectangular" width={150} height={30} />
+                  <Skeleton variant="rectangular" width={150} height={30} />
+                </Box>
+
+                <CardContent sx={{ flexGrow: 1 }}>
+                  {/* Order info */}
+                  <Box sx={{ mb: 2 }}>
+                    <Skeleton variant="text" width="60%" height={20} />
+                    <Skeleton variant="text" width="40%" height={20} />
+                  </Box>
+
+                  {/* Order table rows */}
+                  {[1, 2, 3, 4, 5].map((row) => (
+                    <Box
+                      key={row}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        mb: 1,
+                      }}
+                    >
+                      <Skeleton variant="text" width="40%" height={20} />
+                      <Skeleton variant="text" width="20%" height={20} />
+                    </Box>
+                  ))}
+
+                  {/* Totals */}
+                  <Box
+                    sx={{
+                      borderTop: "1px solid",
+                      borderColor: "divider",
+                      mt: 2,
+                      pt: 2,
+                    }}
+                  >
+                    {["Order Total", "Tax", "Discount", "Total"].map(
+                      (label, i) => (
+                        <Box
+                          key={i}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 1,
+                          }}
+                        >
+                          <Skeleton variant="text" width="40%" height={20} />
+                          <Skeleton variant="text" width="20%" height={20} />
+                        </Box>
+                      )
+                    )}
+                  </Box>
+                </CardContent>
+
+                {/* Checkout button */}
+                <Box sx={{ p: 2 }}>
+                  <Skeleton variant="rectangular" height={50} width="100%" />
+                </Box>
+              </Card>
             )}
           </Grid>
         </Grid>
