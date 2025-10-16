@@ -28,21 +28,15 @@ import {
   CheckCircleOutline,
   Search,
 } from "@mui/icons-material";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as ReTooltip,
-  ResponsiveContainer,
-} from "recharts";
+import BarChartTwoToneIcon from "@mui/icons-material/BarChartTwoTone";
 import useMenuStore from "../../lib/menuStore";
 import DashboardHeader from "./components/dashboard-header";
 import WaiterDashboardSkeleton from "./components/skeletons/waiter-dashboard-skeleton";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
+import { Bar } from "react-chartjs-2";
+import "chart.js/auto";
+import SalesBarChart from "./components/sales-data-chart";
+import RevenueLineChartCard from "./components/revenue-line-chart-card";
 
 // ----- Helper Components -----
 const StatCard = ({ icon, value, subtitle, accent }) => (
@@ -98,13 +92,17 @@ const WaiterDashboard = () => {
     getActiveSessionByRestaurant,
     assignedTables,
     loadingActiveSessionByRestaurant,
+    salesData,
+    loadingChart,
+    fetchSalesData, 
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     getActiveSessionByRestaurant();
-  }, [getActiveSessionByRestaurant]);
+    fetchSalesData();
+  }, [getActiveSessionByRestaurant, fetchSalesData]);
 
   // ---- Derived Insights ----
   const totalRevenue = useMemo(
@@ -212,47 +210,31 @@ const WaiterDashboard = () => {
           {/* ---- Performance Charts ---- */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6}>
-              <Card sx={{ borderRadius: 2, height: 300 }}>
-                <CardHeader title="Waiter Performance" />
+              <Card sx={{ height: "100%", }}>
+                <CardHeader
+                  title={<Typography variant="subtitle1">Sales Performance</Typography>}
+                  subheader="Last 7 Days"
+                  avatar={<BarChartTwoToneIcon color="primary" />}
+                  sx={{ pb: 0 }}
+                />
                 <CardContent>
-                  <ResponsiveContainer width="100%" height="90%">
-                    <PieChart>
-                      <Pie
-                        data={performanceData}
-                        dataKey="value"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={90}
-                        label
-                      >
-                        {performanceData.map((entry, index) => (
-                          <Cell
-                            key={index}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <ReTooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <Box
+                    sx={{
+                      display: "flex",
+                    }}
+                  >
+                    {loadingChart ? (
+                      <CircularProgress />
+                    ) : (
+                      <SalesBarChart orders={assignedTables} />
+                    )}
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Card sx={{ borderRadius: 2, height: 300 }}>
-                <CardHeader title="Top Orders Today" />
-                <CardContent>
-                  <ResponsiveContainer width="100%" height="90%">
-                    <BarChart data={topOrdersData}>
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <ReTooltip />
-                      <Bar dataKey="qty" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              <RevenueLineChartCard />
             </Grid>
           </Grid>
 

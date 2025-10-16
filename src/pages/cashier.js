@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Grid,
@@ -19,23 +20,42 @@ import {
   TableHead,
   TableRow,
   Stack,
+  TableContainer,
+  Paper,
+  TextField,
+  Avatar,
+  Radio,
 } from "@mui/material";
 import {
   Receipt,
   ShoppingCart,
   Payment,
-  CheckCircle,
-  Cancel,
   AttachMoney,
   CreditCard,
   Smartphone,
   History,
-  MonetizationOn,
   Replay,
   LocalOffer,
   Add,
+  Person,
+  ReceiptLong,
+  ShoppingCartCheckout,
+  AccessTime,
+  Restaurant,
+  TableRestaurant,
 } from "@mui/icons-material";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
+import useCashierStore from "../lib/cashierStore";
+import {
+  formatDateTime,
+  formatDateTimeWithSuffix,
+} from "../utils/format-datetime";
+import CreditCardTwoToneIcon from "@mui/icons-material/CreditCardTwoTone";
+import MoneyTwoToneIcon from "@mui/icons-material/MoneyTwoTone";
+import PriceCheckTwoToneIcon from "@mui/icons-material/PriceCheckTwoTone";
+import SecurityUpdateGoodTwoToneIcon from "@mui/icons-material/SecurityUpdateGoodTwoTone";
+import OrdersAwaitingPayment from "../components/active-orders-view";
+import CashierDashboardSkeleton from "../components/skeletons/cashier-panel-skeleton";
 
 const orders = [
   {
@@ -65,271 +85,669 @@ const transactions = [
 ];
 
 export default function CashierDashboard() {
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const {
+    activeSessions,
+    loadingActiveSessionByRestaurant,
+    activeSeesionByRestaurantLoaded,
+    getActiveSessionByRestaurant,
+    setCashAmount,
+    setCardAmount,
+    setMomoAmount,
+    handlePaymentMethodChange,
+    cashAmount,
+    cardAmount,
+    momoAmount,
+    paymentMethod,
+    setPaymentMethod,
+    setSelectedSession,
+    selectedSession,
+    handlePayment,
+    handlePrintBill,
+    closedSessions,
+    allSessions,
+    setSelected,
+    selected,
+    proceedToPayment,
+    setProceedToPayment,
+  } = useCashierStore();
+  const [discount, setDiscount] = useState(0);
+
+  const theme = useTheme();
+
+  useEffect(() => {
+    getActiveSessionByRestaurant();
+  }, []);
+
+  const handleCashChange = (e) => {
+    const { value } = e.target;
+    const regex = /^\d+(\.\d{0,2})?$/;
+
+    if (value === "" || regex.test(value)) {
+      setCashAmount(value);
+    }
+  };
+
+  const options = [
+    {
+      value: "active",
+      title: "Active",
+      text: "View sessions that are currently open",
+    },
+    {
+      value: "recent",
+      title: "Recent",
+      text: "View sessions that were recently closed",
+    },
+  ];
+
+  const handleDiscountChange = (e) => {
+    const { value } = e.target;
+    const regex = /^\d+(\.\d{0,2})?$/;
+
+    if (value === "" || regex.test(value)) {
+      let num = parseFloat(value);
+
+      if (!isNaN(num)) {
+        // clamp the discount to not exceed the order_total
+        const maxDiscount = Number(selectedSession?.order_total) || 0;
+        if (num > maxDiscount) {
+          num = maxDiscount;
+        }
+        setDiscount(num.toString());
+      } else {
+        setDiscount(value); // allow empty string
+      }
+    }
+  };
+
+
+  const handleProceedToPayment = () => {
+    if (!proceedToPayment) {
+      setProceedToPayment(true);
+    }
+    else {
+      handlePayment();
+      setProceedToPayment(false);
+    }
+  };
+
+  const sessionStats = useMemo(() => {
+    return allSessions.reduce(
+      (acc, session) => {
+        acc.total += session.order_total || 0;
+
+        if (session.payment_method) {
+          acc[session.payment_method] =
+            (acc[session.payment_method] || 0) + (session.order_total || 0);
+        }
+
+        return acc;
+      },
+      { total: 0, cash: 0, card: 0, momo: 0 }
+    );
+  }, [allSessions]);
+
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          mb: 3,
-        }}
-      >
-        {/* Left: Icon + Title */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <PriceCheckIcon sx={{ fontSize: 36, color: "primary.main" }} />
-          <Box>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: "bold", letterSpacing: 0.5 }}
-            >
-              Cashier Panel
-            </Typography>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ fontStyle: "italic" }}
-            >
-              Track payments • Manage earnings • Record transactions
-            </Typography>
+    <>
+      {loadingActiveSessionByRestaurant ? (
+        <CashierDashboardSkeleton />
+      ) : (
+        <Box sx={{ p: 3 }}>
+          {/* Header */}
+          <Box sx={{ mb: 4 }}>
+            {/* Summary Bar */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}>
+                    <PriceCheckTwoToneIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{sessionStats.total}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Avatar sx={{ bgcolor: "success.main", mr: 2 }}>
+                    <MoneyTwoToneIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{sessionStats.cash}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Cash
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Avatar sx={{ bgcolor: "error.main", mr: 2 }}>
+                    <CreditCardTwoToneIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{sessionStats.card}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Card
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Avatar sx={{ bgcolor: "warning.main", mr: 2 }}>
+                    <SecurityUpdateGoodTwoToneIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6">{sessionStats.momo}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Momo
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
           </Box>
-        </Box>
-      </Box>
 
-      <Grid container spacing={3}>
-        {/* LEFT SIDE */}
-        <Grid item xs={12} md={7}>
-          {/* Daily Summary */}
-          <Card
-            sx={{ borderRadius: 3, mb: 3, borderLeft: "5px solid #4caf50" }}
-          >
-            <CardContent
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  alignItems: "center",
-                  color: "#4caf50",
-                }}
-              >
-                <MonetizationOn /> Total Sales Today: <strong>$1,235</strong>
-              </Typography>
-              <Typography variant="subtitle1">
-                Cash: <strong>$500</strong> | Card: <strong>$600</strong> |
-                Mobile: <strong>$135</strong>
-              </Typography>
-            </CardContent>
-          </Card>
-
-          {/* Orders */}
-          <Card
-            sx={{ borderRadius: 3, mb: 3, borderLeft: "5px solid #1976d2" }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#1976d2",
-                }}
-              >
-                <ShoppingCart /> Orders Awaiting Payment
-              </Typography>
-              <List>
-                {orders.map((order) => (
-                  <ListItem
-                    key={order.id}
-                    button
-                    onClick={() => setSelectedOrder(order)}
+          <Grid container spacing={3}>
+            {/* LEFT SIDE */}
+            <Grid item xs={12} md={7}>
+              {/* Select */}
+              <Box display="flex" gap={1} sx={{ mb: 2 }}>
+                {options.map((opt) => (
+                  <Paper
+                    key={opt.value}
+                    onClick={() => setSelected(opt.value)}
                     sx={{
-                      border: "1px solid #eee",
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      p: 2,
                       borderRadius: 2,
-                      mb: 1,
-                      "&:hover": { background: "#f0f7ff" },
+                      cursor: "pointer",
+                      border:
+                        selected === opt.value
+                          ? `2px solid ${theme.palette.primary.main}`
+                          : `1px solid ${theme.palette.divider}`,
+                      backgroundColor:
+                        selected === opt.value
+                          ? theme.palette.action.selected
+                          : theme.palette.background.paper,
+                    }}
+                    elevation={selected === opt.value ? 3 : 1}
+                  >
+                    <Radio
+                      checked={selected === opt.value}
+                      onChange={() => setSelected(opt.value)}
+                      value={opt.value}
+                      color="primary"
+                    />
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {opt.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {opt.text}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                ))}
+              </Box>
+
+              {/* Orders */}
+              {selected === "active" && (
+                <Card
+                  sx={{
+                    borderRadius: 3,
+                    mb: 3,
+                    borderLeft: "5px solid gold",
+                    maxHeight: "calc(100vh - 200px)",
+                    overflowY: "auto",
+                  }}
+                >
+                  <CardContent>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        mb: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <ShoppingCart /> Orders Awaiting Payment
+                    </Typography>
+                    <Divider />
+                    <List>
+                      {activeSessions.map((session) => (
+                        <ListItem
+                          key={session.id}
+                          button
+                          onClick={() => setSelectedSession(session)}
+                          sx={{
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 2,
+                            mb: 1,
+                            mt: 2,
+                            p: 2,
+                            "&:hover": { backgroundColor: "action.hover" },
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          {/* Top Row: Order ID and Status */}
+                          <Box
+                            sx={{
+                              width: "100%",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 1,
+                            }}
+                          >
+                            <Typography variant="subtitle1" fontWeight="bold">
+                              <Receipt
+                                fontSize="small"
+                                sx={{ mr: 0.5 }}
+                                color="action"
+                              />
+                              ORD-{session.order_id}
+                            </Typography>
+                            <Chip
+                              label={session.session_status}
+                              color={
+                                session.session_status === "billed"
+                                  ? "warning"
+                                  : session.session_status === "open"
+                                  ? "info"
+                                  : "error"
+                              }
+                              size="small"
+                            />
+                          </Box>
+
+                          {/* Second Row: Details Grid */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                              mb: 1,
+                            }}
+                          >
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <AttachMoney fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                Total: ${session.order_total}
+                              </Typography>
+                            </Box>
+
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <TableRestaurant
+                                fontSize="small"
+                                color="action"
+                              />
+                              <Typography variant="body2">
+                                Table {session.table_number ?? "N/A"}
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Person fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {session.waiter_first_name}{" "}
+                                {session.waiter_last_name}
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <AccessTime fontSize="small" color="action" />
+                              <Typography variant="body2">
+                                {formatDateTimeWithSuffix(session.opened_at)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Restaurant fontSize="small" color="action" />
+                            <Typography variant="body2">
+                              {session.order_items
+                                .map((item) => item.menu_item.name)
+                                .join(", ")}
+                            </Typography>
+                          </Box>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Transactions */}
+              {selected === "recent" && (
+                <Card
+                  sx={{
+                    borderRadius: 3,
+                    mb: 3,
+                    borderLeft: "5px solid #ff5252",
+                    maxHeight: "calc(100vh - 200px)",
+                    overflowY: "auto",
+                  }}
+                >
+                  <CardContent>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        mb: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <History /> Recent Transactions
+                    </Typography>
+                    <Divider />
+                    <Table sx={{ mt: 1 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>
+                            <TableRestaurant fontSize="small" /> Table
+                          </TableCell>
+                          <TableCell>
+                            <Receipt fontSize="small" /> Order
+                          </TableCell>
+                          <TableCell>
+                            <AttachMoney fontSize="small" /> Amount
+                          </TableCell>
+                          <TableCell>
+                            <Payment fontSize="small" /> Method
+                          </TableCell>
+                          <TableCell>
+                            <AccessTime fontSize="small" /> Closed At
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {closedSessions.map((session) => (
+                          <TableRow key={session.session_id}>
+                            <TableCell>{session.table_number}</TableCell>
+                            <TableCell>ORD-{session.order_id}</TableCell>
+                            <TableCell>${session.order_total}</TableCell>
+                            <TableCell>{session.payment_method}</TableCell>
+                            <TableCell>
+                              {formatDateTime(session.closed_at)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Actions */}
+              {/* <Card sx={{ borderRadius: 3, borderLeft: "5px solid #9c27b0" }}>
+              <CardContent>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    mb: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    color: "#9c27b0",
+                  }}
+                >
+                  ⚡ Quick Actions
+                </Typography>
+                <Stack direction="row" spacing={2}>
+                  <Button variant="outlined" startIcon={<Replay />} color="info">
+                    Refund
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<LocalOffer />}
+                    color="secondary"
+                  >
+                    Discount
+                  </Button>
+                  <Button variant="outlined" startIcon={<Add />} color="primary">
+                    Manual Order
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card> */}
+            </Grid>
+
+            {/* RIGHT SIDE - POS */}
+            <Grid item xs={12} md={5}>
+              <Card
+                sx={{
+                  borderRadius: 3,
+                  borderLeft: "5px solid green",
+                }}
+              >
+                <CardContent>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      mb: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      // color: "green",
                     }}
                   >
-                    <ListItemText
-                      primary={`${order.id} - $${order.total}`}
-                      secondary={order.items.join(", ")}
-                    />
-                    <Chip label={order.status} color="warning" size="small" />
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-
-          {/* Transactions */}
-          <Card
-            sx={{ borderRadius: 3, mb: 3, borderLeft: "5px solid #ff9800" }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#ff9800",
-                }}
-              >
-                <History /> Recent Transactions
-              </Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Order</TableCell>
-                    <TableCell>Amount</TableCell>
-                    <TableCell>Method</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{tx.id}</TableCell>
-                      <TableCell>{tx.orderId}</TableCell>
-                      <TableCell>${tx.amount}</TableCell>
-                      <TableCell>{tx.method}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card sx={{ borderRadius: 3, borderLeft: "5px solid #9c27b0" }}>
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#9c27b0",
-                }}
-              >
-                ⚡ Quick Actions
-              </Typography>
-              <Stack direction="row" spacing={2}>
-                <Button variant="outlined" startIcon={<Replay />} color="info">
-                  Refund
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<LocalOffer />}
-                  color="secondary"
-                >
-                  Discount
-                </Button>
-                <Button variant="outlined" startIcon={<Add />} color="primary">
-                  Manual Order
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* RIGHT SIDE - POS */}
-        <Grid item xs={12} md={5}>
-          <Card
-            sx={{
-              borderRadius: 3,
-              borderLeft: "5px solid #673ab7",
-              minHeight: "100%",
-            }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  mb: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "#673ab7",
-                }}
-              >
-                <Payment /> Checkout / POS
-              </Typography>
-
-              {selectedOrder ? (
-                <Box>
-                  <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                    <Receipt fontSize="small" /> Order: {selectedOrder.id}
+                    <Payment /> Checkout
                   </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    Items: {selectedOrder.items.join(", ")}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Total: ${selectedOrder.total}
-                  </Typography>
+                  <Divider />
 
-                  <Divider sx={{ mb: 2 }} />
+                  {selectedSession ? (
+                    <Box>
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ mb: 1, mt: 2, fontWeight: 600 }}
+                      >
+                        <Receipt fontSize="small" /> ORD-{" "}
+                        {selectedSession?.order_id}
+                      </Typography>
 
-                  <Typography variant="body2" sx={{ mb: 1 }}>
-                    Select Payment Method:
-                  </Typography>
-                  <ToggleButtonGroup
-                    value={paymentMethod}
-                    exclusive
-                    onChange={(e, val) => val && setPaymentMethod(val)}
-                    sx={{ mb: 2 }}
-                  >
-                    <ToggleButton value="cash">
-                      <AttachMoney /> Cash
-                    </ToggleButton>
-                    <ToggleButton value="card">
-                      <CreditCard /> Card
-                    </ToggleButton>
-                    <ToggleButton value="mobile">
-                      <Smartphone /> Mobile
-                    </ToggleButton>
-                  </ToggleButtonGroup>
+                      {/* Order Items Table */}
+                      <TableContainer
+                        component={Paper}
+                        sx={{ mb: 2, borderRadius: 2 }}
+                      >
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Item</TableCell>
+                              <TableCell align="right">Price</TableCell>
+                              <TableCell align="center">Qty</TableCell>
+                              <TableCell align="right">Amount</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {selectedSession.order_items.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{item.menu_item.name}</TableCell>
+                                <TableCell align="right">
+                                  {item.menu_item.price}
+                                </TableCell>
+                                <TableCell align="center">
+                                  {item.quantity}
+                                </TableCell>
+                                <TableCell align="right">
+                                  {item.menu_item.price * item.quantity}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
 
-                  <Box sx={{ display: "flex", gap: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      fullWidth
-                      startIcon={<CheckCircle />}
-                    >
-                      Complete Payment
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      fullWidth
-                      startIcon={<Cancel />}
-                    >
-                      Cancel
-                    </Button>
-                  </Box>
-                </Box>
-              ) : (
-                <Typography>Select an order to process</Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
+                      {/* Totals Section */}
+                      <Box sx={{ mb: 2 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Subtotal</span>
+                          <b>{selectedSession.order_total}</b>
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Discount</span>
+                          <b>{discount ?? 0}</b>
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Tax</span>
+                          <b>{selectedSession.order_tax ?? 0}</b>
+                        </Typography>
+                        <Divider sx={{ my: 1 }} />
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>Total</span>
+                          <span>
+                            $
+                            {selectedSession.order_total -
+                              (discount ?? 0) +
+                              (selectedSession.order_tax ?? 0)}
+                          </span>
+                        </Typography>
+                      </Box>
+                      <Divider sx={{ my: 2 }} />
+
+                      {/* Payment Methods */}
+                      {proceedToPayment && (
+                        <Box>
+                          <ToggleButtonGroup
+                            value={paymentMethod}
+                            fullWidth
+                            exclusive
+                            onChange={(e, val) => val && setPaymentMethod(val)}
+                            sx={{ mb: 2 }}
+                          >
+                            <ToggleButton value="cash" sx={{ p: 2 }}>
+                              <AttachMoney /> Cash
+                            </ToggleButton>
+                            <ToggleButton value="mobile" sx={{ p: 2 }}>
+                              <Smartphone /> MoMo
+                            </ToggleButton>
+                            <ToggleButton value="card" sx={{ p: 3 }}>
+                              <CreditCard /> Card
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+
+                          <Box>
+                            {paymentMethod === "cash" && (
+                              <>
+                                <TextField
+                                  required
+                                  fullWidth
+                                  variant="outlined"
+                                  label="Cash Amount Received"
+                                  type="text"
+                                  value={cashAmount}
+                                  onChange={handleCashChange}
+                                  sx={{ mb: 2 }}
+                                />
+
+                                <TextField
+                                  required
+                                  fullWidth
+                                  variant="outlined"
+                                  label="Discount"
+                                  type="text"
+                                  value={discount}
+                                  onChange={handleDiscountChange}
+                                  sx={{ mb: 2 }}
+                                />
+                              </>
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Actions */}
+                      <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+                        <Button
+                          variant="contained"
+                          color="info"
+                          fullWidth
+                          sx={{ textTransform: "none", p: 4 }}
+                          startIcon={<ReceiptLong />}
+                          onClick={handlePrintBill}
+                        >
+                          Print Bill
+                        </Button>
+                        <Button
+                          variant={proceedToPayment ? "contained" : "outlined"}
+                          color="success"
+                          fullWidth
+                          sx={{ textTransform: "none", p: 4 }}
+                          startIcon={<ShoppingCartCheckout />}
+                          onClick={handleProceedToPayment}
+                        >
+                          {proceedToPayment ? "Pay" : "Proceed to Pay"}
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Typography>Select an order to process</Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+      )}
+    </>
   );
 }

@@ -125,7 +125,8 @@ const useBarStore = create(
             .from("order_items_full")
             .select("*")
             .eq("item_type", "drink")
-            .eq("restaurant_id", restaurantId);
+            .eq("restaurant_id", restaurantId)
+            .order("opened_at", { ascending: false });
 
           if (error) handleError(error);
 
@@ -150,7 +151,8 @@ const useBarStore = create(
             .neq("item_status", "ready")
             .neq("item_status", "served")
             .neq("item_status", "cancelled")
-            .eq("restaurant_id", restaurantId);
+            .eq("restaurant_id", restaurantId)
+            .order("opened_at", { ascending: false });
 
           if (error) handleError(error);
 
@@ -170,7 +172,9 @@ const useBarStore = create(
             .from("order_items_full")
             .select("*")
             .eq("item_status", "ready")
-            .eq("restaurant_id", restaurantId);
+            .eq("item_type", "drink")
+            .eq("restaurant_id", restaurantId)
+            .order("opened_at", { ascending: false });
 
           if (error) handleError(error);
 
@@ -190,7 +194,9 @@ const useBarStore = create(
             .from("order_items_full")
             .select("*")
             .eq("item_status", "served")
-            .eq("restaurant_id", restaurantId);
+            .eq("item_type", "drink")
+            .eq("restaurant_id", restaurantId)
+            .order("opened_at", { ascending: false });
 
           if (error) handleError(error);
 
@@ -217,8 +223,8 @@ const useBarStore = create(
               showCancelButton: false,
               showDenyButton: true,
               showConfirmButton: true,
-              confirmButtonText: "Undo",
-              denyButtonText: "Remove",
+              confirmButtonText: "Stop Cooking",
+              denyButtonText: "Remove Item",
               confirmButtonColor: "#3085d6",
               denyButtonColor: "#d33",
               timer: 5000,
@@ -278,9 +284,7 @@ const useBarStore = create(
               html: "Automatically marking as ready in <b>5</b>s...",
               icon: "warning",
               showCancelButton: true,
-              showConfirmButton: true,
-              confirmButtonText: "Cancel",
-              confirmButtonColor: "#3085d6",
+              showConfirmButton: false,
               cancelButtonColor: "#d33",
               timer: 5000,
               timerProgressBar: true,

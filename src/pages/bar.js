@@ -70,7 +70,7 @@ export default function BartenderPanel() {
         }}
       >
         {/* Left: Icon + Title */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        {/* <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <LocalBarIcon sx={{ fontSize: 36, color: "primary.main" }} />
           <Box>
             <Typography
@@ -87,7 +87,7 @@ export default function BartenderPanel() {
               Manage drinks • Track status • Stay efficient
             </Typography>
           </Box>
-        </Box>
+        </Box> */}
       </Box>
       
       {/* Big Option Buttons */}
