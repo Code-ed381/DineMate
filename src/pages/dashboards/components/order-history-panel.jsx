@@ -104,8 +104,8 @@ const OrderHistoryTable = () => {
         }}
       />
       <Divider />
-      <CardContent sx={{ flex: 1, p: 0 }}>
-        <Box sx={{ height: "100%", width: "100%" }}>
+      <CardContent sx={{ flex: 1, p: 0, overflow: "auto" }}>
+        <Box sx={{ overflow: "auto" }}>
           <DataGrid
             rows={rows}
             columns={columns}

@@ -94,7 +94,9 @@ const WaiterDashboard = () => {
     loadingActiveSessionByRestaurant,
     salesData,
     loadingChart,
-    fetchSalesData, 
+    fetchSalesData,
+    subscribeToSessions, // ✅ Add to menuStore
+    unsubscribeFromSessions, // ✅ Add to menuStore
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -102,7 +104,12 @@ const WaiterDashboard = () => {
   useEffect(() => {
     getActiveSessionByRestaurant();
     fetchSalesData();
-  }, [getActiveSessionByRestaurant, fetchSalesData]);
+    subscribeToSessions(); // ✅ Subscribe
+
+    return () => {
+      unsubscribeFromSessions(); // ✅ Cleanup
+    };
+  }, []);
 
   // ---- Derived Insights ----
   const totalRevenue = useMemo(

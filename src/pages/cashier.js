@@ -88,7 +88,6 @@ export default function CashierDashboard() {
   const {
     activeSessions,
     loadingActiveSessionByRestaurant,
-    activeSeesionByRestaurantLoaded,
     getActiveSessionByRestaurant,
     setCashAmount,
     setCardAmount,
@@ -109,6 +108,8 @@ export default function CashierDashboard() {
     selected,
     proceedToPayment,
     setProceedToPayment,
+    subscribeToSessions, // ✅ Add
+    unsubscribeFromSessions, // ✅ Add
   } = useCashierStore();
   const [discount, setDiscount] = useState(0);
 
@@ -116,6 +117,11 @@ export default function CashierDashboard() {
 
   useEffect(() => {
     getActiveSessionByRestaurant();
+    subscribeToSessions(); // ✅ Subscribe
+
+    return () => {
+      unsubscribeFromSessions(); // ✅ Cleanup
+    };
   }, []);
 
   const handleCashChange = (e) => {

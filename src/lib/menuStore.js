@@ -72,8 +72,63 @@ const useMenuStore = create(
         datasets: [],
       },
       loadingChart: false,
+      sessionsChannel: null,
 
       setAssignedTables: (table) => set({ assignedTables: table }),
+
+      subscribeToSessions: () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const { user } = useAuthStore.getState();
+        const userId = user?.user?.id;
+
+        if (!restaurantId || !userId) return;
+
+        const oldChannel = get().sessionsChannel;
+        if (oldChannel) {
+          supabase.removeChannel(oldChannel);
+        }
+
+        const channel = supabase
+          .channel(`waiter-sessions-${userId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "table_sessions",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Session update:", payload);
+              get().getActiveSessionByRestaurant();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "order_items",
+              // filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Order item update:", payload);
+              get().getActiveSessionByRestaurant();
+            }
+          )
+          .subscribe();
+
+        set({ sessionsChannel: channel });
+      },
+
+      unsubscribeFromSessions: () => {
+        const channel = get().sessionsChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          set({ sessionsChannel: null });
+        }
+      },
 
       // Fetch categories
       fetchCategories: async () => {

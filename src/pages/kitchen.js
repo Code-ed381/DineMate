@@ -27,6 +27,8 @@ const Kitchen = () => {
     handleUpdateOrderItemStatus,
     handleFetchReadyMeals,
     handleFetchServedMeals,
+    subscribeToOrderItems, // ✅ Add this
+    unsubscribeFromOrderItems, // ✅ Add this
   } = useKitchenStore();
   
   dayjs.extend(relativeTime);
@@ -49,10 +51,19 @@ const Kitchen = () => {
   } 
 
   useEffect(() => {
+    // Initial fetch
     handleFetchPendingMeals();
     handleFetchReadyMeals();
     handleFetchServedMeals();
-  }, [handleFetchPendingMeals, handleFetchReadyMeals, handleFetchServedMeals]);
+
+    // ✅ Subscribe to realtime updates
+    subscribeToOrderItems();
+
+    // ✅ Cleanup on unmount
+    return () => {
+      unsubscribeFromOrderItems();
+    };
+  }, []);
 
   const getTimeAgo = (timestamp) => dayjs(timestamp).fromNow();
 

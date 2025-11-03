@@ -7,314 +7,372 @@ import useRestaurantStore from './restaurantStore';
 import useAuthStore from './authStore';
 import { createJSONStorage } from 'zustand/middleware';
 
-const useTablesStore = create(persist((set, get) => ({
-  open: false,
-  tables: [],
-  table: {},
-  loadingTables: false,
-  tablesLoaded: false,
-  snackbar: {
-    open: false,
-    message: "",
-    severity: "success",
-  },
-  chosenTableSession: [],
-  chosenTableOrderItems: [],
-  loadingActiveSessionByTableNumber: false,
-  activeSeesionByTableNumberLoaded: false,
+const useTablesStore = create(
+  persist(
+    (set, get) => ({
+      open: false,
+      tables: [],
+      table: {},
+      loadingTables: false,
+      tablesLoaded: false,
+      snackbar: {
+        open: false,
+        message: "",
+        severity: "success",
+      },
+      chosenTableSession: [],
+      chosenTableOrderItems: [],
+      loadingActiveSessionByTableNumber: false,
+      activeSeesionByTableNumberLoaded: false,
+      tablesChannel: null,
 
-  // Set table
-  setTable: (table) => {
-    set({ table });
-  },
+      // Set table
+      setTable: (table) => {
+        set({ table });
+      },
 
-  // set open
-  setOpen: (open) => {
-    set({ open });
-  },
+      // set open
+      setOpen: (open) => {
+        set({ open });
+      },
 
-  // update table and delete order
-  handleCloseTableBtn: async (tableSession) => {
-    console.log("tableSession", tableSession);
-    const { getActiveSessionByRestaurant, setTableSelected, setAssignedTables } =
-      useMenuStore.getState();
-    
-    const { selectedRestaurant } = useRestaurantStore.getState();
-    // delete order
-    const { error: ordersError } = await supabase
-      .from("orders")
-      .delete()
-      .eq("session_id", tableSession?.session_id)
-      .eq(
-        "restaurant_id",
-        selectedRestaurant.restaurants.id
-      )
-      .select();
+      // ✅ Subscribe to table changes
+      subscribeToTables: () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.restaurants?.id;
 
-    if (ordersError) throw ordersError;
+        if (!restaurantId) return;
 
-    // delete table session
-    const { error: tableSessionError } = await supabase
-      .from("table_sessions")
-      .delete()
-      .eq("id", tableSession.session_id)
-      .eq(
-        "restaurant_id",
-        selectedRestaurant.restaurants.id
-      )
-      .select();
+        const oldChannel = get().tablesChannel;
+        if (oldChannel) {
+          supabase.removeChannel(oldChannel);
+        }
 
-    if (tableSessionError) throw tableSessionError;
+        const channel = supabase
+          .channel(`tables-${restaurantId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "restaurant_tables",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Table change:", payload);
+              get().getTablesOverview();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "table_sessions",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Table session change:", payload);
+              get().getTablesOverview();
+            }
+          )
+          .subscribe();
 
-    // update table status
-    const { error: tablesError } = await supabase
-      .from("restaurant_tables")
-      .update({ status: "available" })
-      .eq("id", tableSession.table_id)
-      .eq(
-        "restaurant_id",
-        selectedRestaurant.restaurants.id
-      )
-      .select();
+        set({ tablesChannel: channel });
+      },
 
-    if (tablesError) throw tablesError;
+      unsubscribeFromTables: () => {
+        const channel = get().tablesChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          set({ tablesChannel: null });
+        }
+      },
 
-    get().getTablesOverview();
-    getActiveSessionByRestaurant();
-    set({ open: false, table: {}, chosenTableSession: [], chosenTableOrderItems: [] });
-    setTableSelected(false);
-    setAssignedTables([]);
-  },
+      // update table and delete order
+      handleCloseTableBtn: async (tableSession) => {
+        console.log("tableSession", tableSession);
+        const {
+          getActiveSessionByRestaurant,
+          setTableSelected,
+          setAssignedTables,
+        } = useMenuStore.getState();
 
-  // Close modals
-  handleClose: () => {
-    set({ open: false });
-  },
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        // delete order
+        const { error: ordersError } = await supabase
+          .from("orders")
+          .delete()
+          .eq("session_id", tableSession?.session_id)
+          .eq("restaurant_id", selectedRestaurant.restaurants.id)
+          .select();
 
-  // Set snackbar
-  setSnackbar: (snackbar) => {
-    set({ snackbar });
-  },
+        if (ordersError) throw ordersError;
 
-  // Fetch tables  with session and table overview
-  getTablesOverview: async () => {
-    const { selectedRestaurant } = useRestaurantStore.getState();
-    set({ loadingTables: true });
+        // delete table session
+        const { error: tableSessionError } = await supabase
+          .from("table_sessions")
+          .delete()
+          .eq("id", tableSession.session_id)
+          .eq("restaurant_id", selectedRestaurant.restaurants.id)
+          .select();
 
-    try {
-      const { data, error } = await supabase
-        .from("waiter_tables_overview")
-        .select("*")
-        .eq("restaurant_id", selectedRestaurant.restaurants.id)
-        .or(
-          `effective_status.eq.available,waiter_id.eq.${
-            useAuthStore.getState().user.user.id
-          }`
-        )
-        .order("table_number", { ascending: true });
+        if (tableSessionError) throw tableSessionError;
 
-      if (error) throw error;
+        // update table status
+        const { error: tablesError } = await supabase
+          .from("restaurant_tables")
+          .update({ status: "available" })
+          .eq("id", tableSession.table_id)
+          .eq("restaurant_id", selectedRestaurant.restaurants.id)
+          .select();
 
-      set({ tables: data || [], tablesLoaded: true });
-    } catch (error) {
-      handleError(error);
-    } finally {
-      set({ loadingTables: false });
-    }
-  },
+        if (tablesError) throw tablesError;
 
-  // Change table status and handle actions
-  handleStatusChange: async (table, status) => {
-    get().setTable(table);
-    if (status === "reserve table") {
-      const { error: tablesError } = await supabase
-        .from("restaurant_tables")
-        .update({ status: "reserved" })
-        .eq("id", table.table_id)
-        .eq(
-          "restaurant_id",
-          useRestaurantStore.getState().selectedRestaurant.restaurants.id
-        )
-        .select();
+        get().getTablesOverview();
+        getActiveSessionByRestaurant();
+        set({
+          open: false,
+          table: {},
+          chosenTableSession: [],
+          chosenTableOrderItems: [],
+        });
+        setTableSelected(false);
+        setAssignedTables([]);
+      },
 
-      if (tablesError) throw tablesError;
+      // Close modals
+      handleClose: () => {
+        set({ open: false });
+      },
 
-      get().getTablesOverview();
-      set({ openAvailable: false });
+      // Set snackbar
+      setSnackbar: (snackbar) => {
+        set({ snackbar });
+      },
 
-      return { message: "reserved" };
-    }
-    if (status === "cancel reservation") {
-      const { error: tablesError } = await supabase
-        .from("restaurant_tables")
-        .update({ status: "available" })
-        .eq("id", table.table_id)
-        .eq(
-          "restaurant_id",
-          useRestaurantStore.getState().selectedRestaurant.restaurants.id
-        )
-        .select();
+      // Fetch tables  with session and table overview
+      getTablesOverview: async () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        set({ loadingTables: true });
 
-      if (tablesError) throw tablesError;
+        try {
+          const { data, error } = await supabase
+            .from("waiter_tables_overview")
+            .select("*")
+            .eq("restaurant_id", selectedRestaurant.restaurants.id)
+            .or(
+              `effective_status.eq.available,waiter_id.eq.${
+                useAuthStore.getState().user.user.id
+              }`
+            )
+            .order("table_number", { ascending: true });
 
-      get().getTablesOverview();
-      set({ openAvailable: false });
+          if (error) throw error;
 
-      return { message: "cancelled" };
-    }
-    if (status === "start ordering") {
-      const { data: session, error: sessionError } = await supabase
-        .from("table_sessions")
-        .insert([
-          {
-            table_id: table.table_id,
-            restaurant_id:
-              useRestaurantStore.getState().selectedRestaurant.restaurants.id,
-            waiter_id: useAuthStore.getState().user.user.id,
-            opened_at: new Date(),
-            status: "open",
-          },
-        ])
-        .select();
+          set({ tables: data || [], tablesLoaded: true });
+        } catch (error) {
+          handleError(error);
+        } finally {
+          set({ loadingTables: false });
+        }
+      },
 
-      if (sessionError) throw sessionError;
+      // Change table status and handle actions
+      handleStatusChange: async (table, status) => {
+        get().setTable(table);
+        if (status === "reserve table") {
+          const { error: tablesError } = await supabase
+            .from("restaurant_tables")
+            .update({ status: "reserved" })
+            .eq("id", table.table_id)
+            .eq(
+              "restaurant_id",
+              useRestaurantStore.getState().selectedRestaurant.restaurants.id
+            )
+            .select();
 
-      console.log(session);
+          if (tablesError) throw tablesError;
 
-      const { error: orderError } = await supabase
-        .from("orders")
-        .insert([
-          {
-            restaurant_id:
-              useRestaurantStore.getState().selectedRestaurant.restaurants.id,
-            total: 0,
-            session_id: session[0].id,
-            status: "pending",
-          },
-        ])
-        .select();
+          get().getTablesOverview();
+          set({ openAvailable: false });
 
-      if (orderError) throw orderError;
+          return { message: "reserved" };
+        }
+        if (status === "cancel reservation") {
+          const { error: tablesError } = await supabase
+            .from("restaurant_tables")
+            .update({ status: "available" })
+            .eq("id", table.table_id)
+            .eq(
+              "restaurant_id",
+              useRestaurantStore.getState().selectedRestaurant.restaurants.id
+            )
+            .select();
 
-      const { error: tablesError } = await supabase
-        .from("restaurant_tables")
-        .update({ status: "occupied" })
-        .eq("id", table.table_id)
-        .eq(
-          "restaurant_id",
-          useRestaurantStore.getState().selectedRestaurant.restaurants.id
-        )
-        .select();
+          if (tablesError) throw tablesError;
 
-      if (tablesError) throw tablesError;
+          get().getTablesOverview();
+          set({ openAvailable: false });
 
-      useMenuStore.getState().setChosenTable(table);
+          return { message: "cancelled" };
+        }
+        if (status === "start ordering") {
+          const { data: session, error: sessionError } = await supabase
+            .from("table_sessions")
+            .insert([
+              {
+                table_id: table.table_id,
+                restaurant_id:
+                  useRestaurantStore.getState().selectedRestaurant.restaurants
+                    .id,
+                waiter_id: useAuthStore.getState().user.user.id,
+                opened_at: new Date(),
+                status: "open",
+              },
+            ])
+            .select();
 
-      get().getTablesOverview();
+          if (sessionError) throw sessionError;
 
-      return { message: "ordering" };
-    }
-    if (status === "view order") {
-      get().filterActiveSessionByTableNumber(table.table_number);
-      console.log("table", table);
-      set({ open: true });
+          console.log(session);
 
-      return { message: "viewing" };
-    }
-  },
+          const { error: orderError } = await supabase
+            .from("orders")
+            .insert([
+              {
+                restaurant_id:
+                  useRestaurantStore.getState().selectedRestaurant.restaurants
+                    .id,
+                total: 0,
+                session_id: session[0].id,
+                status: "pending",
+              },
+            ])
+            .select();
 
-  // filter active session by table number
-  filterActiveSessionByTableNumber: async (tableNumber) => {
-    console.log("tableNumber", tableNumber);
-    set({
-      loadingActiveSessionByTableNumber: true,
-    });
-    try {
-      let { data: waiter_orders_overview, error } = await supabase
-        .from("waiter_orders_overview")
-        .select(`*`)
-        .eq("table_number", tableNumber)
-        .maybeSingle();
+          if (orderError) throw orderError;
 
-      if (error) throw error;
+          const { error: tablesError } = await supabase
+            .from("restaurant_tables")
+            .update({ status: "occupied" })
+            .eq("id", table.table_id)
+            .eq(
+              "restaurant_id",
+              useRestaurantStore.getState().selectedRestaurant.restaurants.id
+            )
+            .select();
 
-      console.log(waiter_orders_overview);
+          if (tablesError) throw tablesError;
 
-      set({
-        chosenTableSession: waiter_orders_overview,
-        chosenTableOrderItems: waiter_orders_overview?.order_items,
-        activeSessionByTableNumberLoaded: true,
-      });
-    } catch (error) {
-      handleError(error);
-    } finally {
-      set({
-        loadingActiveSessionByTableNumber: false,
-      });
-    }
-  },
+          useMenuStore.getState().setChosenTable(table);
 
-  // Function to delete an order item
-  handleRemoveItem: async (itemId) => {
-    try {
-      const { chosenTableOrderItems } = get();
+          get().getTablesOverview();
 
-      // Step 1: Remove item from selectedTableOrders state
-      const updatedOrders = chosenTableOrderItems.filter(
-        (order) => order.id !== itemId?.id
-      );
-      const totalQuantity = updatedOrders.reduce(
-        (acc, cur) => acc + cur.quantity,
-        0
-      );
-      const total = updatedOrders.reduce((acc, cur) => acc + cur.total, 0);
+          return { message: "ordering" };
+        }
+        if (status === "view order") {
+          get().filterActiveSessionByTableNumber(table.table_number);
+          console.log("table", table);
+          set({ open: true });
 
-      set({
-        chosenTableOrderItems: updatedOrders,
-        // totalOrdersQty: totalQuantity,
-        // totalOrdersPrice: total.toFixed(2),
-      });
+          return { message: "viewing" };
+        }
+      },
 
-      // Step 3: Update Supabase
-      const { error: ordersItemsError } = await supabase
-        .from("ordersItems")
-        .delete()
-        .eq("id", itemId?.id); // Delete the specific item by ID
+      // filter active session by table number
+      filterActiveSessionByTableNumber: async (tableNumber) => {
+        console.log("tableNumber", tableNumber);
+        set({
+          loadingActiveSessionByTableNumber: true,
+        });
+        try {
+          let { data: waiter_orders_overview, error } = await supabase
+            .from("waiter_orders_overview")
+            .select(`*`)
+            .eq("table_number", tableNumber)
+            .maybeSingle();
 
-      if (ordersItemsError) {
-        handleError(ordersItemsError);
-      }
+          if (error) throw error;
 
+          console.log(waiter_orders_overview);
 
-      const { error: ordersError } = await supabase
-        .from("orders")
-        .update({ total: total })
-        .eq("id", itemId?.order_id)
-        .select();
-      
-      if (ordersError) {
-        handleError(ordersError);
-      }
-          
-    } catch (error) {
-      handleError(error);
-    }
-  },
-}),
-  {
-    name: "tables",
-    partialize: (state) => ({
-      table: state.table,
-      tables: state.tables,
-      open: state.open,
-      snackbar: state.snackbar,
-      chosenTableSession: state.chosenTableSession,
-      chosenTableOrderItems: state.chosenTableOrderItems,
-      loadingActiveSessionByTableNumber: state.loadingActiveSessionByTableNumber,
-      activeSessionByTableNumberLoaded: state.activeSessionByTableNumberLoaded,
+          set({
+            chosenTableSession: waiter_orders_overview,
+            chosenTableOrderItems: waiter_orders_overview?.order_items,
+            activeSessionByTableNumberLoaded: true,
+          });
+        } catch (error) {
+          handleError(error);
+        } finally {
+          set({
+            loadingActiveSessionByTableNumber: false,
+          });
+        }
+      },
+
+      // Function to delete an order item
+      handleRemoveItem: async (itemId) => {
+        try {
+          const { chosenTableOrderItems } = get();
+
+          // Step 1: Remove item from selectedTableOrders state
+          const updatedOrders = chosenTableOrderItems.filter(
+            (order) => order.id !== itemId?.id
+          );
+          const totalQuantity = updatedOrders.reduce(
+            (acc, cur) => acc + cur.quantity,
+            0
+          );
+          const total = updatedOrders.reduce((acc, cur) => acc + cur.total, 0);
+
+          set({
+            chosenTableOrderItems: updatedOrders,
+            // totalOrdersQty: totalQuantity,
+            // totalOrdersPrice: total.toFixed(2),
+          });
+
+          // Step 3: Update Supabase
+          const { error: ordersItemsError } = await supabase
+            .from("ordersItems")
+            .delete()
+            .eq("id", itemId?.id); // Delete the specific item by ID
+
+          if (ordersItemsError) {
+            handleError(ordersItemsError);
+          }
+
+          const { error: ordersError } = await supabase
+            .from("orders")
+            .update({ total: total })
+            .eq("id", itemId?.order_id)
+            .select();
+
+          if (ordersError) {
+            handleError(ordersError);
+          }
+        } catch (error) {
+          handleError(error);
+        }
+      },
     }),
-    version: 1,
-  }
-));
+    {
+      name: "tables",
+      partialize: (state) => ({
+        table: state.table,
+        tables: state.tables,
+        open: state.open,
+        snackbar: state.snackbar,
+        chosenTableSession: state.chosenTableSession,
+        chosenTableOrderItems: state.chosenTableOrderItems,
+        loadingActiveSessionByTableNumber:
+          state.loadingActiveSessionByTableNumber,
+        activeSessionByTableNumberLoaded:
+          state.activeSessionByTableNumberLoaded,
+      }),
+      version: 1,
+    }
+  )
+);
 
 export default useTablesStore;

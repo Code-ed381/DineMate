@@ -9,7 +9,7 @@ import { Typography, Box } from "@mui/material";
 
 const useCashierStore = create(
   persist(
-      (set, get) => ({
+    (set, get) => ({
       selected: "active",
       cashAmount: "",
       cardAmount: "",
@@ -22,13 +22,13 @@ const useCashierStore = create(
       activeSeesionByRestaurantLoaded: false,
       selectedSession: null,
       proceedToPayment: false,
-      
-    
+      sessionsChannel: null,
+
       // Function to handle proceed to payment
       setProceedToPayment: (value) => {
         set({ proceedToPayment: value });
       },
-      
+
       // Function to handle select
       setSelected: (value) => {
         set({ selected: value });
@@ -58,6 +58,58 @@ const useCashierStore = create(
       setSelectedSession: (session) => {
         set({ selectedSession: session });
       },
+      // ✅ Subscribe to table sessions
+      subscribeToSessions: () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.restaurants?.id;
+
+        if (!restaurantId) return;
+
+        const oldChannel = get().sessionsChannel;
+        if (oldChannel) {
+          supabase.removeChannel(oldChannel);
+        }
+
+        const channel = supabase
+          .channel(`cashier-sessions-${restaurantId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "table_sessions",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Session change:", payload);
+              get().getActiveSessionByRestaurant();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "orders",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Order change:", payload);
+              get().getActiveSessionByRestaurant();
+            }
+          )
+          .subscribe();
+
+        set({ sessionsChannel: channel });
+      },
+
+      unsubscribeFromSessions: () => {
+        const channel = get().sessionsChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          set({ sessionsChannel: null });
+        }
+      },
 
       // Function to get active session by restaurant
       getActiveSessionByRestaurant: async () => {
@@ -76,17 +128,17 @@ const useCashierStore = create(
           let { data: cashier_orders_overview, error } = await supabase
             .from("cashier_orders_overview")
             .select("*")
-            .eq("restaurant_id", selectedRestaurantId)
+            .eq("restaurant_id", selectedRestaurantId);
 
-            if (error) throw error;
-            
-            const activeSessions = cashier_orders_overview.filter(
-              session => session.session_status !== "close"
-            );
+          if (error) throw error;
 
-            const closedSessions = cashier_orders_overview.filter(
-              session => session.session_status === "close"
-            );
+          const activeSessions = cashier_orders_overview.filter(
+            (session) => session.session_status !== "close"
+          );
+
+          const closedSessions = cashier_orders_overview.filter(
+            (session) => session.session_status === "close"
+          );
 
           console.log("activeSessions", activeSessions);
           console.log("closedSessions", closedSessions);
@@ -106,7 +158,7 @@ const useCashierStore = create(
           });
         }
       },
-      
+
       // Function to handle payment
       handlePayment: async () => {
         const selectedSession = get().selectedSession;
@@ -114,116 +166,116 @@ const useCashierStore = create(
         const cashAmount = Number(get().cashAmount);
         const cardAmount = Number(get().cardAmount);
         const momoAmount = Number(get().momoAmount);
-          
+
         if (paymentMethod === "cash") {
-            if(cashAmount <= 0 ) {
+          if (cashAmount <= 0) {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: "Please enter cash amount",
+            });
+            return;
+          } else if (cashAmount < selectedSession.order_total) {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: "Cash amount is less than order total",
+            });
+            return;
+          } else if (cashAmount >= selectedSession.order_total) {
+            Swal.fire({
+              title: `Total Amount: ${selectedSession.order_total.toFixed(2)}`,
+              html: '<div id="swal-content"></div>', // placeholder div
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonColor: "#3085d6",
+              cancelButtonColor: "#d33",
+              confirmButtonText: "Yes, confirm",
+              didOpen: () => {
+                ReactDOM.render(
+                  <Box variant="h6" color="text.secondary">
+                    <Typography variant="h6" color="text.secondary">
+                      Cash Paid: {cashAmount.toFixed(2)}
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary">
+                      Change:{" "}
+                      {(cashAmount - selectedSession.order_total).toFixed(2)}
+                    </Typography>
+                  </Box>,
+                  document.getElementById("swal-content")
+                );
+              },
+            }).then(async (result) => {
+              if (result.isConfirmed) {
+                const { data: session, error: sessionError } = await supabase
+                  .from("table_sessions")
+                  .update({ status: "close", closed_at: new Date() })
+                  .eq("id", selectedSession.session_id)
+                  .select();
+
+                if (sessionError) throw sessionError;
+
+                console.log("session", session);
+
+                const { data: order, error: orderError } = await supabase
+                  .from("orders")
+                  .update({ status: "served" })
+                  .eq("id", selectedSession.order_id)
+                  .select();
+
+                if (orderError) throw orderError;
+
+                const { data: table, error: tableError } = await supabase
+                  .from("restaurant_tables")
+                  .update({ status: "available" })
+                  .eq("id", selectedSession.table_id)
+                  .select();
+
+                if (tableError) throw tableError;
+
+                console.log("table", table);
+
                 Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "Please enter cash amount",
+                  icon: "success",
+                  title: "Success",
+                  text: "Payment made successfully",
+                  showConfirmButton: false,
+                  timer: 1500,
                 });
-                return;
-            }
-            else if(cashAmount < selectedSession.order_total) {
-                Swal.fire({
-                    icon: "error",
-                    title: "Error",
-                    text: "Cash amount is less than order total",
-                });
-                return;
-            }
-            else if (cashAmount >= selectedSession.order_total) {
-                Swal.fire({
-                  title: `Total Amount: ${selectedSession.order_total.toFixed(2)}`,
-                  html: '<div id="swal-content"></div>', // placeholder div
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonColor: "#3085d6",
-                  cancelButtonColor: "#d33",
-                  confirmButtonText: "Yes, confirm",
-                  didOpen: () => {
-                    ReactDOM.render(
-                        <Box variant="h6" color="text.secondary">
-                            <Typography variant="h6" color="text.secondary">Cash Paid: {cashAmount.toFixed(2)}</Typography>
-                            <Typography variant="h6" color="text.secondary">Change: {(cashAmount - selectedSession.order_total).toFixed(2)}</Typography>
-                        </Box>,
-                      document.getElementById("swal-content")
-                    );
-                  },
-                }).then(async (result) => {
-                  if (result.isConfirmed) {
-                    const { data: session, error: sessionError } = await supabase
-                    .from('table_sessions')
-                    .update({ status: 'close', closed_at: new Date() })
-                    .eq('id', selectedSession.session_id)
-                    .select()
 
-                    if(sessionError) throw sessionError;
+                set({ selectedSession: null });
+                set({ cashAmount: "" });
+                set({ cardAmount: "" });
+                set({ momoAmount: "" });
+                set({ paymentMethod: "cash" });
 
-                    console.log("session", session);
-
-                    const { data: order, error: orderError } = await supabase
-                    .from('orders')
-                    .update({ status: 'served' })
-                    .eq('id', selectedSession.order_id)
-                    .select()
-
-                    if (orderError) throw orderError;
-                      
-                    const { data: table, error: tableError } = await supabase
-                    .from("restaurant_tables")
-                    .update({ status: "available" })
-                    .eq("id", selectedSession.table_id)
-                    .select();
-
-                    if (tableError) throw tableError;
-
-                    console.log("table", table);
-
-                    Swal.fire({
-                        icon: "success",
-                        title: "Success",
-                        text: "Payment made successfully",
-                        showConfirmButton: false,
-                        timer: 1500,
-                    });
-                      
-                    set({ selectedSession: null });
-                    set({ cashAmount: "" });
-                    set({ cardAmount: "" });
-                    set({ momoAmount: "" });
-                    set({ paymentMethod: "cash" });
-
-                    get().getActiveSessionByRestaurant();
-          
-                  }
-                });
-            }
-            
-
+                get().getActiveSessionByRestaurant();
+              }
+            });
+          }
         }
       },
-      
+
       // FUnction to handle print bill
       handlePrintBill: async () => {
         const selectedSession = get().selectedSession;
-        
+
         const { data, error } = await supabase
-        .from('table_sessions')
-        .update({ status: 'billed' })
-        .eq('id', selectedSession.session_id)
-        .select()
-          
-        if(error) throw error;
+          .from("table_sessions")
+          .update({ status: "billed" })
+          .eq("id", selectedSession.session_id)
+          .select();
+
+        if (error) throw error;
 
         console.log("data", data);
 
         Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: "Bill printed successfully",
-            showConfirmButton: false,
-            timer: 1500,
+          icon: "success",
+          title: "Success",
+          text: "Bill printed successfully",
+          showConfirmButton: false,
+          timer: 1500,
         });
 
         get().getActiveSessionByRestaurant();
@@ -232,8 +284,8 @@ const useCashierStore = create(
     {
       name: "cashierStore",
       partialize: (state) => ({
-          activeSessions: state.activeSessions,
-          selectedSession: state.selectedSession,
+        activeSessions: state.activeSessions,
+        selectedSession: state.selectedSession,
       }),
     }
   )

@@ -27,6 +27,7 @@ const useBarStore = create(
       searchQuery: "",
       tabs: [],
       activeTab: 0,
+      orderItemsChannel: null,
 
       setIsLoadingItems: (value) => set({ loadingItems: value }),
       setItems: (value) => set({ items: value }),
@@ -34,8 +35,56 @@ const useBarStore = create(
       setSelectedCategory: (value) => set({ selectedCategory: value }),
       setSearchQuery: (value) => set({ searchQuery: value }),
       setActiveTab: (index) => set({ activeTab: index }),
-      
-      setTabs: (updater) => set((state) => ({tabs: typeof updater === "function" ? updater(state.tabs) : updater})),
+
+      // ✅ Subscribe to drink orders
+      subscribeToDrinkOrders: () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.restaurants?.id;
+
+        if (!restaurantId) return;
+
+        const oldChannel = get().orderItemsChannel;
+        if (oldChannel) {
+          supabase.removeChannel(oldChannel);
+        }
+
+        const channel = supabase
+          .channel(`bar-orders-${restaurantId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "order_items",
+              // filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              console.log("Bar order change:", payload);
+
+              // Only refresh if it's a drink item
+              // You can check payload.new.type === 'drink'
+              get().handleFetchPendingOrders();
+              get().handleFetchReadyOrders();
+              get().handleFetchServedOrders();
+            }
+          )
+          .subscribe();
+
+        set({ orderItemsChannel: channel });
+      },
+
+      unsubscribeFromDrinkOrders: () => {
+        const channel = get().orderItemsChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          set({ orderItemsChannel: null });
+        }
+      },
+
+      setTabs: (updater) =>
+        set((state) => ({
+          tabs: typeof updater === "function" ? updater(state.tabs) : updater,
+        })),
       getActiveCart: () => {
         const { tabs, activeTab } = get();
         return tabs[activeTab]?.cart || [];
@@ -57,7 +106,7 @@ const useBarStore = create(
             },
           ],
           activeTab: state.tabs.length,
-      })),
+        })),
 
       addToCart: (drink) =>
         set((state) => ({
@@ -75,7 +124,7 @@ const useBarStore = create(
                 }
               : tab
           ),
-      })),
+        })),
 
       removeFromCart: (id) =>
         set((state) => ({
@@ -84,7 +133,7 @@ const useBarStore = create(
               ? { ...tab, cart: tab.cart.filter((item) => item.id !== id) }
               : tab
           ),
-      })),
+        })),
 
       handleFetchItems: async () => {
         set({ loadingItems: true });
