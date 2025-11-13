@@ -42,6 +42,7 @@ import useAuthStore from "../../lib/authStore";
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import ThemeToggle from "../../components/theme-toggle";
+import { useSettings } from '../../providers/settingsProvider';
 
 function Copyright(props) {
   return (
@@ -120,6 +121,7 @@ const Layout = () => {
     setSelectedRestaurant,
     restaurants,
   } = useRestaurantStore();
+  const {settings} = useSettings();
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
@@ -223,9 +225,9 @@ const Layout = () => {
                 sx={{ mr: 2, fontWeight: "900" }}
               >
                 {selectedRestaurant?.restaurants?.name}{" "}
-                <span style={{ fontWeight: "normal", fontSize: "14px" }}>
+                {settings?.general?.show_breadcrumb && <span style={{ fontWeight: "normal", fontSize: "14px" }}>
                   * {breadcrumb}
-                </span>
+                </span>}
               </Typography>
 
               {/* Centered Time & Date */}
@@ -236,11 +238,11 @@ const Layout = () => {
                   sx={{ fontWeight: "900" }}
                   noWrap
                 >
-                  {formatDate(currentTime)}
+                  {settings?.general?.show_date_and_time_on_navbar && formatDate(currentTime)}
                 </Typography>
               </Box>
 
-              <ThemeToggle />
+              {settings?.general?.show_light_night_toggle && <ThemeToggle />}
 
               {restaurants.length > 1 && (
                 <TooltipComponent title="Switch Restaurant">
@@ -256,7 +258,7 @@ const Layout = () => {
               )}
 
               <TooltipComponent title="Notifications">
-                <IconButton
+                {settings?.general?.allow_notifications && <IconButton
                   size="large"
                   aria-label="show 17 new notifications"
                   color="inherit"
@@ -265,7 +267,7 @@ const Layout = () => {
                   <Badge badgeContent={17} color="error">
                     <NotificationsIcon />
                   </Badge>
-                </IconButton>
+                </IconButton>}
                 <Popover
                   id={id}
                   open={openNotification}

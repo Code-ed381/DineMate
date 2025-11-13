@@ -13,6 +13,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Close";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import useRestaurantStore from '../../lib/restaurantStore'
 
 export default function RestaurantDetailsPanel({ restaurant }) {
   const [editMode, setEditMode] = useState(false);
@@ -30,6 +31,7 @@ export default function RestaurantDetailsPanel({ restaurant }) {
     zip_code: restaurant?.zip_code || "",
     country: restaurant?.country || "",
   });
+  const { selectedRestaurant } = useRestaurantStore();
 
   const handleChange = (field) => (e) =>
     setFormData({ ...formData, [field]: e.target.value });
@@ -122,7 +124,7 @@ export default function RestaurantDetailsPanel({ restaurant }) {
         <Typography variant="h6" sx={{ fontWeight: "bold" }}>
           Restaurant Details
         </Typography>
-        {!editMode ? (
+        {!editMode ? (selectedRestaurant?.role === "owner" && 
           <IconButton onClick={() => setEditMode(true)} color="primary">
             <EditIcon />
           </IconButton>

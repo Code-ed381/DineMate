@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Grid,
@@ -17,529 +17,670 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   LinearProgress,
-  TextField,
   Stack,
-  Tooltip,
+  Paper,
+  Alert,
+  useTheme,
+  alpha,
 } from "@mui/material";
 import {
   TrendingUp,
+  TrendingDown,
   ShoppingBag,
-  LocalDining,
-  TableRestaurant,
+  AttachMoney,
   People,
-  StarRate,
-  Inventory2,
-  Print,
+  Schedule,
+  Warning,
+  EmojiEvents,
   Refresh,
-  Visibility,
-  ArrowForward,
+  GetApp,
+  ChevronRight,
+  Speed,
+  Restaurant,
+  Inventory,
 } from "@mui/icons-material";
 import {
   LineChart,
   Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RTooltip,
-  ResponsiveContainer,
   BarChart,
   Bar,
   PieChart,
   Pie,
   Cell,
-  Legend,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
 } from "recharts";
-import DashboardHeader from "./components/dashboard-header";
-import useAuthStore from "../../lib/authStore";
 
-// ————————————————————————————————————————————
-// Owner's Dashboard (single-tenant, Material UI + Recharts)
-// ————————————————————————————————————————————
-export default function OwnerDashboard() {
-  const { user } = useAuthStore();
+export default function EnhancedOwnerDashboard() {
+  const theme = useTheme();
+  const [timeRange, setTimeRange] = useState("week");
+  const [selectedMetric, setSelectedMetric] = useState("revenue");
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  console.log(user);
-  const [range, setRange] = useState("week"); // today | week | month
+  // Simulate real-time updates
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
 
-  // ==== Mock Data (replace with API/Zustand) ====
+  // Enhanced KPIs with comparisons
   const kpis = useMemo(
     () => ({
-      todayRevenue: 1240.75,
-      orders: 87,
-      avgOrder: 14.25,
-      activeTables: 12,
-      totalTables: 20,
-      staffOnShift: 8,
-      rating: 4.6,
+      revenue: {
+        current: 12847.5,
+        previous: 11240.3,
+        change: 14.3,
+        target: 15000,
+      },
+      orders: {
+        current: 187,
+        previous: 165,
+        change: 13.3,
+        avgValue: 68.7,
+      },
+      customers: {
+        current: 342,
+        previous: 298,
+        change: 14.8,
+        returning: 62,
+      },
+      efficiency: {
+        avgPrepTime: 14.2,
+        previous: 16.8,
+        change: -15.5,
+        tableUtilization: 78,
+      },
     }),
     []
   );
 
-  const salesTrend = useMemo(
-    () =>
-      range === "today"
+  // Revenue data
+  const revenueData = useMemo(() => {
+    const data =
+      timeRange === "today"
         ? [
-            { name: "9a", value: 120 },
-            { name: "11a", value: 240 },
-            { name: "1p", value: 410 },
-            { name: "3p", value: 380 },
-            { name: "5p", value: 560 },
-            { name: "7p", value: 720 },
+            { time: "9AM", revenue: 420, orders: 12, customers: 18 },
+            { time: "11AM", revenue: 1240, orders: 28, customers: 42 },
+            { time: "1PM", revenue: 2540, orders: 52, customers: 78 },
+            { time: "3PM", revenue: 1120, orders: 24, customers: 32 },
+            { time: "5PM", revenue: 1380, orders: 32, customers: 48 },
+            { time: "7PM", revenue: 3240, orders: 64, customers: 96 },
           ]
-        : range === "week"
+        : timeRange === "week"
         ? [
-            { name: "Mon", value: 1020 },
-            { name: "Tue", value: 1240 },
-            { name: "Wed", value: 990 },
-            { name: "Thu", value: 1530 },
-            { name: "Fri", value: 1840 },
-            { name: "Sat", value: 2210 },
-            { name: "Sun", value: 1670 },
+            { time: "Mon", revenue: 8420, orders: 142, customers: 218 },
+            { time: "Tue", revenue: 9240, orders: 156, customers: 245 },
+            { time: "Wed", revenue: 7890, orders: 128, customers: 198 },
+            { time: "Thu", revenue: 10530, orders: 178, customers: 276 },
+            { time: "Fri", revenue: 14840, orders: 234, customers: 362 },
+            { time: "Sat", revenue: 16210, orders: 268, customers: 412 },
+            { time: "Sun", revenue: 13670, orders: 218, customers: 334 },
           ]
         : [
-            { name: "W1", value: 8120 },
-            { name: "W2", value: 9760 },
-            { name: "W3", value: 10540 },
-            { name: "W4", value: 9340 },
-          ],
-    [range]
-  );
+            { time: "Week 1", revenue: 58420, orders: 982, customers: 1542 },
+            { time: "Week 2", revenue: 62760, orders: 1056, customers: 1678 },
+            { time: "Week 3", revenue: 59540, orders: 1018, customers: 1598 },
+            { time: "Week 4", revenue: 64340, orders: 1092, customers: 1724 },
+          ];
+    return data;
+  }, [timeRange]);
 
-  const categoryMix = [
-    { name: "Pizza", value: 38 },
-    { name: "Burgers", value: 22 },
-    { name: "Pasta", value: 18 },
-    { name: "Salads", value: 12 },
-    { name: "Drinks", value: 10 },
+  // Category performance
+  const categoryData = [
+    { name: "Pizza", value: 38, revenue: 4880 },
+    { name: "Burgers", value: 22, revenue: 2826 },
+    { name: "Pasta", value: 18, revenue: 2312 },
+    { name: "Salads", value: 12, revenue: 1542 },
+    { name: "Beverages", value: 10, revenue: 1285 },
   ];
 
+  // Staff performance
+  const staffPerformance = [
+    { name: "Alice", orders: 42, revenue: 2890, rating: 4.8 },
+    { name: "John", orders: 38, revenue: 2610, rating: 4.6 },
+    { name: "Mei", orders: 35, revenue: 2405, rating: 4.9 },
+    { name: "Kwame", orders: 32, revenue: 2198, rating: 4.7 },
+    { name: "Sarah", orders: 29, revenue: 1995, rating: 4.5 },
+  ];
+
+  // Top items
   const topItems = [
-    { name: "Margherita Pizza", sold: 132 },
-    { name: "Cheeseburger", sold: 118 },
-    { name: "Spaghetti Bolognese", sold: 94 },
-    { name: "Caesar Salad", sold: 80 },
-    { name: "Lemonade", sold: 76 },
+    { name: "Margherita Pizza", sold: 132, revenue: 1716 },
+    { name: "Classic Burger", sold: 118, revenue: 1534 },
+    { name: "Spaghetti", sold: 94, revenue: 1222 },
+    { name: "Caesar Salad", sold: 80, revenue: 1040 },
+    { name: "Lemonade", sold: 156, revenue: 624 },
   ];
 
-  const liveOrders = [
-    { id: 1248, table: "T7", total: 42.3, status: "In Kitchen" },
-    { id: 1247, table: "T3", total: 18.5, status: "Pending" },
-    { id: 1246, table: "T10", total: 67.0, status: "Ready" },
-    { id: 1245, table: "T2", total: 25.9, status: "Served" },
+  // Peak hours
+  const peakHoursData = [
+    { hour: "Breakfast", orders: 45, capacity: 80 },
+    { hour: "Lunch", orders: 156, capacity: 180 },
+    { hour: "Afternoon", orders: 42, capacity: 100 },
+    { hour: "Dinner", orders: 178, capacity: 200 },
   ];
 
-  const tableSnapshot = [
-    { number: "T1", status: "Free" },
-    { number: "T2", status: "Occupied" },
-    { number: "T3", status: "Occupied" },
-    { number: "T4", status: "Reserved" },
-    { number: "T5", status: "Free" },
-    { number: "T6", status: "Occupied" },
-    { number: "T7", status: "Occupied" },
-    { number: "T8", status: "Free" },
+  const COLORS = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.error.main,
+    theme.palette.warning.main,
+    theme.palette.success.main,
   ];
-
-  const employees = [
-    { name: "Alice", orders: 36 },
-    { name: "John", orders: 31 },
-    { name: "Mei", orders: 28 },
-    { name: "Kwame", orders: 24 },
-  ];
-
-  const inventoryAlerts = [
-    { item: "Beef Patties", level: 12, threshold: 15 },
-    { item: "Mozzarella", level: 6, threshold: 10 },
-    { item: "Tomato Sauce", level: 18, threshold: 20 },
-  ];
-
-  const COLORS = ["#6366F1", "#22C55E", "#F59E0B", "#EC4899", "#06B6D4"]; // indigo, green, amber, pink, cyan
-
-  const progressPct = Math.round((kpis.activeTables / kpis.totalTables) * 100);
 
   return (
-    <Box className="owner-dashboard" sx={{ p: 3, display: "grid", gap: 3 }}>
-      <DashboardHeader
-        title="Owner Dashboard"
-        description="Quick overview on your restaurant. Snapshots of your restaurant's performance, orders, and more."
-        background="linear-gradient(135deg, #232526 0%, #414345 100%)"
-        color="#fff"
-      />
-      {/* Header / Filters */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 2,
-        }}
-      >
-        <Stack direction="row" spacing={1} alignItems="center">
-          <TextField size="small" placeholder="Search…" />
-          <ToggleButtonGroup
-            value={range}
-            exclusive
-            onChange={(e, v) => v && setRange(v)}
-            size="small"
-          >
-            <ToggleButton value="today">Today</ToggleButton>
-            <ToggleButton value="week">Week</ToggleButton>
-            <ToggleButton value="month">Month</ToggleButton>
-          </ToggleButtonGroup>
-          <Tooltip title="Refresh">
-            <IconButton>
-              <Refresh />
-            </IconButton>
-          </Tooltip>
+    <Box sx={{ p: 3 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          mb={2}
+        >
+          <Box>
+            <Typography variant="h4" fontWeight={700} gutterBottom>
+              Owner Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Real-time insights and performance analytics
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant={autoRefresh ? "contained" : "outlined"}
+              startIcon={<Refresh />}
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              size="small"
+            >
+              {autoRefresh ? "Live" : "Paused"}
+            </Button>
+            <ToggleButtonGroup
+              value={timeRange}
+              exclusive
+              onChange={(e, v) => v && setTimeRange(v)}
+              size="small"
+            >
+              <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="week">Week</ToggleButton>
+              <ToggleButton value="month">Month</ToggleButton>
+            </ToggleButtonGroup>
+            <Button variant="outlined" startIcon={<GetApp />} size="small">
+              Export
+            </Button>
+          </Stack>
         </Stack>
+        <Typography variant="caption" color="text.secondary">
+          Last updated: {lastUpdate.toLocaleTimeString()}
+        </Typography>
       </Box>
 
+      {/* Alerts */}
+      <Stack spacing={1} mb={3}>
+        <Alert severity="warning" icon={<Warning />}>
+          Low stock: Mozzarella (6 units remaining)
+        </Alert>
+      </Stack>
+
       {/* KPI Cards */}
-      <Grid container spacing={2}>
+      <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            icon={<TrendingUp />}
-            label="Revenue"
-            value={`$${kpis.todayRevenue.toLocaleString()}`}
-            sub="Today"
+          <MetricCard
+            title="Total Revenue"
+            value={`$${kpis.revenue.current.toLocaleString()}`}
+            change={kpis.revenue.change}
+            target={kpis.revenue.target}
+            icon={<AttachMoney />}
+            color="primary"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
+          <MetricCard
+            title="Orders Completed"
+            value={kpis.orders.current}
+            change={kpis.orders.change}
+            subtitle={`Avg. $${kpis.orders.avgValue}`}
             icon={<ShoppingBag />}
-            label="Orders"
-            value={kpis.orders}
-            sub="Completed"
+            color="success"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            icon={<LocalDining />}
-            label="Avg. Order"
-            value={`$${kpis.avgOrder}`}
-            sub="per ticket"
+          <MetricCard
+            title="Total Customers"
+            value={kpis.customers.current}
+            change={kpis.customers.change}
+            subtitle={`${kpis.customers.returning}% returning`}
+            icon={<People />}
+            color="secondary"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3 }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              Active Tables
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                mb: 1,
-              }}
-            >
-              <Typography variant="h5" fontWeight={800}>
-                {kpis.activeTables}/{kpis.totalTables}
-              </Typography>
-              <TableRestaurant />
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={progressPct}
-              sx={{ borderRadius: 999 }}
-            />
-          </Card>
+          <MetricCard
+            title="Avg Prep Time"
+            value={`${kpis.efficiency.avgPrepTime}m`}
+            change={kpis.efficiency.change}
+            subtitle={`${kpis.efficiency.tableUtilization}% table util.`}
+            icon={<Schedule />}
+            color="warning"
+            inverseGood
+          />
         </Grid>
       </Grid>
 
       {/* Charts Row */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={7}>
-          <Card sx={{ p: 2.5, borderRadius: 3, boxShadow: 3, height: 340 }}>
-            <SectionHeader
-              title="Revenue Trend"
-              action={
-                <Button size="small" endIcon={<ArrowForward />}>
-                  View report
+      <Grid container spacing={3} mb={3}>
+        {/* Revenue Chart */}
+        <Grid item xs={12} lg={8}>
+          <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+                flexShrink={0}
+              >
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    Revenue & Performance
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Track performance over time
+                  </Typography>
+                </Box>
+                <ToggleButtonGroup
+                  value={selectedMetric}
+                  exclusive
+                  onChange={(e, v) => v && setSelectedMetric(v)}
+                  size="small"
+                >
+                  <ToggleButton value="revenue">Revenue</ToggleButton>
+                  <ToggleButton value="orders">Orders</ToggleButton>
+                  <ToggleButton value="customers">Customers</ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueData}>
+                    <defs>
+                      <linearGradient
+                        id="colorMetric"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={theme.palette.primary.main}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={theme.palette.primary.main}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={theme.palette.divider}
+                    />
+                    <XAxis
+                      dataKey="time"
+                      stroke={theme.palette.text.secondary}
+                    />
+                    <YAxis stroke={theme.palette.text.secondary} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: 8,
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey={selectedMetric}
+                      stroke={theme.palette.primary.main}
+                      strokeWidth={2}
+                      fill="url(#colorMetric)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Category Pie */}
+        <Grid item xs={12} lg={4}>
+          <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Box flexShrink={0} mb={2}>
+                <Typography variant="h6" fontWeight={700} gutterBottom>
+                  Category Mix
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Sales distribution
+                </Typography>
+              </Box>
+              <Box sx={{ height: 240, flexShrink: 0 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+              <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", mt: 2 }}>
+                <Stack spacing={1}>
+                  {categoryData.map((cat, idx) => (
+                    <Stack
+                      key={idx}
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            bgcolor: COLORS[idx],
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Typography variant="body2">{cat.name}</Typography>
+                      </Stack>
+                      <Typography variant="body2" fontWeight={700}>
+                        {cat.value}%
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Performance Grid */}
+      <Grid container spacing={3} mb={3}>
+        {/* Top Items */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+                flexShrink={0}
+              >
+                <Typography variant="h6" fontWeight={700}>
+                  Top Performers
+                </Typography>
+                <Button size="small" endIcon={<ChevronRight />}>
+                  View All
                 </Button>
-              }
-            />
-            <Box sx={{ height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={salesTrend}
-                  margin={{ left: 8, right: 8, top: 10 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <RTooltip formatter={(v) => [`$${v}`, "Revenue"]} />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#6366F1"
-                    strokeWidth={3}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={5}>
-          <Card sx={{ p: 2.5, borderRadius: 3, boxShadow: 3, height: 340 }}>
-            <SectionHeader title="Category Mix" />
-            <Box sx={{ height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryMix}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={100}
-                    innerRadius={55}
-                    paddingAngle={3}
-                  >
-                    {categoryMix.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Legend />
-                  <RTooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </Box>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Middle Row: Top Items + Live Orders + Rating/Staff */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: 360 }}>
-            <SectionHeader title="Top Items" />
-            <List dense>
-              {topItems.map((it, idx) => (
-                <ListItem
-                  key={idx}
-                  secondaryAction={
-                    <Chip label={`${it.sold} sold`} size="small" />
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar variant="rounded">🍽️</Avatar>
-                  </ListItemAvatar>
-                  <ListItemText primary={it.name} />
-                </ListItem>
-              ))}
-            </List>
-            <Divider sx={{ my: 1.5 }} />
-            <Button fullWidth variant="outlined">
-              Manage Menu
-            </Button>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: 360 }}>
-            <SectionHeader
-              title="Live Orders"
-              action={
-                <IconButton size="small">
-                  <Visibility />
-                </IconButton>
-              }
-            />
-            <List dense>
-              {liveOrders.map((o) => (
-                <ListItem key={o.id}>
-                  <ListItemAvatar>
-                    <Avatar variant="circular">
-                      <ShoppingBag fontSize="small" />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={`#${o.id} · ${o.table}`}
-                    secondary={`${o.status} · $${o.total.toFixed(2)}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-            <Divider sx={{ my: 1.5 }} />
-            <Stack direction="row" spacing={1}>
-              <Button variant="contained" fullWidth>
-                View All
-              </Button>
-              <Button variant="outlined" fullWidth startIcon={<Print />}>
-                Print Last
-              </Button>
-            </Stack>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: 360 }}>
-            <SectionHeader title="Team on Shift" />
-            <List dense>
-              {employees.map((e, i) => (
-                <ListItem
-                  key={i}
-                  secondaryAction={
-                    <Chip size="small" label={`${e.orders} orders`} />
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar src={`https://i.pravatar.cc/150?img=${i + 10}`} />
-                  </ListItemAvatar>
-                  <ListItemText primary={e.name} secondary="Waiter" />
-                </ListItem>
-              ))}
-            </List>
-            <Divider sx={{ my: 1.5 }} />
-            <Stack direction="row" spacing={1}>
-              <Chip icon={<People />} label={`${kpis.staffOnShift} on shift`} />
-              <Chip
-                icon={<StarRate />}
-                label={`${kpis.rating}★ rating`}
-                color="warning"
-              />
-            </Stack>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Bottom Row: Inventory + Tables Snapshot */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={5}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: 300 }}>
-            <SectionHeader title="Inventory Alerts" icon={<Inventory2 />} />
-            <List dense>
-              {inventoryAlerts.map((it, idx) => {
-                const pct = Math.min(
-                  100,
-                  Math.round((it.level / it.threshold) * 100)
-                );
-                return (
-                  <ListItem key={idx} sx={{ alignItems: "center" }}>
-                    <ListItemAvatar>
-                      <Avatar variant="rounded">📦</Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={it.item}
-                      secondary={`Level: ${it.level} / ${it.threshold}`}
-                    />
-                    <Box sx={{ minWidth: 120 }}>
-                      <LinearProgress
-                        variant="determinate"
-                        value={pct}
-                        sx={{ borderRadius: 999 }}
+              </Stack>
+              <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                <List>
+                  {topItems.map((item, idx) => (
+                    <ListItem key={idx} sx={{ px: 0 }}>
+                      <ListItemAvatar>
+                        <Avatar
+                          sx={{
+                            bgcolor: alpha(theme.palette.primary.main, 0.1),
+                            color: "primary.main",
+                          }}
+                        >
+                          #{idx + 1}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={item.name}
+                        secondary={`${item.sold} sold`}
                       />
-                    </Box>
-                  </ListItem>
-                );
-              })}
-            </List>
-            <Divider sx={{ my: 1.5 }} />
-            <Button size="small" variant="outlined">
-              Open Inventory
-            </Button>
+                      <Typography variant="body2" fontWeight={700}>
+                        ${item.revenue}
+                      </Typography>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={7}>
-          <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: 300 }}>
-            <SectionHeader title="Tables Snapshot" icon={<TableRestaurant />} />
-            <Grid container spacing={1.5}>
-              {tableSnapshot.map((t, i) => (
-                <Grid key={i} item xs={3} sm={2.4} md={2.4} lg={1.7}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      textAlign: "center",
-                      bgcolor:
-                        t.status === "Occupied"
-                          ? "#fdecea"
-                          : t.status === "Reserved"
-                          ? "#fff7e6"
-                          : "#f0fdf4",
-                      border: "1px solid",
-                      borderColor:
-                        t.status === "Occupied"
-                          ? "error.light"
-                          : t.status === "Reserved"
-                          ? "warning.light"
-                          : "success.light",
-                    }}
-                  >
-                    <Typography fontWeight={700}>{t.number}</Typography>
-                    <Chip
-                      size="small"
-                      label={t.status}
-                      sx={{ mt: 0.5 }}
-                      color={
-                        t.status === "Occupied"
-                          ? "error"
-                          : t.status === "Reserved"
-                          ? "warning"
-                          : "success"
-                      }
-                    />
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
+        {/* Staff Performance */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Typography variant="h6" fontWeight={700} mb={2} flexShrink={0}>
+                Team Performance
+              </Typography>
+              <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                <List>
+                  {staffPerformance.map((staff, idx) => (
+                    <ListItem
+                      key={idx}
+                      sx={{
+                        px: 2,
+                        py: 1.5,
+                        mb: 1,
+                        bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        borderRadius: 2,
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${staff.name}`}
+                        />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={staff.name}
+                        secondary={
+                          <Stack direction="row" spacing={1} component="span">
+                            <Typography variant="caption" component="span">
+                              {staff.orders} orders
+                            </Typography>
+                            <Typography variant="caption" component="span">
+                              •
+                            </Typography>
+                            <Typography variant="caption" component="span">
+                              ⭐ {staff.rating}
+                            </Typography>
+                          </Stack>
+                        }
+                      />
+                      <Typography variant="body2" fontWeight={700}>
+                        ${staff.revenue}
+                      </Typography>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* Peak Hours */}
+      <Card sx={{ height: 350, display: "flex", flexDirection: "column" }}>
+        <CardContent
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <Typography variant="h6" fontWeight={700} mb={2} flexShrink={0}>
+            Peak Hours Analysis
+          </Typography>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={peakHoursData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={theme.palette.divider}
+                />
+                <XAxis dataKey="hour" stroke={theme.palette.text.secondary} />
+                <YAxis stroke={theme.palette.text.secondary} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: theme.palette.background.paper,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 8,
+                  }}
+                />
+                <Bar
+                  dataKey="orders"
+                  fill={theme.palette.primary.main}
+                  radius={[8, 8, 0, 0]}
+                />
+                <Bar
+                  dataKey="capacity"
+                  fill={alpha(theme.palette.primary.main, 0.2)}
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </Box>
+        </CardContent>
+      </Card>
     </Box>
   );
 }
 
-// ————————————————————————————————————————————
-// Helper Components
-// ————————————————————————————————————————————
-function KpiCard({ icon, label, value, sub }) {
-  return (
-    <Card sx={{ p: 2, borderRadius: 3, boxShadow: 3, height: "100%" }}>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-        <Avatar
-          variant="rounded"
-          sx={{ bgcolor: "primary.main", color: "white" }}
-        >
-          {icon}
-        </Avatar>
-        <Typography variant="subtitle2" color="text.secondary">
-          {label}
-        </Typography>
-      </Stack>
-      <Typography variant="h5" fontWeight={800}>
-        {value}
-      </Typography>
-      {sub && (
-        <Typography variant="caption" color="text.secondary">
-          {sub}
-        </Typography>
-      )}
-    </Card>
-  );
-}
+function MetricCard({
+  title,
+  value,
+  change,
+  target,
+  subtitle,
+  icon,
+  color,
+  inverseGood,
+}) {
+  const theme = useTheme();
+  const isPositive = inverseGood ? change < 0 : change > 0;
+  const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
-function SectionHeader({ title, action, icon }) {
+  const targetProgress = target
+    ? (parseFloat(value.replace(/[$,]/g, "")) / target) * 100
+    : 0;
+
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        mb: 1.5,
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center">
-        {icon && (
-          <Avatar variant="rounded" sx={{ width: 28, height: 28 }}>
+    <Card>
+      <CardContent>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          mb={2}
+        >
+          <Avatar
+            sx={{
+              bgcolor: alpha(theme.palette[color].main, 0.1),
+              color: `${color}.main`,
+            }}
+          >
             {icon}
           </Avatar>
-        )}
-        <Typography variant="subtitle1" fontWeight={800}>
+          {change && (
+            <Chip
+              icon={<TrendIcon />}
+              label={`${Math.abs(change).toFixed(1)}%`}
+              size="small"
+              color={isPositive ? "success" : "error"}
+              sx={{ fontWeight: 700 }}
+            />
+          )}
+        </Stack>
+        <Typography variant="body2" color="text.secondary" gutterBottom>
           {title}
         </Typography>
-      </Stack>
-      {action || null}
-    </Box>
+        <Typography variant="h4" fontWeight={700} gutterBottom>
+          {value}
+        </Typography>
+        {subtitle && (
+          <Typography variant="caption" color="text.secondary">
+            {subtitle}
+          </Typography>
+        )}
+        {target && (
+          <Box mt={2}>
+            <Stack direction="row" justifyContent="space-between" mb={0.5}>
+              <Typography variant="caption" color="text.secondary">
+                Target Progress
+              </Typography>
+              <Typography variant="caption" fontWeight={700}>
+                {targetProgress.toFixed(0)}%
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={Math.min(100, targetProgress)}
+              sx={{ height: 6, borderRadius: 3 }}
+            />
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 }

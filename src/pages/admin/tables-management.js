@@ -50,6 +50,7 @@ import AdminHeader from "../../components/admin-header";
 import FAB from "../../components/fab";
 import useAppStore from "../../lib/appstore";
 import DataTable from "../../components/data-table";
+import {useSettingsStore} from "../../lib/settingsStore";
 
 const statusColors = {
   available: { color: "success", icon: CheckCircleIcon },
@@ -65,7 +66,7 @@ const statusColors = {
 
 export default function TableManagement() {
   const { getTablesOverview, addTable, tables, loadingTables } = useTableManagementStore();
-  const { viewMode } = useAppStore();
+  const { viewMode } = useSettingsStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [capacityFilter, setCapacityFilter] = useState("all");
@@ -670,7 +671,7 @@ export default function TableManagement() {
       </Grid>
 
       {/* Cards */}
-      {viewMode === "card" && (
+      {viewMode === "grid" && (
         <Grid container spacing={3}>
           {filteredTables.map((table) => {
             const statusKey = table.base_status || `available`;
@@ -841,7 +842,7 @@ export default function TableManagement() {
       )}
 
       {/* Data Table */}
-      {viewMode === "table" && (
+      {viewMode === "list" && (
         <DataTable
           rows={filteredTables}
           columns={columns}

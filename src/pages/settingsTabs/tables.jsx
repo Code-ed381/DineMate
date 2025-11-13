@@ -10,8 +10,11 @@ import {
   CardContent,
   Stack,
 } from "@mui/material";
+import { useSettings } from "../../providers/settingsProvider";
 
 export default function TableSettingsPanel() {
+  const { settings, updateSetting } = useSettings();
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -19,19 +22,20 @@ export default function TableSettingsPanel() {
         Table Settings
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Manage defaults and automation for table management.
+        Manage defaults and permissions for table management.
       </Typography>
 
       <Stack spacing={3}>
-        {/* Section 1: Reservations */}
+        {/* Section 1: Permissions */}
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Reservations
+              Permissions
             </Typography>
             <FormControlLabel
-              control={<Switch defaultChecked />}
-              label="Allow online table reservations"
+              control={<Switch />}
+
+              label="Allow admin to assign table"
             />
             <FormControlLabel
               control={<Switch />}

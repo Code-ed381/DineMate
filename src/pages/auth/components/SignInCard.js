@@ -18,6 +18,8 @@ import useAuthStore from '../../../lib/authStore';
 import { useNavigate } from 'react-router-dom';
 import CircularProgress from '@mui/material/CircularProgress';
 import Swal from 'sweetalert2';
+import Logo from '../../../assets/logo.png';
+
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -90,7 +92,7 @@ export default function SignInCard() {
   return (
     <Card variant="outlined">
       <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
-        <SitemarkIcon />
+        <img src={Logo} alt="Logo" width={50} height={50} />
       </Box>
       <Typography
         component="h1"

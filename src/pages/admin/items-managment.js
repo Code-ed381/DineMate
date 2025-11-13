@@ -31,6 +31,8 @@ import useAppStore from "../../lib/appstore";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
 import Avatar from "@mui/material/Avatar";
+import { useSettings } from "../../providers/settingsProvider";
+import { useSettingsStore } from "../../lib/settingsStore";
 
 const columns = [
   {
@@ -149,7 +151,8 @@ export default function MenuItemsManagement() {
     loadingMenuItems,
   } = useMenuItemsStore();
   const { selectedRestaurant } = useRestaurantStore();
-  const { viewMode } = useAppStore();
+  const { settings } = useSettings();
+  const {viewMode} = useSettingsStore();
 
   useEffect(() => {
     fetchMenuItems();
@@ -506,8 +509,25 @@ export default function MenuItemsManagement() {
             }}
           >
             {selectedCategory && (
-              <IconButton size="small" sx={{ mr: 2 }} color="error" onClick={() => {setSelectedCategory(""); fetchMenuItems();}} >
-                <Typography variant="body2" sx={{ textTransform: "capitalize", mr: 1, fontWeight: "medium" }}>{selectedCategory}</Typography>
+              <IconButton
+                size="small"
+                sx={{ mr: 2 }}
+                color="error"
+                onClick={() => {
+                  setSelectedCategory("");
+                  fetchMenuItems();
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    textTransform: "capitalize",
+                    mr: 1,
+                    fontWeight: "medium",
+                  }}
+                >
+                  {selectedCategory}
+                </Typography>
                 <CloseIcon fontSize="small" />
               </IconButton>
             )}
@@ -529,154 +549,160 @@ export default function MenuItemsManagement() {
           </Box>
 
           {/* Grid View */}
-          {viewMode === "card" && (
+          {viewMode === "grid" && (
             <Grid container spacing={3}>
               {filteredMenuItems.map((item) => (
                 <Grid item xs={12} sm={6} md={3} key={item.id}>
-                  {loadingMenuItems ? (<Skeleton variant="rectangular" width={300} height={400} />) : (<Card
-                    sx={{
-                      borderRadius: 3,
-                      boxShadow: 3,
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      height="160"
-                      image={item.image_url}
-                      alt={item.name}
-                    />
-                    <CardContent
+                  {loadingMenuItems ? (
+                    <Skeleton variant="rectangular" width={300} height={400} />
+                  ) : (
+                    <Card
                       sx={{
+                        borderRadius: 3,
+                        boxShadow: 3,
+                        height: "100%",
                         display: "flex",
                         flexDirection: "column",
-                        flexGrow: 1,
                       }}
                     >
-                      {/* Title + Price */}
-                      <Box
+                      <CardMedia
+                        component="img"
+                        height="160"
+                        image={item.image_url}
+                        alt={item.name}
+                      />
+                      <CardContent
                         sx={{
                           display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 1,
+                          flexDirection: "column",
+                          flexGrow: 1,
                         }}
                       >
-                        <Typography
-                          variant="body2"
-                          fontWeight="bold"
-                          fontSize={16}
+                        {/* Title + Price */}
+                        <Box
                           sx={{
-                            flex: 1,
-                            whiteSpace: "normal",
-                            wordBreak: "break-word",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 1,
                           }}
                         >
-                          {item.name}
-                        </Typography>
-                        <Typography
-                          variant="h6"
-                          sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
-                        >
-                          ${item.price}
-                        </Typography>
-                      </Box>
-
-                      <Divider sx={{ my: 1 }} />
-
-                      {/* Category + Availability */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 1,
-                        }}
-                      >
-                        <Chip
-                          size="small"
-                          sx={{
-                            flexGrow: 1,
-                            maxWidth: "50%",
-                            textAlign: "center",
-                          }}
-                          label={item.category_name}
-                          color="primary"
-                        />
-                        <Chip
-                          size="small"
-                          sx={{
-                            flexGrow: 1,
-                            maxWidth: "50%",
-                            textAlign: "center",
-                          }}
-                          label={item.available ? "Available" : "Out of Stock"}
-                          color={item.available ? "success" : "error"}
-                        />
-                      </Box>
-
-                      <Divider sx={{ my: 1 }} />
-
-                      {/* Tags */}
-                      <Box
-                        sx={{
-                          my: 1,
-                          display: "flex",
-                          gap: 1,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <Typography variant="subtitle2">Tags</Typography>
-                        <Box>
-                          {item.tags.map((tag, idx) => (
-                            <Chip
-                              key={idx}
-                              size="small"
-                              label={tag}
-                              color="primary"
-                              variant="outlined"
-                            />
-                          ))}
+                          <Typography
+                            variant="body2"
+                            fontWeight="bold"
+                            fontSize={16}
+                            sx={{
+                              flex: 1,
+                              whiteSpace: "normal",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {item.name}
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                          >
+                            ${item.price}
+                          </Typography>
                         </Box>
-                      </Box>
 
-                      <Divider sx={{ my: 1 }} />
+                        <Divider sx={{ my: 1 }} />
 
-                      {/* Buttons */}
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          mt: "auto",
-                        }}
-                      >
-                        <Button
-                          startIcon={<EditIcon />}
-                          fullWidth
-                          color="primary"
+                        {/* Category + Availability */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          startIcon={<DeleteIcon />}
-                          fullWidth
-                          color="error"
+                          <Chip
+                            size="small"
+                            sx={{
+                              flexGrow: 1,
+                              maxWidth: "50%",
+                              textAlign: "center",
+                            }}
+                            label={item.category_name}
+                            color="primary"
+                          />
+                          <Chip
+                            size="small"
+                            sx={{
+                              flexGrow: 1,
+                              maxWidth: "50%",
+                              textAlign: "center",
+                            }}
+                            label={
+                              item.available ? "Available" : "Out of Stock"
+                            }
+                            color={item.available ? "success" : "error"}
+                          />
+                        </Box>
+
+                        <Divider sx={{ my: 1 }} />
+
+                        {/* Tags */}
+                        <Box
+                          sx={{
+                            my: 1,
+                            display: "flex",
+                            gap: 1,
+                            flexWrap: "wrap",
+                          }}
                         >
-                          Delete
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>)}
+                          <Typography variant="subtitle2">Tags</Typography>
+                          <Box>
+                            {item.tags.map((tag, idx) => (
+                              <Chip
+                                key={idx}
+                                size="small"
+                                label={tag}
+                                color="primary"
+                                variant="outlined"
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+
+                        <Divider sx={{ my: 1 }} />
+
+                        {/* Buttons */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 1,
+                            mt: "auto",
+                          }}
+                        >
+                          <Button
+                            startIcon={<EditIcon />}
+                            fullWidth
+                            color="primary"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            startIcon={<DeleteIcon />}
+                            fullWidth
+                            color="error"
+                          >
+                            Delete
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )}
                 </Grid>
               ))}
             </Grid>
           )}
 
           {/* Table View */}
-          {viewMode === "table" && (
+          {viewMode === "list" && (
             <DataTable
               rows={menuItems}
               columns={columns}

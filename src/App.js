@@ -20,13 +20,14 @@ import RestaurantGrid from "./pages/restaurantSelectionPage";
 import ResetPassword from "./pages/auth/resetPassword";
 import Onboarding from "./pages/auth/onboarding";
 import Tables from "./pages/tables";
+import Index from "./pages/index";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/">
-          <Route index element={<Login />} />
+          <Route index element={<Index />} />
           <Route path="sign-up" element={<SignUp />} />
           <Route path="sign-in" element={<SignIn />} />
           <Route

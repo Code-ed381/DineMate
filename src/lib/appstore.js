@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
+import { useSettingsStore } from './settingsStore';
 
 const useAppStore = create((set) => ({
-  viewMode: "card",
-  setViewMode: (viewMode) => set({ viewMode }),
+
 
   darkMode: false,
   setDarkMode: (darkMode) => set({ darkMode }),
@@ -16,6 +16,13 @@ const useAppStore = create((set) => ({
   setBreadcrumb: (breadcrumb) => {
     localStorage.setItem('breadcrumb', breadcrumb);
     set({ breadcrumb })
+  },
+
+  handleDefaultViewChange: (e) => {
+    const current = useSettingsStore?.getState()?.settings?.employee_defaults || {};
+    const updated = { ...current, default_view: e.target.value };
+
+    useSettingsStore?.getState()?.updateSetting("employee_defaults", updated);
   },
 
   setUser: (user) => set({ user }),

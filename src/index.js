@@ -4,12 +4,15 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AppThemeProvider } from './theme/app-theme-provider';
+import { SettingsProvider } from './providers/settingsProvider';
 
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <AppThemeProvider>
-      <App />
+      <SettingsProvider>
+        <App />
+      </SettingsProvider>
     </AppThemeProvider>
   </React.StrictMode>
 );

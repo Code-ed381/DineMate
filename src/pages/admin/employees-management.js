@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
   Typography,
@@ -24,18 +24,25 @@ import useRestaurantStore from "../../lib/restaurantStore";
 import useEmployeesStore from "../../lib/employeesStore";
 import useAppStore from "../../lib/appstore";
 import useAuthStore from "../../lib/authStore";
+import { useSettings } from "../../providers/settingsProvider";
+import { useSettingsStore } from "../../lib/settingsStore";
 
 const EmployeeManagement = () => {
   const { employees, fetchEmployees, updateEmployeeDetailsAsAdmin } =
     useEmployeesStore();
   const { selectedRestaurant } = useRestaurantStore();
-  const { uploadFile, viewMode } = useAppStore();
+  const { uploadFile } = useAppStore();
   const { updateUserAvatarAsAdmin, updateUserDetailsAsAdmin } = useAuthStore();
+  const { settings } = useSettings();
+  const { viewMode } = useSettingsStore();
+  const [role, setRole] = useState(null);
 
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchEmployees();
+
+    setRole(selectedRestaurant.role);
   }, [fetchEmployees]);
 
   const handleRowClick = (params) => {
@@ -624,7 +631,7 @@ const EmployeeManagement = () => {
       />
 
       {/* Conditional UI */}
-      {viewMode === "table" && (
+      {viewMode === "list" && (
         <DataTable
           rows={employees}
           columns={columns}
@@ -633,7 +640,7 @@ const EmployeeManagement = () => {
         />
       )}
 
-      {viewMode === "card" && (
+      {viewMode === "grid" && (
         <Grid container spacing={3}>
           {employees.map((emp) => (
             <Grid item xs={12} md={4} key={emp.id}>
@@ -670,20 +677,40 @@ const EmployeeManagement = () => {
                   />
 
                   {/* Camera icon button */}
-                  <IconButton
-                    color="primary"
-                    sx={{
-                      position: "absolute",
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: "white",
-                      boxShadow: 2,
-                      "&:hover": { bgcolor: "grey.200" },
-                    }}
-                    onClick={() => fileInputRef.current.click()} // open file input
-                  >
-                    <CameraAltIcon />
-                  </IconButton>
+                  {settings?.employee_permissions?.admin_delete_edit_employee &&
+                    role === "admin" && (
+                      <IconButton
+                        color="primary"
+                        sx={{
+                          position: "absolute",
+                          bottom: 8,
+                          right: 8,
+                          bgcolor: "white",
+                          boxShadow: 2,
+                          "&:hover": { bgcolor: "grey.200" },
+                        }}
+                        onClick={() => fileInputRef.current.click()} // open file input
+                      >
+                        <CameraAltIcon />
+                      </IconButton>
+                    )}
+
+                  {role === "owner" && (
+                    <IconButton
+                      color="primary"
+                      sx={{
+                        position: "absolute",
+                        bottom: 8,
+                        right: 8,
+                        bgcolor: "white",
+                        boxShadow: 2,
+                        "&:hover": { bgcolor: "grey.200" },
+                      }}
+                      onClick={() => fileInputRef.current.click()} // open file input
+                    >
+                      <CameraAltIcon />
+                    </IconButton>
+                  )}
 
                   {/* Hidden file input */}
                   <input
@@ -830,24 +857,48 @@ const EmployeeManagement = () => {
                     />
                   </Box>
 
-                  <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      fullWidth
-                      onClick={() => handleCardEdit(emp)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      startIcon={<DeleteIcon />}
-                      fullWidth
-                      color="error"
-                    >
-                      Delete
-                    </Button>
-                  </Box>
+                  {settings?.employee_permissions?.admin_delete_edit_employee &&
+                    role === "admin" && (
+                      <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                        <Button
+                          size="small"
+                          startIcon={<EditIcon />}
+                          fullWidth
+                          onClick={() => handleCardEdit(emp)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<DeleteIcon />}
+                          fullWidth
+                          color="error"
+                        >
+                          Delete
+                        </Button>
+                      </Box>
+                    )}
+
+                  {role === "owner" && (
+                    <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        fullWidth
+                        onClick={() => handleCardEdit(emp)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<DeleteIcon />}
+                        fullWidth
+                        color="error"
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  )}
                 </Box>
               </Card>
             </Grid>
@@ -856,7 +907,14 @@ const EmployeeManagement = () => {
       )}
 
       {/* Floating Action Button */}
-      <FAB handleAdd={() => handleAddEmployee()} title="Add Employee" />
+      {settings?.employee_permissions?.admin_invite_employee &&
+        role === "admin" && (
+          <FAB handleAdd={() => handleAddEmployee()} title="Add Employee" />
+        )}
+
+      {role === "owner" && (
+        <FAB handleAdd={() => handleAddEmployee()} title="Add Employee" />
+      )}
     </Box>
   );
 };

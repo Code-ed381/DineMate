@@ -1,8 +1,8 @@
 import { Box, Typography, ToggleButtonGroup, ToggleButton, Divider } from "@mui/material";
-import useAppStore from "../lib/appstore";
+import {useSettingsStore} from "../lib/settingsStore";
 
 export default function AdminHeader({ title, description }) { 
-    const { viewMode, setViewMode } = useAppStore();
+    const { viewMode, setViewMode } = useSettingsStore();
     
     return (
         <>
@@ -33,11 +33,11 @@ export default function AdminHeader({ title, description }) {
                 <ToggleButtonGroup
                 value={viewMode}
                 exclusive
-                onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                onChange={(e) => setViewMode(e.target.value)}
                 size="small"
                 >
-                <ToggleButton value="card">Card View</ToggleButton>
-                <ToggleButton value="table">Table View</ToggleButton>
+                <ToggleButton value="grid">Grid View</ToggleButton>
+                <ToggleButton value="list">List View</ToggleButton>
                 </ToggleButtonGroup>
             </Box>
             <Divider sx={{ mt: 2, mb: 2 }} />

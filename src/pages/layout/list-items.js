@@ -14,6 +14,7 @@ import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import useRestaurantStore from "../../lib/restaurantStore";
 import LocalBarIcon from "@mui/icons-material/LocalBar";
 import SettingsIcon from "@mui/icons-material/Settings";
+import {useSettings} from "../../providers/settingsProvider";
 
 export const MainListItems = () => {
   const { selectedRestaurant } = useRestaurantStore();
@@ -112,6 +113,7 @@ export const MainListItems = () => {
 export const SecondaryListItems = () => {
   const { setBreadcrumb } = useAppStore();
   const { selectedRestaurant } = useRestaurantStore();
+  const { settings } = useSettings();
 
   return (
     <React.Fragment>
@@ -157,8 +159,7 @@ export const SecondaryListItems = () => {
         </>
       )}
 
-      {(selectedRestaurant.role === "owner" ||
-        selectedRestaurant.role === "admin") && (
+      {selectedRestaurant.role === "owner" ? (
         <>
           <Link
             to="/app/report"
@@ -172,6 +173,25 @@ export const SecondaryListItems = () => {
               <ListItemText primary="Reports" />
             </ListItemButton>
           </Link>
+        </>
+      ) : (
+          <>
+            {(selectedRestaurant.role === "admin" && settings?.employee_permissions?.admins_view_report) ? (
+              <>
+                <Link
+                  to="/app/report"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                  onClick={() => setBreadcrumb("Reports")}
+                >
+                  <ListItemButton>
+                    <ListItemIcon>
+                      <TrendingUpIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Reports" />
+                  </ListItemButton>
+                </Link>
+              </>
+            ) : null}
         </>
       )}
 
