@@ -16,7 +16,9 @@ const useAuthStore = create(
       user: null,
       session: null,
       memberships: [],
+      currentMember: null,
       setMemberships: (memberships) => set({ memberships }),
+      setCurrentMember: (member) => set({ currentMember: member }),
       refreshSession: async () => {
         const {
           data: { session },
@@ -476,15 +478,15 @@ const useAuthStore = create(
 
         const { session, user } = data;
 
-        useAuthStore.getState().setAuth({ user, session });
+        get().setAuth({ user, session });
 
         // fetch memberships (from your restaurant_members table)
         const { data: memberships } = await supabase
           .from("restaurant_members")
-          .select("restaurant_id, role")
+          .select("*")
           .eq("user_id", user.id);
 
-        useAuthStore.getState().setMemberships(memberships);
+        get().setMemberships(memberships);
 
         return data;
       },
@@ -506,7 +508,7 @@ const useAuthStore = create(
 
         if (error) throw error;
 
-        useAuthStore.getState().setAuth({ user: data.user, session: data.session });
+        get().setAuth({ user: data.user, session: data.session });
         return data;
       },
 

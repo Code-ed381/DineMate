@@ -92,6 +92,8 @@ export default function ChefDashboardPro() {
     handleFetchReadyMeals,
     handleFetchServedMeals,
     handleFetchOrderItems,
+    subscribeToOrderItems,
+    unsubscribeFromOrderItems,
   } = useKitchenStore();
 
   const isLoading =
@@ -105,11 +107,17 @@ export default function ChefDashboardPro() {
     handleFetchServedMeals();
     handleFetchOrderItems();
 
-    return () => controller.abort();
+    // ✅ Subscribe to realtime updates
+    subscribeToOrderItems();
+
+    return () => {
+      controller.abort();
+      unsubscribeFromOrderItems();
+    };
   }, []);
 
-  const pending = pendingMeals?.length || 0;
-  const preparing = preparingMeals?.length || 0;
+  const pending = pendingMeals?.filter((meal) => meal?.item_status !== "preparing").length || 0;
+  const preparing = preparingMeals?.filter((meal) => meal?.item_status !== "pending").length || 0;
   const ready = readyMeals?.length || 0;
   const served = servedMeals?.length || 0;
 
@@ -164,35 +172,38 @@ export default function ChefDashboardPro() {
             </Grid>
           </Grid>
 
-          <Grid container spacing={3}>
-            {/* Left: Live Order Queue */}
-            <Grid item xs={12} lg={7}>
-              <Stack spacing={3}>
-                {/* Orders Bar Chart */}
-                <OrdersBarChart />
+          {/* Orders Bar Chart */}
+          <OrdersBarChart />
 
-                {/* Order History Table */}
-                <OrderHistoryTable />
-              </Stack>
+          <Grid container spacing={3} sx={{ my: 3 }}>
+            {/* Left: Live Order Queue */}
+            <Grid item xs={12} lg={6}>
+              <LiveOrderQueueCard
+                pendingMeals={pendingMeals}
+                filter="pending"
+                title="Pending Orders"
+              />
             </Grid>
 
             {/* Right: Kitchen Health + Alerts */}
-            <Grid item xs={12} lg={5}>
+            <Grid item xs={12} lg={6}>
               <LiveOrderQueueCard
                 pendingMeals={pendingMeals}
-                preparingMeals={preparingMeals}
-                readyMeals={readyMeals}
-                servedMeals={servedMeals}
+                filter="preparing"
+                title="Preparing Orders"
               />
             </Grid>
           </Grid>
 
-          <Box sx={{ mt: 3, textAlign: "center" }}>
+          {/* Order History Table */}
+          <OrderHistoryTable />
+
+          {/* <Box sx={{ mt: 3, textAlign: "center" }}>
             <Typography variant="caption" color="text.secondary">
               Pro tip: integrate with printers and kitchen display systems (KDS)
               for fastest throughput.
             </Typography>
-          </Box>
+          </Box> */}
         </Box>
       )}
     </>

@@ -5,13 +5,17 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AppThemeProvider } from './theme/app-theme-provider';
 import { SettingsProvider } from './providers/settingsProvider';
+import { SubscriptionProvider } from './providers/subscriptionProvider'; 
+ 
 
 const root = createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <AppThemeProvider>
       <SettingsProvider>
-        <App />
+        <SubscriptionProvider>
+          <App />
+        </SubscriptionProvider>
       </SettingsProvider>
     </AppThemeProvider>
   </React.StrictMode>

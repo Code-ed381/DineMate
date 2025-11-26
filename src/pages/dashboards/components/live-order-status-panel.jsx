@@ -11,20 +11,23 @@ import {
   Paper,
   LinearProgress,
 } from "@mui/material";
-import EventNoteTwoToneIcon from "@mui/icons-material/EventNoteTwoTone";
+import OutdoorGrillTwoToneIcon from "@mui/icons-material/OutdoorGrillTwoTone";
+import PendingActionsTwoToneIcon from "@mui/icons-material/PendingActionsTwoTone";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 // utils you already had
 import { elapsedMinutesSince, formatDateTimeWithSuffix } from "../../../utils/format-datetime";
 
-function LiveOrderQueueCard({ pendingMeals, pendingCount }) {
+function LiveOrderQueueCard({ pendingMeals, filter, title }) {
   return (
     <Card
       sx={{
         borderRadius: 3,
-        maxHeight: "80vh",
-        overflow: "auto",
         boxShadow: 3,
+        height: "100%",
+        maxHeight: 900, // ✅ prevents overstretching
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <CardHeader
@@ -34,17 +37,23 @@ function LiveOrderQueueCard({ pendingMeals, pendingCount }) {
             fontSize: "1.1rem",
           },
         }}
-        avatar={<EventNoteTwoToneIcon />}
+        avatar={filter === "pending" ? <PendingActionsTwoToneIcon /> : <OutdoorGrillTwoToneIcon />}
         title={
           <>
-            Live Order Queue <Chip label={pendingCount || 0} size="small" />
+            {title} <Chip label={pendingMeals?.filter((order) => order?.item_status === filter).length || 0} size="small" />
           </>
         }
       />
       <Divider />
-      <CardContent sx={{ p: 2 }}>
+      <CardContent
+        sx={{
+          p: 2,
+          overflowY: "auto",   // ✅ scrolling happens here
+          flex: 1,             // ✅ takes remaining vertical space
+        }}
+      >
         <Stack spacing={2}>
-          {pendingMeals.map((order) => {
+          {pendingMeals?.filter((order) => order?.item_status === filter).map((order) => {
             const elapsed = elapsedMinutesSince(order.item_created_at);
             const sla = order?.menu_item_preparation_time;
             const progress = Math.min(100, (elapsed / sla) * 100);
@@ -64,10 +73,10 @@ function LiveOrderQueueCard({ pendingMeals, pendingCount }) {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "flex-start",
-                //   backgroundColor: overdue
-                //     ? theme.palette.tonalOffset?.light ||
-                //       theme.palette.error.light
-                //     : theme.palette.background.paper,
+                  //   backgroundColor: overdue
+                  //     ? theme.palette.tonalOffset?.light ||
+                  //       theme.palette.error.light
+                  //     : theme.palette.background.paper,
                   animation: overdue ? "pulseBg 1.5s infinite" : "none",
                   "@keyframes pulseBg": {
                     "0%": { boxShadow: `0 0 0px ${theme.palette.error.main}` },
@@ -167,11 +176,19 @@ function LiveOrderQueueCard({ pendingMeals, pendingCount }) {
             );
           })}
 
-          {pendingMeals.length === 0 && (
-            <Box sx={{ p: 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large"/>
+          {pendingMeals?.filter((meal) => meal?.item_status === filter).length === 0 && (
+            <Box
+              sx={{
+                p: 2,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
               <Typography variant="body1" fontWeight={600}>
-                No active orders
+                No {filter} orders
               </Typography>
               {/* <Typography variant="body2" color="text.secondary">
                 All clear — great job! 🎉

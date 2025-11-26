@@ -28,6 +28,7 @@ import {
   CheckCircleOutline,
   Search,
 } from "@mui/icons-material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BarChartTwoToneIcon from "@mui/icons-material/BarChartTwoTone";
 import useMenuStore from "../../lib/menuStore";
 import DashboardHeader from "./components/dashboard-header";
@@ -217,17 +218,28 @@ const WaiterDashboard = () => {
           {/* ---- Performance Charts ---- */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6}>
-              <Card sx={{ height: "100%", }}>
+              <Card sx={{ height: "100%" }}>
                 <CardHeader
-                  title={<Typography variant="subtitle1">Sales Performance</Typography>}
+                  title={
+                    <Typography variant="subtitle1">
+                      Sales Performance
+                    </Typography>
+                  }
                   subheader="Last 7 Days"
                   avatar={<BarChartTwoToneIcon color="primary" />}
                   sx={{ pb: 0 }}
                 />
-                <CardContent>
+                <CardContent
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <Box
                     sx={{
                       display: "flex",
+                      width: "100%",
                     }}
                   >
                     {loadingChart ? (
@@ -241,7 +253,7 @@ const WaiterDashboard = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <RevenueLineChartCard />
+              <RevenueLineChartCard orders={assignedTables} />
             </Grid>
           </Grid>
 
@@ -291,14 +303,23 @@ const WaiterDashboard = () => {
           <Grid container spacing={2}>
             {filteredTables.length === 0 ? (
               <Grid item xs={12}>
-                <Typography
-                  align="center"
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ py: 4 }}
+                <Box
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
-                  No tables found 🔍
-                </Typography>
+                  <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
+                  <Typography variant="body1" fontWeight={600}>
+                    No tables found
+                  </Typography>
+                  {/* <Typography variant="body2" color="text.secondary">
+                All clear — great job! 🎉
+              </Typography> */}
+                </Box>
               </Grid>
             ) : (
               filteredTables.map((session) => (

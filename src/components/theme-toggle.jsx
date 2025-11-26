@@ -2,6 +2,9 @@
 import { FormGroup, FormControlLabel, Switch, styled } from "@mui/material";
 import { useColorMode } from "../theme/app-theme-provider";
 import TooltipComponent from "./tooltip";
+import { useSubscription } from "../providers/subscriptionProvider";
+import { useState } from "react";
+import UpgradeModal from "./UpgradeModal";
 
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
   width: 62,
@@ -61,8 +64,14 @@ const MaterialUISwitch = styled(Switch)(({ theme }) => ({
 
 export default function ThemeSwitch() {
   const { mode, setMode } = useColorMode();
+  const { subscriptionPlan } = useSubscription();
+  const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
 
   const handleChange = () => {
+    if (subscriptionPlan === "free") {
+      setOpenUpgradeModal(true);
+      return;
+    }
     setMode(mode === "dark" ? "light" : "dark");
   };
 
@@ -80,6 +89,7 @@ export default function ThemeSwitch() {
         }
         label=""
       />
+      <UpgradeModal open={openUpgradeModal} onClose={() => setOpenUpgradeModal(false)} />
     </FormGroup>
   );
 }

@@ -26,6 +26,8 @@ import useAppStore from "../../lib/appstore";
 import useAuthStore from "../../lib/authStore";
 import { useSettings } from "../../providers/settingsProvider";
 import { useSettingsStore } from "../../lib/settingsStore";
+import { useSubscription } from "../../providers/subscriptionProvider";
+import UpgradeModal from "../../components/UpgradeModal";
 
 const EmployeeManagement = () => {
   const { employees, fetchEmployees, updateEmployeeDetailsAsAdmin } =
@@ -36,6 +38,8 @@ const EmployeeManagement = () => {
   const { settings } = useSettings();
   const { viewMode } = useSettingsStore();
   const [role, setRole] = useState(null);
+  const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
+  const { subscriptionPlan } = useSubscription();
 
   const fileInputRef = useRef(null);
 
@@ -45,8 +49,19 @@ const EmployeeManagement = () => {
     setRole(selectedRestaurant.role);
   }, [fetchEmployees]);
 
+  useEffect(() => {
+    if (subscriptionPlan === "free") {
+      setOpenUpgradeModal(true);
+    }
+  }, [subscriptionPlan]);
+
   const handleRowClick = (params) => {
     let selectedAvatar;
+
+    if (subscriptionPlan === "free") {
+      setOpenUpgradeModal(true);
+      return;
+    }
 
     Swal.fire({
       title: "Edit Employee",
@@ -433,6 +448,11 @@ const EmployeeManagement = () => {
   ];
 
   const handleAddEmployee = async (restaurantId) => {
+
+    if (subscriptionPlan === "free") {
+      setOpenUpgradeModal(true);
+      return;
+    }
     Swal.fire({
       title: "Invite New Employee",
       html: `
@@ -915,6 +935,9 @@ const EmployeeManagement = () => {
       {role === "owner" && (
         <FAB handleAdd={() => handleAddEmployee()} title="Add Employee" />
       )}
+
+
+      <UpgradeModal open={openUpgradeModal} onClose={() => setOpenUpgradeModal(false)} />
     </Box>
   );
 };

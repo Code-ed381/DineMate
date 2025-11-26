@@ -9,15 +9,16 @@ import CssBaseline from "@mui/material/CssBaseline";
 import MuiDrawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
 import MuiAppBar from "@mui/material/AppBar";
-import Popover from "@mui/material/Popover";
 import Badge from "@mui/material/Badge";
 import Toolbar from "@mui/material/Toolbar";
 import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
+import Slide from "@mui/material/Slide";
+import Alert from "@mui/material/Alert";
+
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
-import logo from "../../assets/logo.jpeg";
 import dayjs from "dayjs";
 
 // Icons
@@ -42,7 +43,9 @@ import useAuthStore from "../../lib/authStore";
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import ThemeToggle from "../../components/theme-toggle";
-import { useSettings } from '../../providers/settingsProvider';
+import { useSettings } from "../../providers/settingsProvider";
+import { useSubscription } from "../../providers/subscriptionProvider";
+import { ToastContainer } from "react-toastify";
 
 function Copyright(props) {
   return (
@@ -107,8 +110,6 @@ const Drawer = styled(MuiDrawer, {
   },
 }));
 
-
-
 const Layout = () => {
   const [open, setOpen] = React.useState(false);
   const [anchorElUser, setAnchorElUser] = React.useState(null);
@@ -121,7 +122,10 @@ const Layout = () => {
     setSelectedRestaurant,
     restaurants,
   } = useRestaurantStore();
-  const {settings} = useSettings();
+  const { settings } = useSettings();
+  const { subscriptions } = useSubscription();
+
+  const subscription_plan = subscriptions[0]?.subscription_plan;
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
@@ -196,7 +200,7 @@ const Layout = () => {
         <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
           <CssBaseline />
 
-          <AppBar position="absolute" open={open} >
+          <AppBar position="absolute" open={open}>
             <Toolbar sx={{ pr: "20px" }}>
               <IconButton
                 edge="start"
@@ -225,9 +229,11 @@ const Layout = () => {
                 sx={{ mr: 2, fontWeight: "900" }}
               >
                 {selectedRestaurant?.restaurants?.name}{" "}
-                {settings?.general?.show_breadcrumb && <span style={{ fontWeight: "normal", fontSize: "14px" }}>
-                  * {breadcrumb}
-                </span>}
+                {settings?.general?.show_breadcrumb && (
+                  <span style={{ fontWeight: "normal", fontSize: "14px" }}>
+                    * {breadcrumb}
+                  </span>
+                )}
               </Typography>
 
               {/* Centered Time & Date */}
@@ -238,7 +244,8 @@ const Layout = () => {
                   sx={{ fontWeight: "900" }}
                   noWrap
                 >
-                  {settings?.general?.show_date_and_time_on_navbar && formatDate(currentTime)}
+                  {settings?.general?.show_date_and_time_on_navbar &&
+                    formatDate(currentTime)}
                 </Typography>
               </Box>
 
@@ -257,32 +264,76 @@ const Layout = () => {
                 </TooltipComponent>
               )}
 
-              <TooltipComponent title="Notifications">
-                {settings?.general?.allow_notifications && <IconButton
+              {settings?.general?.allow_notifications && (
+                <IconButton
                   size="large"
                   aria-label="show 17 new notifications"
                   color="inherit"
                   onClick={handleClick}
                 >
-                  <Badge badgeContent={17} color="error">
+                  <Badge
+                    badgeContent={0}
+                    color="default"
+                  >
                     <NotificationsIcon />
                   </Badge>
-                </IconButton>}
-                <Popover
-                  id={id}
-                  open={openNotification}
-                  anchorEl={anchorEl}
-                  onClose={handleClose}
-                  anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "left",
+                </IconButton>
+              )}
+              {/* <Popover
+                id={id}
+                open={openNotification}
+                anchorEl={anchorEl}
+                onClose={handleClose}
+                anchorOrigin={{
+                  vertical: "bottom",
+                  horizontal: "left",
+                }}
+              >
+                <List
+                  sx={{
+                    width: "100%",
+                    maxWidth: 360,
+                    bgcolor: "background.paper",
+                    maxHeight: "70vh",
+                    overflowY: "auto",
                   }}
                 >
-                  <Typography sx={{ p: 2 }}>
-                    The content of the Popover.The content of the Popover.
-                  </Typography>
-                </Popover>
-              </TooltipComponent>
+                  {notifications?.map((notification) => (
+                    <Box key={notification?.id} sx={{ p: 1 }}>
+                    <ListItem>
+                      <ListItemAvatar>
+                        <Avatar>
+                          <ImageIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={notification?.message}
+                        secondary={formatDateTimeWithSuffix(
+                          notification?.created_at
+                        )}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton edge="end" aria-label="delete">
+                          <DeleteIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                    <Divider />
+                    </Box>
+                  ))}
+
+                  {notifications?.length === 0 && (
+                    <ListItem>
+                      <ListItemAvatar>
+                        <Avatar>
+                          <CancelIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText primary="No notifications" />
+                    </ListItem>
+                  )}
+                </List>
+              </Popover> */}
 
               <IconButton color="inherit">
                 <Box sx={{ flexGrow: 0 }}>
@@ -389,6 +440,7 @@ const Layout = () => {
             <Toolbar />
             <Box sx={{ minHeight: "90vh", padding: "20px", flexGrow: 1 }}>
               <Outlet />
+              <ToastContainer />
             </Box>
             {/* <Copyright sx={{ pt: 4 }} /> */}
           </Box>

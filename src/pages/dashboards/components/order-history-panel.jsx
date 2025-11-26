@@ -21,7 +21,7 @@ const OrderHistoryTable = () => {
     }).format(date);
   }
 
-  const rows = orderItems.map((dish) => ({
+  const rows = orderItems?.map((dish) => ({
     id: dish.order_item_id, // DataGrid requires a unique id
     order_id: dish.order_id,
     table_number: dish?.table_number ?? "—",
@@ -36,15 +36,15 @@ const OrderHistoryTable = () => {
   }));
 
   const columns = [
-    { field: "order_id", headerName: "Order Number", width: 60 },
-    { field: "table_number", headerName: "Table Number", width: 60 },
-    { field: "waiter", headerName: "Waiter", width: 120 },
-    { field: "item", headerName: "Item", width: 160 },
-    { field: "quantity", headerName: "Qty", width: 60 },
+    { field: "order_id", headerName: "Order No.", width: 100 },
+    { field: "table_number", headerName: "Table No.", width: 100 },
+    { field: "waiter", headerName: "Waiter", width: 200 },
+    { field: "item", headerName: "Item", width: 200 },
+    { field: "quantity", headerName: "Qty", width: 100 },
     {
       field: "status",
       headerName: "Status",
-      width: 100,
+      width: 120,
       renderCell: (params) => {
         const status = params?.value?.toLowerCase();
         return (
@@ -69,12 +69,12 @@ const OrderHistoryTable = () => {
     {
       field: "order_date",
       headerName: "Order Date",
-      width: 180,
+      width: 250,
     },
     {
       field: "served_date",
       headerName: "Served Date",
-      width: 180
+      width: 250
     },
   ];
 
@@ -92,7 +92,7 @@ const OrderHistoryTable = () => {
         avatar={<ReceiptLongTwoToneIcon />}
         title={
           <>
-            Completed Orders History{" "}
+            Orders History{" "}
             <Chip label={rows.length || 0} size="small" />
           </>
         }

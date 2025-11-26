@@ -10,6 +10,9 @@ import {
 } from "@mui/material";
 import { PendingActions, DoneAll } from "@mui/icons-material";
 import AlarmOnIcon from "@mui/icons-material/AlarmOn";
+import Slide from "@mui/material/Slide";
+import Alert from "@mui/material/Alert";
+import Chip from "@mui/material/Chip";
 import RestaurantMenuIcon from "@mui/icons-material/RestaurantMenu";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -17,6 +20,9 @@ import useKitchenStore from "../lib/kitchenStore";
 import PendingMealsList from "./dashboards/components/pending-meals-list";
 import ReadyMealsList from "./dashboards/components/ready-meals-list";
 import ServedMealsList from "./dashboards/components/served-meals-list";
+import useTablesStore from "../lib/tablesStore";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { formatDateTimeWithSuffix } from "../utils/format-datetime";
 
 const Kitchen = () => {
   const {
@@ -30,7 +36,7 @@ const Kitchen = () => {
     subscribeToOrderItems, // ✅ Add this
     unsubscribeFromOrderItems, // ✅ Add this
   } = useKitchenStore();
-  
+
   dayjs.extend(relativeTime);
 
   function elapsedMinutesSince(iso, maxMinutes) {
@@ -65,7 +71,7 @@ const Kitchen = () => {
     };
   }, []);
 
-  const getTimeAgo = (timestamp) => dayjs(timestamp).fromNow();
+  const getTimeAgo = (timestamp) => formatDateTimeWithSuffix(timestamp);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -117,13 +123,16 @@ const Kitchen = () => {
             </Avatar>
             <Box>
               <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#bf360c" }}
+                variant="body2"
+                sx={{
+                  color: "#bf360c",
+                  fontWeight: "bold",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  fontSize: "1rem",
+                }}
               >
-                {pendingMeals?.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#bf360c" }}>
-                Pending Orders
+                Pending Orders {<Chip label={pendingMeals?.length} />}
               </Typography>
             </Box>
           </Card>
@@ -144,13 +153,16 @@ const Kitchen = () => {
             </Avatar>
             <Box>
               <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#0d47a1" }}
+                variant="body2"
+                sx={{
+                  color: "#0d47a1",
+                  fontWeight: "bold",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  fontSize: "1rem",
+                }}
               >
-                {readyMeals?.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#0d47a1" }}>
-                Ready Orders
+                Ready Orders {<Chip label={readyMeals?.length} />}
               </Typography>
             </Box>
           </Card>
@@ -171,13 +183,16 @@ const Kitchen = () => {
             </Avatar>
             <Box>
               <Typography
-                variant="h6"
-                sx={{ fontWeight: "bold", color: "#2e7d32" }}
+                variant="body2"
+                sx={{
+                  color: "#2e7d32",
+                  fontWeight: "bold",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  fontSize: "1rem",
+                }}
               >
-                {servedMeals?.length}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#2e7d32" }}>
-                Served Orders
+                Served Orders {<Chip label={servedMeals?.length} />}
               </Typography>
             </Box>
           </Card>
@@ -199,23 +214,33 @@ const Kitchen = () => {
               position: "relative",
             }}
           >
-            <CardHeader
-              title="Pending Orders"
-              sx={{ backgroundColor: "#ff5722", color: "#fff" }}
-            />
             <CardContent sx={{ overflowY: "auto", flexGrow: 1 }}>
               {pendingMeals?.length === 0 ? (
-                <Typography textAlign="center" sx={{ mt: 3, color: "#9e9e9e" }}>
-                  No pending meals.
-                </Typography>
+                <Box
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
+                  <Typography variant="body1" fontWeight={600}>
+                    No pending orders
+                  </Typography>
+                  {/* <Typography variant="body2" color="text.secondary">
+                All clear — great job! 🎉
+              </Typography> */}
+                </Box>
               ) : (
-                  <PendingMealsList
-                    pendingMeals={pendingMeals}
-                    handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
-                    getTimeAgo={getTimeAgo}
-                    elapsedMinutesSince={elapsedMinutesSince}
-                    progressValue={progressValue}
-                  />
+                <PendingMealsList
+                  pendingMeals={pendingMeals}
+                  handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
+                  getTimeAgo={getTimeAgo}
+                  elapsedMinutesSince={elapsedMinutesSince}
+                  progressValue={progressValue}
+                />
               )}
             </CardContent>
           </Card>
@@ -233,21 +258,30 @@ const Kitchen = () => {
               flexDirection: "column",
             }}
           >
-            <CardHeader
-              title="Ready Orders"
-              sx={{ backgroundColor: "#2196f3", color: "#fff" }}
-            />
             <CardContent sx={{ overflowY: "auto", flexGrow: 1 }}>
               {readyMeals.length === 0 ? (
-                <Typography textAlign="center" sx={{ mt: 3, color: "#9e9e9e" }}>
-                  No ready meals.
-                </Typography>
+                <Box
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
+                  <Typography variant="body1" fontWeight={600}>
+                    No ready orders
+                  </Typography>
+                  {/* <Typography variant="body2" color="text.secondary">
+                All clear — great job! 🎉
+              </Typography> */}
+                </Box>
               ) : (
-                  <ReadyMealsList
-                    readyMeals={readyMeals}
-                    handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
-                    getTimeAgo={getTimeAgo}
-                  />
+                <ReadyMealsList
+                  readyMeals={readyMeals}
+                  handleUpdateOrderItemStatus={handleUpdateOrderItemStatus}
+                />
               )}
             </CardContent>
           </Card>
@@ -265,20 +299,29 @@ const Kitchen = () => {
               flexDirection: "column",
             }}
           >
-            <CardHeader
-              title="Served Orders (Last 24 hours)"
-              sx={{ backgroundColor: "#4caf50", color: "#fff" }}
-            />
             <CardContent sx={{ overflowY: "auto", flexGrow: 1 }}>
               {servedMeals?.length === 0 ? (
-                <Typography textAlign="center" sx={{ mt: 3, color: "#9e9e9e" }}>
-                  No served meals.
-                </Typography>
+                <Box
+                  sx={{
+                    p: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
+                  <Typography variant="body1" fontWeight={600}>
+                    No served orders
+                  </Typography>
+                  {/* <Typography variant="body2" color="text.secondary">
+                All clear — great job! 🎉
+              </Typography> */}
+                </Box>
               ) : (
-                  <ServedMealsList
-                    servedMeals={servedMeals}
-                    getTimeAgo={getTimeAgo}
-                  />
+                <ServedMealsList
+                  servedMeals={servedMeals}
+                />
               )}
             </CardContent>
           </Card>

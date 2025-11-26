@@ -1,6 +1,7 @@
 import { List, ListItem, Box, Typography, Avatar } from "@mui/material";
+import { formatDateTimeWithSuffix } from "../../../utils/format-datetime";
 
-function ServedMealsList({ servedMeals, getTimeAgo }) {
+function ServedMealsList({ servedMeals }) {
   return (
     <List>
       {servedMeals?.map((dish) => (
@@ -43,7 +44,7 @@ function ServedMealsList({ servedMeals, getTimeAgo }) {
                 : "Unknown Waiter"}
             </Typography>
             <Typography variant="caption" sx={{ color: "#43a047" }}>
-              {getTimeAgo(dish?.updated_at)}
+              {formatDateTimeWithSuffix(dish?.item_updated_at)}
             </Typography>
           </Box>
 

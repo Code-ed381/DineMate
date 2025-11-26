@@ -33,8 +33,8 @@ import {
   CardContent,
   CardActionArea,
   Button,
-  LinearProgress
-} from '@mui/material';
+  LinearProgress,
+} from "@mui/material";
 
 // Icons
 import {
@@ -51,15 +51,14 @@ import {
   Upload as UploadIcon,
   ReceiptLong as ReceiptLongIcon,
   SoupKitchen as SoupKitchenIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
 
 // Store
-import useMenuStore from  "../lib/menuStore";
+import useMenuStore from "../lib/menuStore";  
 
 // Components
 import { printReceipt } from "../components/PrintWindow";
 import MenuSkeleton from "../components/skeletons/menu-section-skeleton";
-
 
 const Menu = () => {
   const navigate = useNavigate();
@@ -98,6 +97,8 @@ const Menu = () => {
     loadingActiveSessionByRestaurant,
     loadingActiveSessionByTableNumber,
     updateSessionStatus,
+    subscribeToOrderItems,
+    unsubscribeFromOrderItems,
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -106,10 +107,14 @@ const Menu = () => {
     getActiveSessionByRestaurant();
     fetchCategories();
     fetchMenuItems();
+
+    subscribeToOrderItems();
+
     return () => {
       controller.abort();
+      unsubscribeFromOrderItems();
     };
-  }, [getActiveSessionByRestaurant, fetchCategories, fetchMenuItems]); // Functions included in the dependency array
+  }, []); // Functions included in the dependency array
 
   // Format date and time
   function formatDateTime(isoString) {
@@ -130,7 +135,14 @@ const Menu = () => {
             <Stack
               direction="row"
               mt={2}
-              sx={{ alignItems: "center", justifyContent: "space-between", border: "2px double #ccc", borderRadius: 2, boxShadow: 3, p: 2 }}
+              sx={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                border: "2px double #ccc",
+                borderRadius: 2,
+                boxShadow: 3,
+                p: 2,
+              }}
             >
               <Typography variant="title" fontWeight="bold">
                 ORDER NO. {chosenTableSession?.order_id}
@@ -146,7 +158,9 @@ const Menu = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: "bold" }}><CancelIcon fontSize="small" color="error" /></TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      <CancelIcon fontSize="small" color="error" />
+                    </TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Product</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Price</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Qty</TableCell>
@@ -166,7 +180,10 @@ const Menu = () => {
                                   onClick={() => handleRemoveItem(item)}
                                   color="error"
                                   size="small"
-                                  disabled={chosenTableSession?.session_status !== "open" || item?.item_status != "pending"}
+                                  disabled={
+                                    chosenTableSession?.session_status !==
+                                      "open" || item?.item_status != "pending"
+                                  }
                                 >
                                   <CancelIcon fontSize="small" />
                                 </IconButton>
@@ -216,7 +233,7 @@ const Menu = () => {
                         {!loadingActiveSessionByTableNumber &&
                         activeSessionByTableNumberLoaded
                           ? chosenTableSession?.order_total?.toFixed(2)
-                          : 0.00}
+                          : 0.0}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -229,7 +246,7 @@ const Menu = () => {
                         {!loadingActiveSessionByTableNumber &&
                         activeSessionByTableNumberLoaded
                           ? chosenTableSession?.order_total?.toFixed(2)
-                          : 0.00}
+                          : 0.0}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -242,22 +259,30 @@ const Menu = () => {
                         {!loadingActiveSessionByTableNumber &&
                         activeSessionByTableNumberLoaded
                           ? chosenTableSession?.order_total?.toFixed(2)
-                          : 0.00}
+                          : 0.0}
                       </Typography>
                     </TableCell>
                   </TableRow>
                   <TableRow sx={{ border: "none" }}>
                     <TableCell colSpan={4} sx={{ py: 0.5 }}>
-                      <Typography variant="h6" fontWeight="bold" color="success">
+                      <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        color="success"
+                      >
                         Total
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 0.5 }}>
-                      <Typography variant="h6" fontWeight="bold" color="success">
+                      <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        color="success"
+                      >
                         {!loadingActiveSessionByTableNumber &&
                         activeSessionByTableNumberLoaded
                           ? chosenTableSession?.order_total?.toFixed(2)
-                          : 0.00}
+                          : 0.0}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -269,15 +294,30 @@ const Menu = () => {
       case 1:
         return (
           <>
-            <Stack justifyContent='center' alignItems='center' spacing={3} mt={4}>
+            <Stack
+              justifyContent="center"
+              alignItems="center"
+              spacing={3}
+              mt={4}
+            >
               <Typography variant="h6">Total Amount</Typography>
-              <Typography variant='h2'><strong>&#163; {formatCashInput(chosenTableSession?.order_total)}</strong></Typography>
+              <Typography variant="h2">
+                <strong>
+                  &#163; {formatCashInput(chosenTableSession?.order_total)}
+                </strong>
+              </Typography>
 
               <FormControl fullWidth sx={{ m: 1 }}>
-                <InputLabel htmlFor="outlined-adornment-amount">Card</InputLabel>
+                <InputLabel htmlFor="outlined-adornment-amount">
+                  Card
+                </InputLabel>
                 <OutlinedInput
                   id="outlined-adornment-amount"
-                  startAdornment={<InputAdornment position="start">{<CreditScoreIcon/>}</InputAdornment>}
+                  startAdornment={
+                    <InputAdornment position="start">
+                      {<CreditScoreIcon />}
+                    </InputAdornment>
+                  }
                   label="Amount"
                   value={card}
                   onChange={(e) => {
@@ -286,12 +326,17 @@ const Menu = () => {
                 />
               </FormControl>
 
-              
               <FormControl fullWidth sx={{ m: 1 }}>
-                <InputLabel htmlFor="outlined-adornment-amount">Cash</InputLabel>
+                <InputLabel htmlFor="outlined-adornment-amount">
+                  Cash
+                </InputLabel>
                 <OutlinedInput
                   id="outlined-adornment-amount"
-                  startAdornment={<InputAdornment position="start">{<CurrencyPoundIcon/>}</InputAdornment>}
+                  startAdornment={
+                    <InputAdornment position="start">
+                      {<CurrencyPoundIcon />}
+                    </InputAdornment>
+                  }
                   label="Amount"
                   value={cash}
                   onChange={(e) => {
@@ -310,7 +355,7 @@ const Menu = () => {
   // search filtering logic
   const searchFilter = useMemo(() => {
     return filteredMenuItems.filter((item) => {
-      if (searchTerm === '') {
+      if (searchTerm === "") {
         return true;
       }
 
@@ -329,7 +374,7 @@ const Menu = () => {
     if (category.name === selectedCategory) {
       setFilteredMenuItems(menuItems);
 
-      setSelectedCategory('');
+      setSelectedCategory("");
     } else {
       filterMenuItemsByCategory(category);
     }
@@ -338,10 +383,10 @@ const Menu = () => {
   // print bill
   const handlePrintReceipt = async (status) => {
     await updateSessionStatus(status);
-    
+
     printReceipt(status);
   };
-  
+
   return (
     <Box m={2}>
       {loadingActiveSessionByRestaurant ? (
@@ -372,7 +417,9 @@ const Menu = () => {
                         {assignedTables.map((table, i) => (
                           <Button
                             variant={
-                              isSelectedTable(table) && tableSelected ? "contained" : "outlined"
+                              isSelectedTable(table) && tableSelected
+                                ? "contained"
+                                : "outlined"
                             }
                             key={i}
                             sx={{ padding: 4, marginRight: 1 }}
@@ -848,6 +895,6 @@ const Menu = () => {
       )}
     </Box>
   );
-}
+};
 
 export default Menu;

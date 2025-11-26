@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import dayjs from 'dayjs';
 import useRestaurantStore from './restaurantStore';
 import useAuthStore from './authStore';
+import useTablesStore from './tablesStore';
 
 // Create the kitchen store with zustand
 const useKitchenStore = create((set, get) => ({
@@ -30,6 +31,7 @@ const useKitchenStore = create((set, get) => ({
   subscribeToOrderItems: () => {
     const { selectedRestaurant } = useRestaurantStore.getState();
     const restaurantId = selectedRestaurant?.restaurants?.id;
+    const { setSnackbar } = useTablesStore.getState();
 
     if (!restaurantId) {
       console.warn("No restaurant selected for subscription");
@@ -54,7 +56,9 @@ const useKitchenStore = create((set, get) => ({
           // filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
+
           console.log("Kitchen order change:", payload);
+
 
           // Refresh all meals when changes occur
           get().handleFetchPendingMeals();
@@ -229,13 +233,6 @@ const useKitchenStore = create((set, get) => ({
 
             if (error) handleError(error);
 
-            Swal.fire({
-              icon: "success",
-              title: `${dish.menu_item_name} cooking started`,
-              text: "Click on item when ready",
-              timer: 1500,
-            });
-
             // ✅ Re-fetch updated items after successful update
             get().handleFetchPendingMeals();
           }
@@ -292,6 +289,10 @@ const useKitchenStore = create((set, get) => ({
               .eq("id", dish.order_item_id);
 
             if (error) handleError(error);
+
+            // ✅ Re-fetch updated items after successful update
+            get().handleFetchReadyMeals();
+            get().handleFetchPendingMeals();
 
             // ✅ Re-fetch updated items after successful update
             get().handleFetchReadyMeals();

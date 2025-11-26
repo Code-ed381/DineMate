@@ -1,8 +1,24 @@
 import { Box, Typography, ToggleButtonGroup, ToggleButton, Divider } from "@mui/material";
-import {useSettingsStore} from "../lib/settingsStore";
+import { useSettingsStore } from "../lib/settingsStore";
+import { useSubscription } from "../providers/subscriptionProvider";
+import UpgradeModal from "../components/UpgradeModal";
+import { useState, useEffect } from "react";
+
 
 export default function AdminHeader({ title, description }) { 
     const { viewMode, setViewMode } = useSettingsStore();
+    const { subscriptionPlan } = useSubscription();
+    const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
+
+    const handleToggleViewMode = (e) => {
+
+        if (subscriptionPlan === "free") {
+            setOpenUpgradeModal(true);
+            return;
+        }
+
+        setViewMode(e.target.value);
+    };  
     
     return (
         <>
@@ -33,14 +49,15 @@ export default function AdminHeader({ title, description }) {
                 <ToggleButtonGroup
                 value={viewMode}
                 exclusive
-                onChange={(e) => setViewMode(e.target.value)}
+                onChange={handleToggleViewMode}
                 size="small"
                 >
-                <ToggleButton value="grid">Grid View</ToggleButton>
                 <ToggleButton value="list">List View</ToggleButton>
+                <ToggleButton value="grid">Grid View</ToggleButton>
                 </ToggleButtonGroup>
             </Box>
             <Divider sx={{ mt: 2, mb: 2 }} />
+            <UpgradeModal open={openUpgradeModal} onClose={() => setOpenUpgradeModal(false)} />
         </>
     );
 }

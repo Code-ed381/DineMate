@@ -3,11 +3,13 @@ import { ThemeProvider, CssBaseline } from "@mui/material";
 import { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { getTheme } from "./index";
 import { useSettingsStore } from "../lib/settingsStore";
+import { useSubscriptionStore } from "../lib/subscriptionStore";
 
 const ColorModeContext = createContext();
 
 export function AppThemeProvider({ children }) {
   const { settings } = useSettingsStore();
+  const { subscriptionPlan } = useSubscriptionStore();
 
   const prefersDarkMode = window.matchMedia(
     "(prefers-color-scheme: dark)"
@@ -16,6 +18,12 @@ export function AppThemeProvider({ children }) {
 
   // 🧩 When DB settings change, update mode accordingly
   useEffect(() => {
+
+    if (subscriptionPlan === "free") {
+      setMode("light");
+      return;
+    }
+    
     const dbMode = settings?.general?.default_theme_mode;
 
     if (dbMode === "system") {

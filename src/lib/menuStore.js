@@ -1,12 +1,13 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import useRestaurantStore from '../lib/restaurantStore';
-import useAuthStore from '../lib/authStore';
-import { supabase } from './supabase';
-import { handleError } from '../components/Error';
-import Swal from 'sweetalert2';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import useRestaurantStore from "../lib/restaurantStore";
+import useAuthStore from "../lib/authStore";
+import useTablesStore from "../lib/tablesStore";
+import { supabase } from "./supabase";
+import { handleError } from "../components/Error";
+import Swal from "sweetalert2";
 import { printReceipt } from "../components/PrintWindow";
-import { database_logs } from './logActivities';
+import { database_logs } from "./logActivities";
 
 // Create the menu store with zustand
 const useMenuStore = create(
@@ -127,6 +128,62 @@ const useMenuStore = create(
         if (channel) {
           supabase.removeChannel(channel);
           set({ sessionsChannel: null });
+        }
+      },
+
+      // ✅ Initialize realtime subscription
+      subscribeToOrderItems: () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const { setSnackbar } = useTablesStore.getState();
+
+        if (!restaurantId) {
+          console.warn("No restaurant selected for subscription");
+          return;
+        }
+
+        // Unsubscribe from previous channel if exists
+        const oldChannel = get().orderItemsChannel;
+        if (oldChannel) {
+          supabase.removeChannel(oldChannel);
+        }
+
+        // Create new channel for this restaurant
+        const channel = supabase
+          .channel(`kitchen-orders-${restaurantId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*", // Listen to INSERT, UPDATE, DELETE
+              schema: "public",
+              table: "order_items",
+              // filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            (payload) => {
+              setSnackbar({
+                open: true,
+                autoHideDuration: 8000,
+                message: "Kitchen order change detected.",
+                severity: "info",
+              });
+
+              console.log("Kitchen order change:", payload);
+
+              // Refresh all meals when changes occur
+              get().getActiveSessionByRestaurant();
+              get().filterActiveSessionByTableNumber(get().chosenTable);
+            }
+          )
+          .subscribe();
+
+        set({ orderItemsChannel: channel });
+      },
+
+      unsubscribeFromOrderItems: () => {
+        const channel = get().orderItemsChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+          set({ orderItemsChannel: null });
         }
       },
 
@@ -514,12 +571,23 @@ const useMenuStore = create(
       addOrUpdateObject: async (orderItem) => {
         const { chosenTableSession, chosenTableOrderItems } = get();
 
+        const restaurant_id = orderItem?.restaurant_id;
+        const item_name = orderItem?.name;
+        const waiter_id = chosenTableSession?.waiter_id;
+        const order_number = chosenTableSession?.order_id;
+
+        console.log("chosenTableSession---->", chosenTableSession);
+        console.log("chosenTableOrderItems---->", chosenTableOrderItems);
+
+        // Check if the order item already exists
         const match = chosenTableOrderItems.find(
           (item) => item.menu_item_id === orderItem.id
         );
 
+        // If the order item already exists
         if (match) {
-          console.log(match);
+          const menu_item_name = match?.menu_item?.name;
+          console.log(menu_item_name);
 
           let orderTotal = chosenTableSession.order_total;
           const newQuantity = match.quantity + 1;
@@ -547,7 +615,7 @@ const useMenuStore = create(
             handleError(ordersError);
           }
 
-          // get().getActiveSessionByRestaurant();
+          get().getActiveSessionByRestaurant();
           get().filterActiveSessionByTableNumber(get().chosenTable);
         } else {
           const { data, error } = await supabase
@@ -686,6 +754,15 @@ const useMenuStore = create(
       // Function to delete an order item
       handleRemoveItem: async (item) => {
         const { chosenTableOrderItems, chosenTableSession } = get();
+
+        const item_name = item?.menu_item?.name;
+        const order_id = chosenTableSession?.order_id;
+
+        console.log("item===>", item);
+        console.log("chosenTableOrderItems===>", chosenTableOrderItems);
+        console.log("chosenTableSession===>", chosenTableSession);
+
+
         try {
           const item_total = item?.quantity * item?.price;
 
