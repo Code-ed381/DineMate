@@ -8,6 +8,7 @@ import { handleError } from "../components/Error";
 import Swal from "sweetalert2";
 import { printReceipt } from "../components/PrintWindow";
 import { database_logs } from "./logActivities";
+import { notificationService } from "../services/notificationService";
 
 // Create the menu store with zustand
 const useMenuStore = create(
@@ -575,6 +576,7 @@ const useMenuStore = create(
         const item_name = orderItem?.name;
         const waiter_id = chosenTableSession?.waiter_id;
         const order_number = chosenTableSession?.order_id;
+        let orderTotal = chosenTableSession.order_total;
 
         console.log("chosenTableSession---->", chosenTableSession);
         console.log("chosenTableOrderItems---->", chosenTableOrderItems);
@@ -589,7 +591,6 @@ const useMenuStore = create(
           const menu_item_name = match?.menu_item?.name;
           console.log(menu_item_name);
 
-          let orderTotal = chosenTableSession.order_total;
           const newQuantity = match.quantity + 1;
           orderTotal += match.price;
 
@@ -615,9 +616,25 @@ const useMenuStore = create(
             handleError(ordersError);
           }
 
+          await notificationService.sendRoleNotification(
+            restaurant_id,
+            waiter_id,
+            {
+              title: "New Order Item Added",
+              message: `${item_name} has been added to order ${order_number}`,
+              roles: ["chef"],
+              priority: "normal",
+              metadata: {
+                tableNumber: chosenTableSession.table_number,
+                amount: orderTotal,
+              },
+            }
+          );
+
           get().getActiveSessionByRestaurant();
           get().filterActiveSessionByTableNumber(get().chosenTable);
         } else {
+          orderTotal += orderItem.price;
           const { data, error } = await supabase
             .from("order_items")
             .insert([
@@ -649,6 +666,21 @@ const useMenuStore = create(
 
           // get().getActiveSessionByRestaurant();
           get().filterActiveSessionByTableNumber(get().chosenTable);
+
+          await notificationService.sendRoleNotification(
+            restaurant_id,
+            waiter_id,
+            {
+              title: "New Order Item Added",
+              message: `${item_name} has been added to order ${order_number}`,
+              roles: ["chef"],
+              priority: "normal",
+              metadata: {
+                tableNumber: chosenTableSession.table_number,
+                amount: orderTotal,
+              },
+            }
+          );
         }
 
         // Find existing item index in the selected table orders
@@ -761,7 +793,6 @@ const useMenuStore = create(
         console.log("item===>", item);
         console.log("chosenTableOrderItems===>", chosenTableOrderItems);
         console.log("chosenTableSession===>", chosenTableSession);
-
 
         try {
           const item_total = item?.quantity * item?.price;

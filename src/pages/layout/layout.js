@@ -2,8 +2,6 @@ import { Outlet } from "react-router-dom";
 import * as React from "react";
 import {
   styled,
-  experimental_extendTheme as extendTheme,
-  useColorScheme,
 } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiDrawer from "@mui/material/Drawer";
@@ -12,10 +10,15 @@ import MuiAppBar from "@mui/material/AppBar";
 import Badge from "@mui/material/Badge";
 import Toolbar from "@mui/material/Toolbar";
 import List from "@mui/material/List";
+import Slide from "@mui/material/Slide";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
-import Slide from "@mui/material/Slide";
-import Alert from "@mui/material/Alert";
+import Popover from "@mui/material/Popover";
+import ListItem from "@mui/material/ListItem";
+import ListItemAvatar from "@mui/material/ListItemAvatar";
+import ListItemText from "@mui/material/ListItemText";
+import ListItemSecondaryAction from "@mui/material/ListItemSecondaryAction";
+
 
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
@@ -30,6 +33,9 @@ import NotificationsIcon from "@mui/icons-material/Notifications";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SettingsIcon from "@mui/icons-material/Settings";
 import CachedIcon from "@mui/icons-material/Cached";
+import ImageIcon from "@mui/icons-material/Image";
+import DeleteIcon from "@mui/icons-material/Delete";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 import { MainListItems, SecondaryListItems } from "./list-items";
 import TooltipComponent from "../../components/tooltip";
@@ -44,16 +50,17 @@ import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import ThemeToggle from "../../components/theme-toggle";
 import { useSettings } from "../../providers/settingsProvider";
-import { useSubscription } from "../../providers/subscriptionProvider";
+// import { useSubscription } from "../../providers/subscriptionProvider";
 import { ToastContainer } from "react-toastify";
+import NotificationList from "../../components/notifications";
+import useNotificationStore from "../../lib/notificationStore";
 
 function Copyright(props) {
   return (
-    <Typography variant="body2" color="#fff" align="center" {...props}>
+    <Typography variant="body2" color="inherit" align="center" {...props}>
       {"© "}
       {new Date().getFullYear()}{" "}
       <Link
-        color="#fff"
         href="https://cyaneltechnologies.com/"
         underline="hover"
       >
@@ -123,15 +130,27 @@ const Layout = () => {
     restaurants,
   } = useRestaurantStore();
   const { settings } = useSettings();
-  const { subscriptions } = useSubscription();
+  const { notifications, setNotifications, subscribeToNotifications, unsubscribe, fetchNotifications } =
+    useNotificationStore();
+  // const { subscriptions } = useSubscription();
 
-  const subscription_plan = subscriptions[0]?.subscription_plan;
+  // const subscription_plan = subscriptions[0]?.subscription_plan;
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
 
   const first_name = user.user.user_metadata.firstName;
   const last_name = user.user.user_metadata.lastName;
+
+
+  useEffect(() => {
+    fetchNotifications();
+    subscribeToNotifications();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribeToNotifications, fetchNotifications]);
 
   useEffect(() => {
     getRestaurants(user.user.id);
@@ -173,15 +192,17 @@ const Layout = () => {
     setOpen(!open);
   };
 
-  const logout = async () => {
+  const logout = async () => { 
     signOut();
 
     localStorage.clear();
     localStorage.removeItem("auth-store");
     localStorage.removeItem("restaurant-store");
     setSelectedRestaurant(null);
-    navigate("/sign-in");
+    navigate("/");
   };
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -191,8 +212,20 @@ const Layout = () => {
     setAnchorEl(null);
   };
 
-  const openNotification = Boolean(anchorEl);
-  const id = openNotification ? "simple-popover" : undefined;
+  const handleDelete = (id) => {
+    setNotifications(notifications.filter((n) => n.id !== id));
+  };
+
+  const handleMarkAsRead = (id) => {
+    setNotifications(
+      notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+  };
+
+  const handleClearAll = () => {
+    setNotifications([]);
+    handleClose();
+  };
 
   return (
     <>
@@ -271,10 +304,7 @@ const Layout = () => {
                   color="inherit"
                   onClick={handleClick}
                 >
-                  <Badge
-                    badgeContent={0}
-                    color="default"
-                  >
+                  <Badge badgeContent={unreadCount} color="error">
                     <NotificationsIcon />
                   </Badge>
                 </IconButton>
@@ -298,42 +328,45 @@ const Layout = () => {
                     overflowY: "auto",
                   }}
                 >
-                  {notifications?.map((notification) => (
-                    <Box key={notification?.id} sx={{ p: 1 }}>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar>
-                          <ImageIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={notification?.message}
-                        secondary={formatDateTimeWithSuffix(
-                          notification?.created_at
-                        )}
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton edge="end" aria-label="delete">
-                          <DeleteIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider />
-                    </Box>
-                  ))}
-
-                  {notifications?.length === 0 && (
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar>
-                          <CancelIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText primary="No notifications" />
-                    </ListItem>
-                  )}
+                  <Box sx={{ p: 1 }}>
+                  <ListItem>
+                    <ListItemAvatar>
+                      <Avatar>
+                        <ImageIcon />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary="No notifications"
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton edge="end" aria-label="delete">
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  <Divider />
+                  </Box>
+                  
+                  <ListItem>
+                    <ListItemAvatar>
+                      <Avatar>
+                        <CancelIcon />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText primary="No notifications" />
+                  </ListItem>
                 </List>
               </Popover> */}
+
+              <NotificationList
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+                notifications={notifications}
+                onDelete={handleDelete}
+                onMarkAsRead={handleMarkAsRead}
+                onClearAll={handleClearAll}
+              />
 
               <IconButton color="inherit">
                 <Box sx={{ flexGrow: 0 }}>
@@ -442,7 +475,7 @@ const Layout = () => {
               <Outlet />
               <ToastContainer />
             </Box>
-            {/* <Copyright sx={{ pt: 4 }} /> */}
+            <Copyright sx={{ pt: 4 }} />
           </Box>
         </Box>
       )}

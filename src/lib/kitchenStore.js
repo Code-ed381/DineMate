@@ -6,6 +6,8 @@ import dayjs from 'dayjs';
 import useRestaurantStore from './restaurantStore';
 import useAuthStore from './authStore';
 import useTablesStore from './tablesStore';
+import { notificationService } from '../services/notificationService';
+import useMenuStore from './menuStore';
 
 // Create the kitchen store with zustand
 const useKitchenStore = create((set, get) => ({
@@ -297,6 +299,16 @@ const useKitchenStore = create((set, get) => ({
             // ✅ Re-fetch updated items after successful update
             get().handleFetchReadyMeals();
             get().handleFetchPendingMeals();
+
+            await notificationService.sendOrderReadyNotification(
+              restaurantId,
+              userId,
+              {
+                orderId: dish?.order_id,
+                tableNumber: dish?.table_number,
+                waiterId: dish?.waiter_id,
+              }
+            );
           }
         });
       } catch (error) {

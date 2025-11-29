@@ -7,7 +7,7 @@ export const formatDateTimeWithSuffix = (isoString) => {
   if (isNaN(date)) return "Invalid date";
 
   return formatDistanceStrict(date, new Date(), { addSuffix: true });
-}
+};
 
 export const elapsedMinutesSince = (iso) => {
   try {
@@ -17,7 +17,7 @@ export const elapsedMinutesSince = (iso) => {
   } catch {
     return 0;
   }
-}
+};
 
 export const formatDateTime = (inputDate) => {
   const date = new Date(inputDate);
@@ -46,4 +46,19 @@ export const formatDateTime = (inputDate) => {
       hour12: true,
     });
   }
-}
+
+};
+
+export const getRelativeTime = (date) => {
+  const now = new Date();
+  const notifDate = new Date(date);
+  const diffMs = now - notifDate;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};

@@ -1,0 +1,70 @@
+/* styles/toast-custom.css */
+
+/* Override default toast styles */
+.Toastify__toast {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+}
+
+/* Urgent notifications - Red */
+.Toastify__toast--error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-left: 4px solid #dc2626;
+}
+
+/* High priority - Orange */
+.Toastify__toast--warning {
+  background-color: #ffedd5;
+  color: #9a3412;
+  border-left: 4px solid #f97316;
+}
+
+/* Normal priority - Blue */
+.Toastify__toast--info {
+  background-color: #dbeafe;
+  color: #1e40af;
+  border-left: 4px solid #3b82f6;
+}
+
+/* Low priority - Gray */
+.Toastify__toast--default {
+  background-color: #f3f4f6;
+  color: #374151;
+  border-left: 4px solid #6b7280;
+}
+
+/* Progress bar colors */
+.Toastify__progress-bar--error {
+  background: #dc2626;
+}
+
+.Toastify__progress-bar--warning {
+  background: #f97316;
+}
+
+.Toastify__progress-bar--info {
+  background: #3b82f6;
+}
+
+.Toastify__progress-bar--default {
+  background: #6b7280;
+}
+
+/* Close button */
+.Toastify__close-button {
+  opacity: 0.5;
+}
+
+.Toastify__close-button:hover {
+  opacity: 1;
+}
+
+/* Toast icon */
+.Toastify__toast-icon {
+  width: 24px;
+}
