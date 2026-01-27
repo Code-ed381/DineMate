@@ -41,7 +41,7 @@ export default function OrdersServedPerformance() {
   const [selectedDate, setSelectedDate] = useState("");
   const [period, setPeriod] = useState<string>("week");
 
-  const servedItems = useMemo(() => (orderItems || []).filter((it: any) => (it?.item_status || "").toLowerCase() === "served"), [orderItems]);
+  const servedItems = useMemo(() => (orderItems || []).filter((it: any) => (it?.order_item_status || "").toLowerCase() === "served"), [orderItems]);
 
   const chartData = useMemo(() => {
     if (!servedItems.length) return [];
@@ -58,7 +58,7 @@ export default function OrdersServedPerformance() {
         buckets[key] = { label: weekdayName(d), key, served: 0 };
       }
       servedItems.forEach((it: any) => {
-        const k = toISODateLocal(it.item_created_at);
+        const k = toISODateLocal(it.task_created_at);
         if (k in buckets) buckets[k].served += it.quantity || 1;
       });
       return Object.values(buckets);
@@ -76,7 +76,7 @@ export default function OrdersServedPerformance() {
         if (!buckets[key]) buckets[key] = { label: `Week ${wk}`, key, served: 0 };
       }
       servedItems.forEach((it: any) => {
-        const dt = new Date(it.item_created_at);
+        const dt = new Date(it.task_created_at);
         if (dt.getFullYear() === year && dt.getMonth() === month) {
           const wk = weekIndexInMonth(dt);
           buckets[`week-${wk}`].served += it.quantity || 1;
@@ -92,7 +92,7 @@ export default function OrdersServedPerformance() {
         buckets[`month-${m}`] = { label: monthNameMonthIndex(m), key: `month-${m}`, served: 0 };
       }
       servedItems.forEach((it: any) => {
-        const dt = new Date(it.item_created_at);
+        const dt = new Date(it.task_created_at);
         if (dt.getFullYear() === year) buckets[`month-${dt.getMonth()}`].served += it.quantity || 1;
       });
       return Object.values(buckets);
@@ -100,7 +100,7 @@ export default function OrdersServedPerformance() {
 
     const buckets: Record<string, any> = {};
     servedItems.forEach((it: any) => {
-      const y = new Date(it.item_created_at).getFullYear();
+      const y = new Date(it.task_created_at).getFullYear();
       const key = `y-${y}`;
       if (!buckets[key]) buckets[key] = { label: `${y}`, key, served: 0 };
       buckets[key].served += it.quantity || 1;
@@ -108,7 +108,7 @@ export default function OrdersServedPerformance() {
     return Object.keys(buckets).sort((a, b) => Number(a.split("-")[1]) - Number(b.split("-")[1])).map(k => buckets[k]);
   }, [servedItems, period, selectedDate]);
 
-  const dayItems = useMemo(() => selectedDate ? servedItems.filter((it: any) => toISODateLocal(it.item_created_at) === selectedDate) : [], [servedItems, selectedDate]);
+  const dayItems = useMemo(() => selectedDate ? servedItems.filter((it: any) => toISODateLocal(it.task_created_at) === selectedDate) : [], [servedItems, selectedDate]);
 
   const columns: GridColDef[] = [
     { field: "time", headerName: "Time", width: 100 },
@@ -140,12 +140,12 @@ export default function OrdersServedPerformance() {
           dayItems.length === 0 ? (
             <Paper sx={{ p: 3, textAlign: "center", borderRadius: 2 }}><Typography variant="h6">No items served on {selectedDate}</Typography></Paper>
           ) : (
-            <Box sx={{ height: 420, width: "100%" }}>
-              <DataGrid rows={dayItems.map((it: any) => ({ id: it.order_item_id, time: new Date(it.item_created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item: it.menu_item_name, qty: it.quantity || 1, price: (it.item_price || 0).toFixed(2), total: ((it.item_price || 0) * (it.quantity || 1)).toFixed(2), table: it.table_number ?? "—", waiter: `${it.waiter_first_name || ""} ${it.waiter_last_name || ""}`.trim(), preparer: `${it.preparer_first_name || ""} ${it.preparer_last_name || ""}`.trim() }))} columns={columns} pageSize={8} disableSelectionOnClick />
+            <Box sx={{ width: "100%", height: { xs: 250, md: 340 } }}>
+              <DataGrid rows={dayItems.map((it: any) => ({ id: it.order_item_id, time: new Date(it.item_created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item: it.menu_item_name, qty: it.quantity || 1, price: (it.item_price || 0).toFixed(2), total: ((it.item_price || 0) * (it.quantity || 1)).toFixed(2), table: it.table_number ?? "—", waiter: `${it.waiter_first_name || ""} ${it.waiter_last_name || ""}`.trim(), preparer: `${it.preparer_first_name || ""} ${it.preparer_last_name || ""}`.trim() }))} columns={columns} initialState={{ pagination: { paginationModel: { pageSize: 8 } } }} disableRowSelectionOnClick />
             </Box>
           )
         ) : (
-          <Box sx={{ width: "100%", height: 340 }}>
+          <Box sx={{ width: "100%", height: { xs: 250, md: 340 } }}>
             {chartData.length === 0 ? (
               <Box sx={{ p: 3, textAlign: "center" }}><InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" /><Typography variant="body1" fontWeight={600}>No items to display</Typography></Box>
             ) : (

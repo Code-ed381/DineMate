@@ -33,7 +33,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   fetchSubscriptions: async () => {
     const { selectedRestaurant } = useRestaurantStore.getState();
-    const restaurant_id = selectedRestaurant?.restaurants?.id;
+    const restaurant_id = selectedRestaurant?.id;
 
     if (!restaurant_id) return;
 

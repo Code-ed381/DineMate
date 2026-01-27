@@ -142,6 +142,9 @@ export interface MenuState {
   getOrderBySessionId: (id: string) => Promise<any>;
   getOrderItemsByOrderId: (id: string) => Promise<any[]>;
   getOrderitemsBySessionId: (sessionId: string) => Promise<any[]>;
+  currentKitchenTasks: any[];
+  dashboardKitchenTasks: any[];
+  loadingCurrentKitchenTasks: boolean;
   setAssignedTables: (table: any[]) => void;
   subscribeToSessions: () => void;
   unsubscribeFromSessions: () => void;
@@ -175,7 +178,8 @@ export interface MenuState {
   setCash: (value: string) => void;
   setCard: (value: string) => void;
   // Internal helper functions or state
-  getAssigendTables: () => void; // Typo in original code
+  getAssignedTables: () => void;
+  fetchKitchenTasksForOrder: (orderId: string) => Promise<void>;
 }
 
 const useMenuStore = create<MenuState>()(
@@ -230,7 +234,7 @@ const useMenuStore = create<MenuState>()(
       loadingMenuItems: false,
       categories: [],
       loadingCategories: false,
-      chosenTableSession: [],
+      chosenTableSession: null,
       chosenTableOrderItems: [],
       loadingActiveSessionByTableNumber: false,
       loadingActiveSessionByRestaurant: false,
@@ -246,6 +250,9 @@ const useMenuStore = create<MenuState>()(
       loadingCurrentOrder: false,
       currentOrderItems: [],
       loadingCurrentOrderItems: false,
+      currentKitchenTasks: [],
+      dashboardKitchenTasks: [],
+      loadingCurrentKitchenTasks: false,
 
       setCash: (value) => set({ cash: value }),
       setCard: (value) => set({ card: value }),
@@ -258,20 +265,72 @@ const useMenuStore = create<MenuState>()(
           return;
         }
 
-        const { data, error } = await supabase
-          .from("orders")
-          .insert([
-            {
-              session_id: session_id,
-              restaurant_id: restaurant_id,
-            },
-          ])
-          .select()
-          .single();
+        try {
+          // FIRST: Verify the session exists in table_sessions
+          const { data: sessionExists, error: sessionCheckError } = await supabase
+            .from("table_sessions")
+            .select("id")
+            .eq("id", session_id)
+            .maybeSingle();
 
-        if (error) throw error;
+          if (sessionCheckError) {
+            console.error("Error checking session:", sessionCheckError);
+            throw sessionCheckError;
+          }
 
-        set({ currentOrder: data });
+          if (!sessionExists) {
+            console.warn(`Session ${session_id} does not exist in table_sessions. Skipping order creation.`);
+            // Clear the invalid session from localStorage
+            localStorage.removeItem("saved_session_id");
+            // Silently return - this is expected when no table is selected
+            return;
+          }
+
+          // Check if order already exists
+          const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("session_id", session_id)
+            .maybeSingle();
+
+          if (existingOrder) {
+            set({ currentOrder: existingOrder, orderId: existingOrder.id });
+            return;
+          }
+
+          // If not, create it
+          const { data, error } = await supabase
+            .from("orders")
+            .insert([
+              {
+                session_id: session_id,
+                restaurant_id: restaurant_id,
+              },
+            ])
+            .select()
+            .single();
+
+          if (error) {
+            if (error.code === "23505") { // Handle race condition
+               const { data: retryData } = await supabase
+                .from("orders")
+                .select("*")
+                .eq("session_id", session_id)
+                .maybeSingle();
+               if (retryData) {
+                 set({ currentOrder: retryData, orderId: retryData.id });
+                 return;
+               }
+            }
+            console.error("Error in createOrder:", error);
+            throw error;
+          }
+
+          set({ currentOrder: data, orderId: data.id });
+        } catch (error) {
+          console.error("Caught error in createOrder:", error);
+          handleError(error as Error);
+        }
       },
 
       deleteOrderBySessionId: async (session_id) => {
@@ -306,7 +365,7 @@ const useMenuStore = create<MenuState>()(
           }
 
           const orderData = data || null;
-          set({ currentOrder: orderData });
+          set({ currentOrder: orderData, orderId: orderData?.id || null });
           return orderData;
         } catch (error) {
           console.error("Unexpected error in getOrderBySessionId:", error);
@@ -343,7 +402,27 @@ const useMenuStore = create<MenuState>()(
           return [];
         } finally {
           set({ loadingCurrentOrderItems: false });
+          if (id) {
+             get().fetchKitchenTasksForOrder(id);
+          }
         }
+      },
+
+      fetchKitchenTasksForOrder: async (orderId) => {
+         set({ loadingCurrentKitchenTasks: true });
+         try {
+           const { data, error } = await supabase
+             .from("kitchen_tasks")
+             .select("*")
+             .eq("order_id", orderId);
+             
+           if (error) throw error;
+           set({ currentKitchenTasks: data || [] });
+         } catch (e) {
+           console.error("Error fetching kitchen tasks:", e);
+         } finally {
+            set({ loadingCurrentKitchenTasks: false });
+         }
       },
 
       getOrderitemsBySessionId: async (sessionId) => {
@@ -379,7 +458,7 @@ const useMenuStore = create<MenuState>()(
 
       subscribeToSessions: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = (selectedRestaurant as any)?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         const { user } = useAuthStore.getState();
         const userId = user?.id;
 
@@ -430,7 +509,7 @@ const useMenuStore = create<MenuState>()(
 
       subscribeToOrderItems: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = (selectedRestaurant as any)?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         const { setSnackbar } = useTablesStore.getState() as any;
 
         if (!restaurantId) {
@@ -462,6 +541,52 @@ const useMenuStore = create<MenuState>()(
 
               get().getActiveSessionByRestaurant();
               get().filterActiveSessionByTableNumber(get().chosenTable);
+              
+              const currentOrderId = get().currentOrder?.id;
+              if (currentOrderId) {
+                get().getOrderItemsByOrderId(currentOrderId);
+              }
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "orders",
+            },
+            (payload) => {
+               // Refresh order details if the changed order is the current one
+               const currentSessionId = get().chosenTableSession?.id || get().currentOrder?.session_id;
+               if (currentSessionId) {
+                 get().getOrderBySessionId(currentSessionId);
+               }
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "kitchen_tasks",
+            },
+            (payload) => {
+               const currentOrderId = get().currentOrder?.id;
+               const involvedOrderId = (payload.new as any)?.order_id || (payload.old as any)?.order_id;
+               
+               // Always refresh dashboard data
+               get().getActiveSessionByRestaurant();
+               
+               // Also refresh specific order details if the current order is affected
+               if (currentOrderId && involvedOrderId === currentOrderId) {
+                 get().fetchKitchenTasksForOrder(currentOrderId);
+                 get().getOrderItemsByOrderId(currentOrderId);
+               }
+
+               // Refresh specifically for table view if active
+               if (get().chosenTable) {
+                  get().filterActiveSessionByTableNumber(get().chosenTable);
+               }
             }
           )
           .subscribe();
@@ -480,7 +605,7 @@ const useMenuStore = create<MenuState>()(
       fetchCategories: async () => {
         set({ loadingCategories: true });
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = (selectedRestaurant as any)?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         try {
           const { data, error } = await supabase
             .from("menu_categories")
@@ -499,7 +624,7 @@ const useMenuStore = create<MenuState>()(
         set({ loadingMenuItems: true });
         try {
           const restaurantId =
-            (useRestaurantStore.getState().selectedRestaurant as any)?.restaurants?.id;
+            useRestaurantStore.getState().selectedRestaurant?.id;
           if (!restaurantId) throw new Error("No restaurant selected");
 
           const { data, error } = await supabase
@@ -532,8 +657,9 @@ const useMenuStore = create<MenuState>()(
         set({ tableSelected: false });
       },
 
-      getAssigendTables: () => {
+      getAssignedTables: () => {
         get().getActiveSessionByRestaurant();
+        useTablesStore.getState().getSessionsOverview();
       },
 
       confirmPayment: async () => {
@@ -543,10 +669,11 @@ const useMenuStore = create<MenuState>()(
           totalOrdersPrice,
           totalOrdersQty,
           orderId,
+          currentOrder,
           waiterName,
           chosenTable,
           orderItems,
-          getAssigendTables,
+          getAssignedTables,
           resetStepper,
         } = get();
 
@@ -594,14 +721,10 @@ const useMenuStore = create<MenuState>()(
               const { error: OrderUpdateError } = await supabase
                 .from("orders")
                 .update({
-                  cash: cashValue.toFixed(2),
-                  card: cardValue.toFixed(2),
-                  balance: changeValue.toFixed(2),
                   total: totalOrdersPrice,
                   status: "served",
-                  printed: true,
                 })
-                .eq("id", orderId)
+                .eq("id", orderId || currentOrder?.id)
                 .select();
 
               if (OrderUpdateError) {
@@ -613,16 +736,23 @@ const useMenuStore = create<MenuState>()(
                 return;
               }
 
-              const { error: tableError } = await supabase
-                .from("tables")
-                .update({
-                  status: "available",
-                  assign: null,
-                })
-                .eq("table_no", chosenTable)
-                .select();
+              // Update session and table status
+              const sId = currentOrder?.session_id;
+              if (sId) {
+                const { data: sessionData } = await supabase
+                  .from("table_sessions")
+                  .update({ status: "close", closed_at: new Date().toISOString() })
+                  .eq("id", sId)
+                  .select("table_id")
+                  .single();
 
-              if (tableError) throw tableError;
+                if (sessionData?.table_id) {
+                  await supabase
+                    .from("restaurant_tables")
+                    .update({ status: "available" })
+                    .eq("id", sessionData.table_id);
+                }
+              }
 
               printReceipt(
                 orderId!,
@@ -639,7 +769,7 @@ const useMenuStore = create<MenuState>()(
 
               Swal.fire({
                 title: "Payment Successful!",
-                text: "Receipt is being printed.",
+                text: "Receipt is being printed. Table is now available.",
                 icon: "success",
               });
 
@@ -652,33 +782,30 @@ const useMenuStore = create<MenuState>()(
                 Change: changeValue,
               };
 
-              database_logs(waiterName!, "PAYMENT_CONFIRMED", details);
+              database_logs(waiterName || "Unknown", "PAYMENT_CONFIRMED", details);
 
               set({
+                chosenTable: null,
+                chosenTableSession: null,
+                chosenTableOrderItems: [],
+                tableSelected: false,
+                currentOrder: null,
+                currentOrderItems: [],
+                orderId: null,
                 cash: "",
                 card: "",
-                totalCashCardAmount: 0,
-                totalOrdersPrice: 0,
-                totalOrdersQty: 0,
-                orderItems: [],
-                proceedToPrint: true,
-                originalOrders: [],
-                orders: [],
-                orderId: null,
-                waiterName: null,
-                tableSelected: false,
-                selectedTableOrders: [],
-                chosenTable: null,
               });
-
-              getAssigendTables();
+              useTablesStore.getState().setSelectedSession(null);
+              resetStepper();
+              getAssignedTables();
             } catch (error) {
-              handleError(error);
+              console.error("Payment Confirmation Error:", error);
+              handleError(error as Error);
             }
           });
-        } catch (error: any) {
-          handleError(error);
-          database_logs(waiterName!, "PAYMENT_FAILED", error);
+        } catch (error) {
+          console.error("Payment Confirmation Outer Error:", error);
+          handleError(error as Error);
         }
       },
 
@@ -722,7 +849,7 @@ const useMenuStore = create<MenuState>()(
           if (error) throw error;
           set({ orders: data || [], originalOrders: data || [], orderLoaded: true });
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         }
       },
 
@@ -807,19 +934,80 @@ const useMenuStore = create<MenuState>()(
       },
 
       updateSessionStatus: async (status) => {
-        const { chosenTableSession } = get();
+        const { chosenTableSession, currentOrder, chosenTable } = get();
+        const tablesStore = useTablesStore.getState() as any;
+        const selectedSession = tablesStore.selectedSession;
+
+        console.log("updateSessionStatus Debug:", {
+          status,
+          chosenTableSession,
+          currentOrder,
+          chosenTable,
+          selectedSessionFromTablesStore: selectedSession
+        });
+
+        // Collect potential session IDs, filtering out null, undefined, and the "undefined" string
+        const potentialSessionIds = [
+          chosenTableSession?.session_id,
+          currentOrder?.session_id,
+          selectedSession?.session_id,
+          selectedSession?.id
+        ].filter(id => id && id !== "undefined");
+
+        const sessionId = potentialSessionIds[0];
+
+        if (!sessionId) {
+          console.warn("updateSessionStatus: No valid session ID found. Checking table/restaurant criteria...");
+          
+          const tableId = chosenTableSession?.table_id || selectedSession?.table_id;
+          const restaurantId = chosenTableSession?.restaurant_id || selectedSession?.restaurant_id;
+
+          if (tableId && restaurantId && tableId !== "undefined" && restaurantId !== "undefined") {
+            console.log("Updating by table_id and restaurant_id:", { tableId, restaurantId });
+            const { error } = await supabase
+              .from("table_sessions")
+              .update({ status })
+              .eq("table_id", tableId)
+              .eq("restaurant_id", restaurantId);
+            
+            if (error) {
+              console.error("Error updating session by table criteria:", error);
+              handleError(error as Error);
+            }
+            
+            const tableNumber = chosenTable || chosenTableSession?.table_number || selectedSession?.table_number;
+            if (tableNumber) {
+              get().filterActiveSessionByTableNumber(tableNumber);
+            }
+            return;
+          }
+          console.error("updateSessionStatus: No session identifier or criteria found");
+          return;
+        }
+
+        console.log("Updating session by ID:", sessionId);
         const { error } = await supabase
           .from("table_sessions")
           .update({ status })
-          .eq("table_id", chosenTableSession.table_id)
-          .eq("restaurant_id", chosenTableSession.restaurant_id)
-          .select();
+          .eq("id", sessionId);
 
         if (error) {
-          handleError(error);
+          console.error("Error updating session by ID:", error);
+          handleError(error as Error);
+          return;
         }
 
-        get().filterActiveSessionByTableNumber(get().chosenTable);
+        // Optimistically update local state if possible
+        if (chosenTableSession && chosenTableSession.session_id === sessionId) {
+          set({ 
+            chosenTableSession: { ...chosenTableSession, session_status: status }
+          });
+        }
+
+        const refreshTableNumber = chosenTable || chosenTableSession?.table_number || selectedSession?.table_number;
+        if (refreshTableNumber) {
+          await get().filterActiveSessionByTableNumber(refreshTableNumber);
+        }
       },
 
       handlePrintBill: async () => {},
@@ -847,10 +1035,12 @@ const useMenuStore = create<MenuState>()(
 
         let newQuantity = 1;
         let newPrice = orderItem.price || 0;
+        let quantityAdded = 1; // Track how many new items were added
 
         if (existingItem) {
           newQuantity = existingItem.quantity + 1;
           newPrice = existingItem.sum_price + orderItem.price;
+          quantityAdded = 1; // Adding 1 more to existing
         }
 
         const { data, error } = await supabase
@@ -873,23 +1063,48 @@ const useMenuStore = create<MenuState>()(
 
         if (error) throw error;
 
-        if (orderItem?.type === 'food') {
-          const { error: kitchenTaskError } = await supabase
-            .from("kitchen_tasks")
-            .insert([
-              {
-                order_id: currentOrder.id,
-                order_item_id: data.id,
-                menu_item_id: orderItem.id,
-                created_at: new Date().toISOString(),
-              },
-            ])
-            .select()
-            .limit(1)
-            .single();
+        // Create kitchen tasks for prepareable items (food and drink) - one task per item quantity
+        if ((orderItem?.type === 'food' || orderItem?.type === 'drink') && data) {
+          // Create individual kitchen tasks for each quantity unit
+          const tasksToInsert = Array.from({ length: quantityAdded }, () => ({
+            order_id: currentOrder.id,
+            order_item_id: data.id,
+            menu_item_id: orderItem.id,
+            status: "pending",
+            created_at: new Date().toISOString(),
+          }));
 
-          if (kitchenTaskError) throw kitchenTaskError;
+          if (tasksToInsert.length > 0) {
+            const { error: kitchenTaskError } = await supabase
+              .from("kitchen_tasks")
+              .insert(tasksToInsert)
+              .select();
+
+            if (kitchenTaskError) {
+              console.error("Error creating kitchen tasks:", kitchenTaskError);
+              throw kitchenTaskError;
+            }
+
+            // Notify Kitchen Staff
+            const { selectedRestaurant } = useRestaurantStore.getState();
+            const { user } = useAuthStore.getState();
+            import("../services/notificationService").then(({ notificationService }) => {
+                 if (selectedRestaurant?.id) {
+                     // Get table number from Tables Store
+                     const { selectedSession } = useTablesStore.getState() as any;
+                     const tableNum = get().chosenTable || selectedSession?.table_number || "?";
+                     
+                     notificationService.sendRoleNotification(selectedRestaurant.id, user?.id || "", {
+                         title: "New Order",
+                         message: `Table ${tableNum}: ${orderItem.name} (x${quantityAdded})`,
+                         priority: "high",
+                         roles: orderItem.type === 'drink' ? ['bartender', 'admin', 'owner'] : ['chef', 'admin', 'owner']
+                     });
+                 }
+            });
+          }
         }
+        
         get().getOrderItemsByOrderId(currentOrder.id);
       },
 
@@ -897,6 +1112,7 @@ const useMenuStore = create<MenuState>()(
         try {
           let newQuantity;
           let new_sum_price;
+          
           if(action === "increase") {
             newQuantity = item.quantity + 1;
             new_sum_price = item.unit_price * newQuantity;
@@ -908,6 +1124,7 @@ const useMenuStore = create<MenuState>()(
             console.warn('Invalid action for quantity update');
             return;
           }
+          
           const { error } = await supabase
             .from("order_items")
             .update({ quantity: newQuantity, sum_price: new_sum_price })
@@ -917,10 +1134,53 @@ const useMenuStore = create<MenuState>()(
 
           if (error) throw error;
 
+          // Handle kitchen tasks for food and drink items
+          if (item.type === 'food' || item.type === 'drink') {
+            if (action === "increase") {
+              // Add one more kitchen task
+              const { error: kitchenTaskError } = await supabase
+                .from("kitchen_tasks")
+                .insert([{
+                  order_id: item.order_id,
+                  order_item_id: item.order_item_id,
+                  menu_item_id: item.menu_item_id,
+                  status: "pending",
+                  created_at: new Date().toISOString(),
+                }])
+                .select();
+
+              if (kitchenTaskError) {
+                console.error("Error creating kitchen task:", kitchenTaskError);
+              }
+            } else if (action === "decrease") {
+              // Remove one kitchen task (strictly PENDING ones)
+              const { data: tasks, error: fetchError } = await supabase
+                .from("kitchen_tasks")
+                .select("id, order_item_id")
+                .eq("order_item_id", item.order_item_id)
+                .eq("status", "pending") // CRITICAL: Only delete pending tasks
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+              if (fetchError) {
+                console.error("Error fetching kitchen task:", fetchError);
+              } else if (tasks && tasks.length > 0) {
+                const { error: deleteError } = await supabase
+                  .from("kitchen_tasks")
+                  .delete()
+                  .eq("id", tasks[0].id);
+
+                if (deleteError) {
+                  console.error("Error deleting kitchen task:", deleteError);
+                }
+              }
+            }
+          }
+
           get().getOrderItemsByOrderId(get().currentOrderItems[0]?.order_id);
         } catch (error) {
           console.error("Error updating quantity:", error);
-          handleError(error);
+          handleError(error as Error);
         }
       },
 
@@ -936,6 +1196,19 @@ const useMenuStore = create<MenuState>()(
             totalOrdersPrice: total,
           }); 
 
+          // First, delete all associated kitchen tasks
+          if (item.type === 'food' || item.type === 'drink') {
+            const { error: kitchenTaskError } = await supabase
+              .from("kitchen_tasks")
+              .delete()
+              .eq("order_item_id", item.order_item_id);
+
+            if (kitchenTaskError) {
+              console.error("Error deleting kitchen tasks:", kitchenTaskError);
+            }
+          }
+
+          // Then delete the order item
           const { error: ordersItemsError } = await supabase
             .from("order_items")
             .delete()
@@ -948,7 +1221,7 @@ const useMenuStore = create<MenuState>()(
           const { error: ordersError } = await supabase
             .from("orders")
             .update({ total: total })
-            .eq("id", get().currentOrderItems[0]?.order_id)
+            .eq("id", item.order_id)
             .select();
 
           if (ordersError) {
@@ -957,7 +1230,7 @@ const useMenuStore = create<MenuState>()(
 
           get().filterActiveSessionByTableNumber(get().chosenTable);
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         }
       },
 
@@ -968,7 +1241,7 @@ const useMenuStore = create<MenuState>()(
           loadingActiveSessionByRestaurant: true,
         });
         try {
-          const restaurantId = (useRestaurantStore?.getState()?.selectedRestaurant as any)?.restaurants?.id;
+          const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
           const userId = useAuthStore?.getState()?.user?.id;
 
           if (!restaurantId || !userId) return;
@@ -983,11 +1256,35 @@ const useMenuStore = create<MenuState>()(
 
           set({
             assignedTablesLoaded: true,
-            assignedTables: waiter_orders_overview || [],
+            assignedTables: (waiter_orders_overview || []).filter((s: any) => s.session_status !== "close"),
             activeSeesionByRestaurantLoaded: true,
+            dashboardKitchenTasks: [] // Reset first
           });
+
+          // Fetch kitchen tasks for these sessions
+          if (waiter_orders_overview && waiter_orders_overview.length > 0) {
+             const allOrderItems: any[] = [];
+             waiter_orders_overview.forEach((session: any) => {
+                if (session.order_items && Array.isArray(session.order_items)) {
+                   allOrderItems.push(...session.order_items);
+                }
+             });
+             
+             if (allOrderItems.length > 0) {
+                const orderItemIds = allOrderItems.map(oi => oi.id);
+                // Chunk requests if too many? For now assuming reasonable size
+                const { data: kitchenTasks } = await supabase
+                  .from("kitchen_tasks")
+                  .select("*")
+                  .in("order_item_id", orderItemIds);
+                  
+                if (kitchenTasks) {
+                   set({ dashboardKitchenTasks: kitchenTasks });
+                }
+             }
+          }
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         } finally {
           set({
             loadingActiveSessionByRestaurant: false,
@@ -996,6 +1293,10 @@ const useMenuStore = create<MenuState>()(
       },
 
       filterActiveSessionByTableNumber: async (tableNumber) => {
+        if (tableNumber === null || tableNumber === undefined) {
+             console.warn("filterActiveSessionByTableNumber called with null/undefined tableNumber");
+             return;
+        }
         set({
           loadingActiveSessionByTableNumber: true,
         });
@@ -1014,7 +1315,7 @@ const useMenuStore = create<MenuState>()(
             activeSeesionByTableNumberLoaded: true,
           });
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         } finally {
           set({
             loadingActiveSessionByTableNumber: false,
@@ -1103,7 +1404,7 @@ const useMenuStore = create<MenuState>()(
             loadingChart: false,
           });
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         }
       },
     }),

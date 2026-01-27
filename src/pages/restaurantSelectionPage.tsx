@@ -36,16 +36,16 @@ const RestaurantSelectionPage: React.FC = () => {
     await fetchSettings(restaurant.restaurants.id);
     
     const roleMap: Record<string, string> = {
-        owner: "/dashboard/owner",
-        admin: "/dashboard/admin",
-        manager: "/dashboard/admin",
-        waiter: "/dashboard/waiter",
-        chef: "/dashboard/chef",
-        bartender: "/dashboard/bartender",
-        cashier: "/dashboard/cashier",
+        owner: "/app/dashboard",
+        admin: "/app/dashboard",
+        manager: "/app/dashboard",
+        waiter: "/app/dashboard",
+        chef: "/app/dashboard",
+        bartender: "/app/dashboard",
+        cashier: "/app/dashboard",
     };
 
-    const target = roleMap[restaurant.role.toLowerCase()] || "/dashboard/waiter";
+    const target = roleMap[restaurant.role.toLowerCase()] || "/app/dashboard";
     navigate(target);
   };
 

@@ -43,7 +43,7 @@ const BigOptionButtons: React.FC = () => {
                 height: "100%",
                 borderRadius: 3,
                 boxShadow: barOptionSelected === opt.id ? 4 : 1,
-                borderColor: barOptionSelected === opt.id ? "primary.main" : "grey.300",
+                borderColor: barOptionSelected === opt.id ? "primary.main" : "divider",
               }}
             >
               <CardActionArea

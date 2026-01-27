@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import Swal from 'sweetalert2';
 import { handleError } from '../components/Error';
 import useRestaurantStore from './restaurantStore';
-import useAuthStore from './authStore';
 
 interface ActionResponse {
     message: string;
@@ -31,8 +30,6 @@ interface TableManagementState {
   editingRow: string | null;
   rowData: Partial<Table>;
   itemsLoading: boolean;
-  employee: any[];
-  employees: any[];
   assignEmployee: number;
   order: any[];
   totalQty: number;
@@ -108,7 +105,7 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
 
   addTable: async (table_number, status, capacity, location, notes) => {
     const { selectedRestaurant } = useRestaurantStore.getState();
-    const restaurantId = selectedRestaurant && ('restaurants' in selectedRestaurant ? selectedRestaurant.restaurants.id : selectedRestaurant.id);
+    const restaurantId = selectedRestaurant && selectedRestaurant.id;
     if (!restaurantId) return;
 
     if (!table_number || isNaN(Number(table_number))) {
@@ -229,7 +226,7 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
 
   handleStatusChange: async (table, status) => {
     const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-    const restaurantId = selectedRestaurant && ('restaurants' in selectedRestaurant ? selectedRestaurant.restaurants.id : selectedRestaurant.id);
+    const restaurantId = selectedRestaurant && selectedRestaurant.id;
     if (!restaurantId) return;
 
     if (status === "reserve table") {
@@ -293,7 +290,7 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
 
   getTablesOverview: async () => {
     const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-    const restaurantId = selectedRestaurant && ('restaurants' in selectedRestaurant ? selectedRestaurant.restaurants.id : selectedRestaurant.id);
+    const restaurantId = selectedRestaurant && selectedRestaurant.id;
     if (!restaurantId) return;
 
     set({ loadingTables: true });

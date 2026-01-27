@@ -14,7 +14,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { selectedRestaurant } = useRestaurantStore();
-  const restaurantId = (selectedRestaurant as RestaurantMember)?.restaurants?.id || (selectedRestaurant as Restaurant)?.id;
+  const restaurantId = selectedRestaurant?.id;
   const { fetchSettings, settings, updateSetting, getSetting } = useSettingsStore();
 
   useEffect(() => {

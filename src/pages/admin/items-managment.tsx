@@ -12,20 +12,15 @@ import {
   CardMedia,
   Divider,
   List,
-  Tooltip,
-  Skeleton,
   Avatar,
   InputAdornment,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
-import MenuBook from "@mui/icons-material/MenuBook";
 import Swal from "sweetalert2";
 import useMenuItemsStore from "../../lib/menuItemsStore";
-import { supabase } from "../../lib/supabase";
 import useRestaurantStore from "../../lib/restaurantStore";
 import CategoryItem from "../../components/category";
 import AdminHeader from "../../components/admin-header";
@@ -33,7 +28,9 @@ import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
 import { useSettingsStore } from "../../lib/settingsStore";
 
-const columns = [
+import { GridColDef } from "@mui/x-data-grid";
+
+const columns: GridColDef[] = [
   {
     field: "image_url",
     headerName: "Image",
@@ -145,9 +142,7 @@ const MenuItemsManagement: React.FC = () => {
     setSelectedCategory,
     selectedCategory,
     filteredMenuItems,
-    loadingMenuItems,
   } = useMenuItemsStore();
-  const { selectedRestaurant } = useRestaurantStore();
   const { viewMode } = useSettingsStore();
 
   useEffect(() => {
@@ -238,6 +233,14 @@ const MenuItemsManagement: React.FC = () => {
       // Add Category logic
   };
 
+  const handleEditCategory = (id: string) => {
+      console.log("Edit category", id);
+  };
+
+  const handleDeleteCategory = (id: string) => {
+      console.log("Delete category", id);
+  };
+
   return (
     <Box sx={{ p: 2 }}>
       <AdminHeader
@@ -253,7 +256,12 @@ const MenuItemsManagement: React.FC = () => {
             </Box>
             <List>
                 {categories.map((cat) => (
-                    <CategoryItem key={cat.id} category={cat} />
+                    <CategoryItem 
+                      key={cat.id} 
+                      category={cat} 
+                      handleEditCategory={handleEditCategory}
+                      handleDeleteCategory={handleDeleteCategory}
+                    />
                 ))}
             </List>
         </Box>

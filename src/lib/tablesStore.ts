@@ -47,8 +47,8 @@ export interface TableState {
   loadingActiveSessionByTableNumber: boolean;
   activeSeesionByTableNumberLoaded: boolean;
   tablesChannel: RealtimeChannel | null;
-  selectedTable: Partial<RestaurantTable>;
-  selectedSession: any;
+  selectedTable: Partial<RestaurantTable> | null;
+  selectedSession: any | null;
   sessions: any[];
   loadingSessions: boolean;
   sessionsLoaded: boolean;
@@ -97,8 +97,8 @@ const useTablesStore = create<TableState>()(
       loadingActiveSessionByTableNumber: false,
       activeSeesionByTableNumberLoaded: false,
       tablesChannel: null,
-      selectedTable: {},
-      selectedSession: {},
+      selectedTable: null,
+      selectedSession: null,
       sessions: [],
       loadingSessions: false,
       sessionsLoaded: false,
@@ -130,9 +130,12 @@ const useTablesStore = create<TableState>()(
       getTables: async () => {
         set({ loadingTables: true, tablesLoaded: false });
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = (selectedRestaurant as any)?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
 
-        if (!restaurantId) return;
+        if (!restaurantId) {
+          console.warn("getTables: No restaurantId found", selectedRestaurant);
+          return;
+        }
 
         try {
           const { data, error } = await supabase
@@ -145,7 +148,7 @@ const useTablesStore = create<TableState>()(
 
           set({ tables: (data as RestaurantTable[]) || [], tablesLoaded: true });
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         } finally {
           set({ loadingTables: false });
         }
@@ -153,7 +156,7 @@ const useTablesStore = create<TableState>()(
 
       subscribeToTables: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = (selectedRestaurant as any)?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
 
         if (!restaurantId) return;
 
@@ -214,7 +217,7 @@ const useTablesStore = create<TableState>()(
           .from("orders")
           .delete()
           .eq("session_id", tableSession?.session_id)
-          .eq("restaurant_id", selectedRestaurant.restaurants.id);
+          .eq("restaurant_id", selectedRestaurant?.id);
 
         if (ordersError) throw ordersError;
 
@@ -222,7 +225,7 @@ const useTablesStore = create<TableState>()(
           .from("table_sessions")
           .delete()
           .eq("id", tableSession.session_id)
-          .eq("restaurant_id", selectedRestaurant.restaurants.id);
+          .eq("restaurant_id", selectedRestaurant?.id);
 
         if (tableSessionError) throw tableSessionError;
 
@@ -230,7 +233,7 @@ const useTablesStore = create<TableState>()(
           .from("restaurant_tables")
           .update({ status: "available" })
           .eq("id", tableSession.table_id)
-          .eq("restaurant_id", selectedRestaurant.restaurants.id);
+          .eq("restaurant_id", selectedRestaurant?.id);
 
         if (tablesError) throw tablesError;
 
@@ -259,7 +262,7 @@ const useTablesStore = create<TableState>()(
           selectedTable: table,
         });
         const restaurantId =
-          (useRestaurantStore.getState().selectedRestaurant as any)?.restaurants?.id;
+          useRestaurantStore.getState().selectedRestaurant?.id;
         const waiterId = useAuthStore.getState().user?.id;
 
         if (!restaurantId || !waiterId) {
@@ -339,7 +342,7 @@ const useTablesStore = create<TableState>()(
 
       cancelReservation: async (table, action) => {
         const { selectedRestaurant } = useRestaurantStore.getState() as any;
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         const waiterId = useAuthStore.getState().user?.id;
 
         if (!restaurantId || !waiterId || !table.id) {
@@ -386,7 +389,9 @@ const useTablesStore = create<TableState>()(
           .eq("table_id", table_id)
           .eq("waiter_id", waiter_id)
           .eq("restaurant_id", restaurant_id)
-          .single();
+          .in("status", ["open", "billed"])
+          .limit(1)
+          .maybeSingle();
 
         if (tableSessionError) {
           if (tableSessionError.code === "PGRST116") return null;
@@ -398,7 +403,7 @@ const useTablesStore = create<TableState>()(
 
       getSessions: async () => {
         const { selectedRestaurant } = useRestaurantStore.getState() as any;
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
 
         set({ loadingSessions: true });
 
@@ -421,7 +426,7 @@ const useTablesStore = create<TableState>()(
 
       getSessionsOverview: async () => {
         const { selectedRestaurant } = useRestaurantStore.getState() as any;
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         const waiterId = useAuthStore.getState().user?.id;
 
         set({ loadingSessionsOverview: true });
@@ -462,6 +467,9 @@ const useTablesStore = create<TableState>()(
             .eq("table_id", table_id)
             .eq("waiter_id", waiter_id)
             .eq("restaurant_id", restaurant_id)
+            .neq("session_status", "close")
+            .order("session_created_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
   
           if (tableSessionError) throw tableSessionError;
@@ -528,10 +536,10 @@ const useTablesStore = create<TableState>()(
             (session) => session.table_id !== table_id
           ),
           selectedTable:
-            state.selectedTable.id === table_id ? {} : state.selectedTable,
+            state.selectedTable?.id === table_id ? null : state.selectedTable,
           selectedSession:
             state.selectedSession?.session_id === tableSession?.id
-              ? {}
+              ? null
               : state.selectedSession,
         }));
       },
@@ -563,7 +571,7 @@ const useTablesStore = create<TableState>()(
 
           if (ordersError) handleError(ordersError);
         } catch (error) {
-          handleError(error);
+          handleError(error as Error);
         }
       },
     }),

@@ -63,7 +63,7 @@ const PersonalInformationForm: React.FC = () => {
           placeholder="John"
           autoComplete="given-name"
           required
-          size="large"
+          size="medium"
           sx={{
             "& .MuiOutlinedInput-input": { fontSize: "1rem" },
             mr: { md: 2 },
@@ -91,7 +91,7 @@ const PersonalInformationForm: React.FC = () => {
           placeholder="Doe"
           autoComplete="family-name"
           required
-          size="large"
+          size="medium"
           sx={{ "& .MuiOutlinedInput-input": { fontSize: "1rem" } }}
           value={personalInfo.lastName}
           onChange={(e) => updatePersonalInfo("lastName", e.target.value)}
@@ -116,7 +116,7 @@ const PersonalInformationForm: React.FC = () => {
           placeholder="john.doe@example.com"
           autoComplete="email"
           required
-          size="large"
+          size="medium"
           sx={{
             "& .MuiOutlinedInput-input": { fontSize: "1rem" },
             mr: { md: 2 },
@@ -141,7 +141,7 @@ const PersonalInformationForm: React.FC = () => {
           type="text"
           placeholder="+233 54 xxx xxxx"
           autoComplete="phone"
-          size="large"
+          size="medium"
           sx={{ "& .MuiOutlinedInput-input": { fontSize: "1rem" } }}
           value={personalInfo.phone_number}
           onChange={(e) => updatePersonalInfo("phone_number", e.target.value)}
@@ -166,7 +166,7 @@ const PersonalInformationForm: React.FC = () => {
           placeholder="••••••••"
           autoComplete="new-password"
           required
-          size="large"
+          size="medium"
           sx={{
             "& .MuiOutlinedInput-input": { fontSize: "1rem" },
             mr: { md: 2 },
@@ -194,7 +194,7 @@ const PersonalInformationForm: React.FC = () => {
           placeholder="••••••••"
           autoComplete="new-password"
           required
-          size="large"
+          size="medium"
           sx={{ "& .MuiOutlinedInput-input": { fontSize: "1rem" } }}
           value={personalInfo.confirmPassword}
           onChange={(e) => updatePersonalInfo("confirmPassword", e.target.value)}

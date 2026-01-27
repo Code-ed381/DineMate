@@ -127,7 +127,12 @@ const NotificationList: React.FC<NotificationListProps> = ({
               <React.Fragment key={idx}>
                 <ListItem sx={{ bgcolor: isUnread ? "action.hover" : "transparent" }} onClick={(e) => handleMarkAsRead(n.id, e)}>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: style.bgColor, color: style.color }}>{style.icon}</Avatar>
+                    <Avatar 
+                      sx={{ bgcolor: style.bgColor, color: style.color }}
+                      src={n?.notification?.sender?.avatar_url}
+                    >
+                      {style.icon}
+                    </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="body2" fontWeight={isUnread ? 600 : 400}>{n?.notification?.message}</Typography>}

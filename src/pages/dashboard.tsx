@@ -34,7 +34,8 @@ const Dashboard: React.FC = () => {
     return null;
   }
 
-  const RoleDashboard = dashboards[role.toLowerCase()];
+  const roleToUse = role?.toLowerCase() || "";
+  const RoleDashboard = dashboards[roleToUse];
 
   if (!RoleDashboard) {
     return (

@@ -376,7 +376,7 @@ const PaymentForm: React.FC = () => {
                       required
                       size="small"
                       value={subscription.card_details.card_number}
-                      onChange={(e) => updateSubscription("card_details", { card_number: e.target.value }, plans)}
+                      onChange={(e) => updateSubscription("card_details", { ...subscription.card_details, card_number: e.target.value })}
                     />
                     {validationErrors.cardNumber && (
                       <Typography color="error" variant="caption">
@@ -395,7 +395,7 @@ const PaymentForm: React.FC = () => {
                       required
                       size="small"
                       value={subscription.card_details.card_cvv}
-                      onChange={(e) => updateSubscription("card_details", { card_cvv: e.target.value }, plans)}
+                      onChange={(e) => updateSubscription("card_details", { ...subscription.card_details, card_cvv: e.target.value })}
                     />
                     {validationErrors.card_cvv && (
                       <Typography color="error" variant="caption">
@@ -433,7 +433,7 @@ const PaymentForm: React.FC = () => {
                       required
                       size="small"
                       value={subscription.card_details.card_expiry_date}
-                      onChange={(e) => updateSubscription("card_details", { card_expiry_date: e.target.value }, plans)}
+                      onChange={(e) => updateSubscription("card_details", { ...subscription.card_details, card_expiry_date: e.target.value })}
                     />
                     {validationErrors.card_expiry_date && (
                       <Typography color="error" variant="caption">
@@ -457,7 +457,7 @@ const PaymentForm: React.FC = () => {
                 label="+233 54 xxx xxx"
                 variant="outlined"
                 value={subscription.card_details.momo_number}
-                onChange={(e) => updateSubscription("card_details", { momo_number: e.target.value }, plans)}
+                onChange={(e) => updateSubscription("card_details", { ...subscription.card_details, momo_number: e.target.value })}
               />
               {validationErrors.momo_number && (
                 <Typography color="error" variant="caption">

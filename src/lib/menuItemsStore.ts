@@ -93,7 +93,7 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
     set({ loadingCategories: true });
     try {
       const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-      const restaurantId = selectedRestaurant?.restaurants?.id;
+      const restaurantId = selectedRestaurant?.id;
 
       if (!restaurantId) throw new Error("No restaurant selected");
 
@@ -113,7 +113,7 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   fetchMenuItems: async () => {
     set({ loadingMenuItems: true });
     try {
-      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.restaurants?.id;
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
       if (!restaurantId) throw new Error("No restaurant selected");
 
       const { data, error } = await supabase

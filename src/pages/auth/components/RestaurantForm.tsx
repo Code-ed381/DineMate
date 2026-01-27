@@ -43,7 +43,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="eg. The Best Restaurant"
           autoComplete="restaurant name"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.name}
           onChange={(e) => updateRestaurantInfo("name", e.target.value)}
           sx={{
@@ -71,7 +71,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="Tell customers about your restaurant"
           autoComplete="description"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.description}
           onChange={(e) => updateRestaurantInfo("description", e.target.value)}
           sx={{
@@ -93,7 +93,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="eg. restaurant@example.com"
           autoComplete="restaurant email"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.email}
           onChange={(e) => updateRestaurantInfo("email", e.target.value)}
           sx={{
@@ -121,7 +121,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="eg. +2334567890"
           autoComplete="State"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.phone_number}
           onChange={(e) => updateRestaurantInfo("phone_number", e.target.value)}
           sx={{
@@ -146,7 +146,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="eg. https://restaurant.com"
           autoComplete="shipping address-line1"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.website}
           onChange={(e) => updateRestaurantInfo("website", e.target.value)}
           sx={{
@@ -168,7 +168,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="Street name and number"
           autoComplete="address-line1"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.address_line_1}
           onChange={(e) => updateRestaurantInfo("address_line_1", e.target.value)}
           sx={{
@@ -194,7 +194,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="Apartment, suite, unit, etc. (optional)"
           autoComplete="address-line2"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.address_line_2}
           onChange={(e) => updateRestaurantInfo("address_line_2", e.target.value)}
           sx={{
@@ -221,7 +221,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="e.g. Tema"
           autoComplete="City"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.city}
           onChange={(e) => updateRestaurantInfo("city", e.target.value)}
           sx={{
@@ -249,7 +249,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="e.g. Greater Accra"
           autoComplete="State"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.state}
           onChange={(e) => updateRestaurantInfo("state", e.target.value)}
           sx={{
@@ -276,7 +276,7 @@ const RestaurantForm: React.FC = () => {
           placeholder="e.g. GZ-xxx-1289"
           autoComplete="shipping postal-code"
           required
-          size="large"
+          size="medium"
           value={restaurantInfo.zip_code}
           onChange={(e) => updateRestaurantInfo("zip_code", e.target.value)}
           sx={{

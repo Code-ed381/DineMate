@@ -34,7 +34,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ allSessions }) 
       <CardContent sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <Stack direction="row" alignItems="center" spacing={1} mb={1}><Typography variant="subtitle1">Transaction History</Typography></Stack>
         <Divider sx={{ mb: 2 }} />
-        <Box sx={{ flex: 1 }}><DataGrid rows={rows} columns={columns} pageSize={10} disableRowSelectionOnClick /></Box>
+        <Box sx={{ flex: 1 }}><DataGrid rows={rows} columns={columns} initialState={{ pagination: { paginationModel: { pageSize: 10 } } }} disableRowSelectionOnClick /></Box>
       </CardContent>
     </Card>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Avatar, Button, CssBaseline, Box, Grid, Typography, Stack, Container, TextField } from '@mui/material';
+import { Avatar, Button, CssBaseline, Box, Grid, Typography, Stack, Container, TextField, Paper } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -75,7 +75,7 @@ export default function SignInSide() {
                         </Box>
                     </Box>
                 </Grid>
-                <Grid item xs={12} sm={8} md={5} elevation={6} square>
+                <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square>
                     <Container maxWidth="xs">
                         <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}><LockOutlinedIcon /></Avatar>

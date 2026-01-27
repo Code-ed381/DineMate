@@ -1,11 +1,31 @@
-import useMenuStore from "../lib/menuStore";
-import useAuthStore from "../lib/authStore";
 import useRestaurantStore from '../lib/restaurantStore';
 
-export const printReceipt = async (status: string) => {
+export const printReceipt = async (
+  orderId: string,
+  waiterName: string,
+  tableNo: string | number,
+  totalQty: number,
+  totalPrice: number,
+  orderItems: any[],
+  totalPaid: string,
+  cash: string,
+  card: string,
+  change: string
+) => {
   const printWindow = window.open("", "", `width=350,height=500`) as unknown as Window;
   if (!printWindow) return;
-  const htmlContent = generatePrintHTML(status);
+  const htmlContent = generatePrintHTML(
+    orderId,
+    waiterName,
+    tableNo,
+    totalQty,
+    totalPrice,
+    orderItems,
+    totalPaid,
+    cash,
+    card,
+    change
+  );
   printWindow.document.open();
   printWindow.document.writeln(htmlContent);
   printWindow.document.close();
@@ -17,17 +37,27 @@ export const printReceipt = async (status: string) => {
   };
 };
 
-const generatePrintHTML = (status: string) => {
-  const { currentOrderItems, chosenTableSession }: any = useMenuStore.getState();
-  const { user }: any = useAuthStore.getState();
-  const { selectedRestaurant }: any = useRestaurantStore.getState();
+const generatePrintHTML = (
+  orderId: string,
+  waiterName: string,
+  tableNo: string | number,
+  totalQty: number,
+  totalPrice: number,
+  orderItems: any[],
+  totalPaid: string,
+  cash: string,
+  card: string,
+  change: string
+) => {
+  // Use passed arguments instead of store
+  const { selectedRestaurant } = useRestaurantStore.getState(); // Keep restaurant store for name
 
-  const rows = (currentOrderItems || []).map((item: any) => `
+  const rows = (orderItems || []).map((item: any) => `
     <tr>
-      <td>${item?.item_name?.toUpperCase()}</td>
-      <td style="text-align: right">£${item?.unit_price?.toFixed(2)}</td>
-      <td style="text-align: center">${item?.quantity}</td>
-      <td style="text-align: right">£${(item?.unit_price * item?.quantity).toFixed(2)}</td>
+      <td>${item?.item_name?.toUpperCase() || item?.name?.toUpperCase()}</td>
+      <td style="text-align: right">£${(item?.unit_price || item?.price)?.toFixed(2)}</td>
+      <td style="text-align: center">${item?.quantity || item?.qty}</td>
+      <td style="text-align: right">£${((item?.unit_price || item?.price) * (item?.quantity || item?.qty)).toFixed(2)}</td>
     </tr>
   `).join("");
 
@@ -36,16 +66,22 @@ const generatePrintHTML = (status: string) => {
       <head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #000; padding: 5px; }</style></head>
       <body>
         <h2 style="text-align: center">${selectedRestaurant?.name?.toUpperCase() || "DINEMATE"}</h2>
-        <p style="text-align: center">${status === "close" ? "Official Receipt" : "Bill"}</p>
+        <p style="text-align: center">Official Receipt</p>
         <hr/>
-        <p>Order No: ${chosenTableSession?.order_id || "N/A"}</p>
-        <p>Table: ${chosenTableSession?.table_number || "N/A"}</p>
+        <p>Order No: ${orderId || "N/A"}</p>
+        <p>Table: ${tableNo || "N/A"}</p>
+        <p>Waiter: ${waiterName || "N/A"}</p>
         <table>
           <thead><tr><th>Item</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><th colspan="3">Grand Total</th><th>£${chosenTableSession?.order_total?.toFixed(2) || "0.00"}</th></tr></tfoot>
+          <tfoot>
+            <tr><th colspan="3">Grand Total</th><th>£${totalPrice?.toFixed(2) || "0.00"}</th></tr>
+            <tr><th colspan="3">Cash Paid</th><th>£${cash}</th></tr>
+            <tr><th colspan="3">Card Paid</th><th>£${card}</th></tr>
+            <tr><th colspan="3">Change</th><th>£${change}</th></tr>
+          </tfoot>
         </table>
-        <p style="text-align: center; margin-top: 20px"><small>${status === "close" ? "THANK YOU!" : "NOT AN OFFICIAL RECEIPT"}</small></p>
+        <p style="text-align: center; margin-top: 20px"><small>THANK YOU!</small></p>
       </body>
     </html>
   `;

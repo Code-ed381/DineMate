@@ -90,7 +90,7 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
             const { data: orders, error: ordersError } = await supabase
                 .from('orders')
                 .select(`*, table(table_no)`)
-                .eq('waiter', user.user.id)
+                .eq('waiter', user.id)
                 .gte('created_at', new Date(new Date().setDate(new Date().getDate() - 1)).toISOString());
 
             if (ordersError) throw ordersError;
@@ -107,7 +107,7 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
                 loadingCards: false
             });
         } catch (error) {
-            handleError(error);
+            handleError(error as Error);
         }
     },
 
@@ -122,7 +122,7 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
             const { data: orders, error } = await supabase
                 .from('orders')
                 .select('*')
-                .eq('waiter', user.user.id)
+                .eq('waiter', user.id)
                 .gte('created_at', new Date(new Date().setDate(new Date().getDate() - 7)).toISOString());
 
             if (error) throw error;
@@ -156,7 +156,7 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
                 loadingChart: false,
             });
         } catch (error) {
-            handleError(error);
+            handleError(error as Error);
         }
     },
 
@@ -184,7 +184,7 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
             set({ totalQty: totalQuantity, totalPrice: total, orderItems: orderItems || [], itemsLoading: false, order: [order] });
             return orderItems || [];
         } catch (error) {
-            handleError(error);
+            handleError(error as Error);
             return [];
         }
     },

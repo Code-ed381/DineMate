@@ -19,12 +19,12 @@ import SitemarkIcon from './components/SitemarkIcon';
 import AppTheme from "./components/shared-theme/AppTheme";
 import ColorModeIconDropdown from './components/shared-theme/ColorModeIconDropdwon';
 import useAuthStore from '../../lib/authStore';
+import AuthStepperContent from './components/AuthStepperContent';
 import Swal from 'sweetalert2';
 
 const Checkout: React.FC = (props) => {
   const {
     steps,
-    getStepContent,
     activeStep,
     handleBack,
     handleNextWithValidation,
@@ -264,7 +264,7 @@ const Checkout: React.FC = (props) => {
               </Stack>
             ) : (
               <Fragment>
-                {getStepContent(activeStep)}
+                <AuthStepperContent step={activeStep} />
                 <Box
                   sx={[
                     {

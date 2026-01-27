@@ -52,7 +52,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
         set({ loading: true });
         try {
             const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-            const restaurantId = selectedRestaurant?.restaurants?.id;
+            const restaurantId = selectedRestaurant?.id;
 
             if (!restaurantId) throw new Error("No restaurant selected");
 

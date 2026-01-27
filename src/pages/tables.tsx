@@ -15,7 +15,6 @@ import {
   InputAdornment, 
   Paper,
   Avatar,
-  IconButton,
   TableContainer,
   Table,
   TableHead,
@@ -24,6 +23,7 @@ import {
   TableBody,
   TableFooter,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 import {
   Search,
@@ -35,12 +35,9 @@ import {
   LockClock,
   EventSeat,
   LocalDining,
-  Add,
 } from "@mui/icons-material";
-import CancelIcon from "@mui/icons-material/Cancel";
 import useMenuStore from "../lib/menuStore";
 import TransitionsModal from "../components/modal";
-import ErrorIcon from "@mui/icons-material/Error";
 import TableSectionSkeleton from "../components/skeletons/table-section-skeleton";
 import useTablesStore from "../lib/tablesStore";
 import EnhancedSnackbar from "../components/snackbar";
@@ -56,17 +53,13 @@ const TableManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const {
-    cancelReservation,
     tables,
     handleStatusChange,
     setSnackbar,
-    selectedTable,
     open,
     handleClose,
     tablesLoaded,
     loadingTables,
-    chosenTableSession,
-    handleRemoveItem,
     getTables,
     getSessionsOverview,
     selectedSession,
@@ -109,31 +102,21 @@ const TableManagement: React.FC = () => {
     getSessionsOverview();
   }, [getTables, getSessionsOverview]);
 
-  const handleStatusFilterChange = (status: string) => {
-    setStatusFilter(status);
-  };
 
   const handleTableActionButtonClick = async (table: any) => {
     const result = await handleStatusChange(table);
     if (!result) return;
 
     if (result.message === "reserved") {
-      setSnackbar({ open: true, message: "Table reserved successfully", severity: "success" });
+      setSnackbar({ id: 1, open: true, message: "Table reserved successfully", severity: "success" });
     } else if (result.message === "cancelled") {
-      setSnackbar({ open: true, message: "Table cancelled successfully", severity: "success" });
+      setSnackbar({ id: 2, open: true, message: "Table cancelled successfully", severity: "success" });
     } else if (result.message === "occupied") {
-      setSnackbar({ open: true, message: "Table occupied now", severity: "success" });
+      setSnackbar({ id: 3, open: true, message: "Table occupied now", severity: "success" });
       navigate("/app/menu");
     }
   };
 
-  const handleAddOrderItemBtn = () => {
-    handleClose();
-    if (selectedSession?.session_id) {
-      localStorage.setItem("saved_session_id", selectedSession.session_id);
-    }
-    navigate(`/app/menu`);
-  };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -201,18 +184,60 @@ const TableManagement: React.FC = () => {
       {loadingTables && <TableSectionSkeleton />}
       <EnhancedSnackbar />
       <TransitionsModal open={open} handleClose={handleClose}>
-          {loadingCurrentOrderItems ? <CircularProgress /> : (
-            <Box>
-                {currentOrderItems.length === 0 ? <Typography>No Items</Typography> : (
-                  <TableContainer>
-                     <Table>
+          {loadingCurrentOrderItems ? (
+            <Box display="flex" justifyContent="center" p={4}><CircularProgress /></Box>
+          ) : (
+            <Box sx={{ minWidth: 400 }}>
+                <Typography variant="h5" gutterBottom fontWeight="bold">
+                  Order Details - Table {selectedSession?.table_number}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Session Started: {selectedSession?.opened_at ? new Date(selectedSession.opened_at).toLocaleString() : 'N/A'}
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+
+                {currentOrderItems.length === 0 ? (
+                  <Typography align="center" sx={{ py: 4 }}>No items found in this order.</Typography>
+                ) : (
+                  <>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><Typography variant="subtitle2" fontWeight="bold">Item</Typography></TableCell>
+                            <TableCell align="center"><Typography variant="subtitle2" fontWeight="bold">Qty</Typography></TableCell>
+                            <TableCell align="right"><Typography variant="subtitle2" fontWeight="bold">Price</Typography></TableCell>
+                            <TableCell align="right"><Typography variant="subtitle2" fontWeight="bold">Subtotal</Typography></TableCell>
+                          </TableRow>
+                        </TableHead>
                         <TableBody>
-                           {currentOrderItems.map((item: any) => (
-                             <TableRow key={item.id}><TableCell>{item.item_name}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>
-                           ))}
+                          {currentOrderItems.map((item: any, idx: number) => (
+                            <TableRow key={item?.order_item_id || item?.id || idx}>
+                              <TableCell>{item?.item_name}</TableCell>
+                              <TableCell align="center">{item?.quantity}</TableCell>
+                              <TableCell align="right">${item?.unit_price?.toFixed(2)}</TableCell>
+                              <TableCell align="right">${item?.sum_price?.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
                         </TableBody>
-                     </Table>
-                  </TableContainer>
+                        <TableFooter>
+                          <TableRow>
+                            <TableCell colSpan={3} align="right">
+                              <Typography variant="h6" fontWeight="bold">Total Amount:</Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="h6" fontWeight="bold" color="primary.main">
+                                ${totalOrdersPrice?.toFixed(2)}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        </TableFooter>
+                      </Table>
+                    </TableContainer>
+                    <Box mt={3} display="flex" justifyContent="flex-end">
+                      <Button variant="contained" onClick={handleClose}>Close</Button>
+                    </Box>
+                  </>
                 )}
             </Box>
           )}

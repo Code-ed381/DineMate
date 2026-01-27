@@ -2,19 +2,18 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
 import { toast, ToastOptions } from "react-toastify";
-import React from 'react';
 import { RealtimeChannel } from "@supabase/supabase-js";
 import useRestaurantStore from "./restaurantStore";
 import useAuthStore from "./authStore";
 
-// Lazy load component to avoid circular or early import issues
-const NotificationToastContent = React.lazy(() => import("../components/notificationToastContent"));
+
 
 export interface NotificationSender {
   user_id: string;
   first_name: string;
   last_name: string;
   default_role: string;
+  avatar_url?: string;
   full_name?: string;
 }
 
@@ -69,7 +68,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ loading: true });
 
     const { selectedRestaurant } = useRestaurantStore.getState() as any;
-    const restaurantId = selectedRestaurant?.restaurants?.id;
+    const restaurantId = selectedRestaurant?.id;
 
     const { user } = useAuthStore.getState();
     const userId = user?.id;
@@ -99,7 +98,10 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
               user_id,
               first_name,
               last_name,
-              default_role
+              first_name,
+              last_name,
+              default_role,
+              avatar_url
             )
           )
         `)
@@ -204,7 +206,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   subscribeToNotifications: () => {
     const { selectedRestaurant } = useRestaurantStore.getState() as any;
-    const restaurantId = selectedRestaurant?.restaurants?.id;
+    const restaurantId = selectedRestaurant?.id;
 
     const { user } = useAuthStore.getState();
     const userId = user?.id;
@@ -228,6 +230,8 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
           filter: `user_id=eq.${userId}`,
         },
         async (payload) => {
+          console.log('🔔 Real-time notification received:', payload);
+          
           try {
             const userNotifRow = payload.new as any;
 
@@ -257,7 +261,10 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
               .limit(1)
               .single();
 
-            if (notifError) return;
+            if (notifError) {
+              console.error('Error fetching notification data:', notifError);
+              return;
+            }
 
             const combined: UserNotification = {
               id: userNotifRow.id,
@@ -275,8 +282,12 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
             }
 
             const exists = get().notifications.some((n) => n.id === combined.id);
-            if (exists) return;
+            if (exists) {
+              console.log('Notification already exists, skipping');
+              return;
+            }
 
+            console.log('✅ Adding new notification to state');
             set((state) => ({
               notifications: [combined, ...state.notifications],
               unreadCount: combined.is_read ? state.unreadCount : state.unreadCount + 1,
@@ -291,7 +302,15 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Notification subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to notifications for user:', userId, 'restaurant:', restaurantId);
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Failed to subscribe to notifications. Check if realtime is enabled on user_notifications table.');
+        }
+      });
 
     set({ subscription });
   },

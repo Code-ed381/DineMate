@@ -19,6 +19,7 @@ import {
   ListItemText,
   List,
   ListItem,
+  useMediaQuery,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -137,6 +138,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
 
 const EnhancedOwnerDashboard: React.FC = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [timeRange, setTimeRange] = useState("week");
   const [selectedMetric, setSelectedMetric] = useState<"revenue" | "orders" | "customers">("revenue");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -254,41 +256,50 @@ const EnhancedOwnerDashboard: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Stack
-          direction="row"
+          direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
-          alignItems="flex-start"
+          alignItems={{ xs: "flex-start", md: "center" }}
+          spacing={2}
           mb={2}
         >
           <Box>
-            <Typography variant="h4" fontWeight={700} gutterBottom>
+            <Typography variant="h4" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
               Owner Dashboard
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Real-time insights and performance analytics
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant={autoRefresh ? "contained" : "outlined"}
-              startIcon={<Refresh />}
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              size="small"
-            >
-              {autoRefresh ? "Live" : "Paused"}
-            </Button>
+          <Stack 
+            direction={{ xs: "column", sm: "row" }} 
+            spacing={1} 
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
+          >
+            <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+              <Button
+                variant={autoRefresh ? "contained" : "outlined"}
+                startIcon={<Refresh />}
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                size="small"
+                fullWidth={isMobile}
+              >
+                {autoRefresh ? "Live" : "Paused"}
+              </Button>
+              <Button variant="outlined" startIcon={<GetApp />} size="small" fullWidth={isMobile}>
+                Export
+              </Button>
+            </Stack>
             <ToggleButtonGroup
               value={timeRange}
               exclusive
               onChange={(_e, v) => v && setTimeRange(v)}
               size="small"
+              fullWidth
             >
               <ToggleButton value="today">Today</ToggleButton>
               <ToggleButton value="week">Week</ToggleButton>
               <ToggleButton value="month">Month</ToggleButton>
             </ToggleButtonGroup>
-            <Button variant="outlined" startIcon={<GetApp />} size="small">
-              Export
-            </Button>
           </Stack>
         </Stack>
         <Typography variant="caption" color="text.secondary">

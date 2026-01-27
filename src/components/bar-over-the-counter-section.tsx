@@ -17,6 +17,8 @@ import {
   Badge,
   Avatar,
   Divider,
+  useTheme,
+  alpha,
 } from "@mui/material";
 import {
   Close,
@@ -26,11 +28,15 @@ import {
   ShoppingCart,
   Receipt as ReceiptIcon,
   LocalBar,
+  DeleteOutline,
+  KeyboardArrowRight,
 } from "@mui/icons-material";
 import useBarStore from "../lib/barStore";
 import BarTakeAwaySkeleton from "./skeletons/bar-takeaway-skeleton";
 
 const OTCTabs: React.FC = () => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const {
     tabs,
     setTabs,
@@ -55,11 +61,13 @@ const OTCTabs: React.FC = () => {
     handleFetchItems();
   }, [handleFetchItems]);
 
-  const filteredItems = items.filter((item: any) => {
-    const matchesCategory = selectedCategory === "all" || item.category_id === selectedCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredItems = items
+    .filter((item: any) => {
+      const matchesCategory = selectedCategory === "all" || item.category_id === selectedCategory;
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const activeCart = getActiveCart();
   const total = getTotal();
@@ -75,49 +83,268 @@ const OTCTabs: React.FC = () => {
   if (loadingItems) return <BarTakeAwaySkeleton />;
 
   return (
-    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", bgcolor: "#f5f7fa", mt: 4 }}>
-      <Paper elevation={0} sx={{ borderBottom: "1px solid", borderColor: "divider", bgcolor: "white" }}>
-        <Box sx={{ px: 3, py: 2 }}>
-           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}><LocalBar sx={{ fontSize: 32, color: "primary.main" }} /><Typography variant="h5" fontWeight="600">Bar Orders</Typography></Box>
-              <Button onClick={addNewTab} variant="contained" startIcon={<Add />}>New Order</Button>
-           </Box>
-           <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 1 }}>
-              {tabs.map((tab: any, index: number) => (
-                <Badge key={tab.id} badgeContent={getCartItemCount(index)} color="error">
-                   <Chip label={tab.name} onClick={() => setActiveTab(index)} onDelete={() => removeTab(tab.id)} variant={activeTab === index ? "filled" : "outlined"} color={activeTab === index ? "primary" : "default"} />
-                </Badge>
-              ))}
-           </Stack>
+    <Box sx={{ 
+      display: "flex", 
+      flexDirection: "column", 
+      bgcolor: "background.default", 
+      height: "calc(100vh - 120px)",
+      mt: 2,
+      borderRadius: 4,
+      overflow: 'hidden',
+      border: '1px solid',
+      borderColor: 'divider'
+    }}>
+      {/* Top Navigation & Tabs */}
+      <Paper elevation={0} sx={{ 
+        borderBottom: "1px solid", 
+        borderColor: "divider", 
+        bgcolor: "background.paper", 
+        borderRadius: 0,
+        p: 2
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}>
+              <LocalBar />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" fontWeight="800" sx={{ lineHeight: 1.2 }}>Takeaway Orders</Typography>
+              <Typography variant="caption" color="text.secondary">Manage over-the-counter payments</Typography>
+            </Box>
+          </Stack>
+          <Button 
+            onClick={addNewTab} 
+            variant="contained" 
+            disableElevation
+            startIcon={<Add />}
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            New Order
+          </Button>
         </Box>
+        
+        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5, '&::-webkit-scrollbar': { display: 'none' } }}>
+          {tabs.map((tab: any, index: number) => (
+            <Chip 
+              key={tab.id}
+              onClick={() => setActiveTab(index)} 
+              onDelete={() => removeTab(tab.id)} 
+              label={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2" fontWeight={activeTab === index ? 700 : 500}>{tab.name}</Typography>
+                  <Badge badgeContent={getCartItemCount(index)} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.65rem', height: 16, minWidth: 16 } }} />
+                </Stack>
+              }
+              variant={activeTab === index ? "filled" : "outlined"} 
+              color={activeTab === index ? "primary" : "default"}
+              sx={{ 
+                borderRadius: 2,
+                height: 40,
+                px: 1,
+                transition: 'all 0.2s',
+                ...(activeTab === index ? {
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
+                } : {})
+              }}
+            />
+          ))}
+        </Stack>
       </Paper>
+
+      {/* Main Content Area */}
       <Box sx={{ flex: 1, overflow: "hidden", display: "flex" }}>
-         <Grid container sx={{ height: "100%" }}>
-            <Grid item xs={12} md={8} sx={{ height: "100%", overflow: "auto", p: 3 }}>
-               <TextField fullWidth placeholder="Search drinks..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} sx={{ mb: 2 }} InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }} />
-               <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                  <Chip label="All" onClick={() => setSelectedCategory("all")} variant={selectedCategory === "all" ? "filled" : "outlined"} />
-                  {categories.map((c: any) => <Chip key={c.id} label={c.name} onClick={() => setSelectedCategory(c.id)} variant={selectedCategory === c.id ? "filled" : "outlined"} />)}
-               </Stack>
-               <Grid container spacing={2}>
-                  {filteredItems.map((item: any) => (
-                    <Grid item xs={6} sm={4} md={3} key={item.id}>
-                       <Card><CardActionArea onClick={() => addToCart(item)}><CardMedia component="img" height="140" image={item.image_url} /><CardContent><Typography variant="subtitle2" noWrap>{item.name}</Typography><Typography variant="h6" color="primary">${item.price}</Typography></CardContent></CardActionArea></Card>
+        <Grid container sx={{ height: "100%" }}>
+          {/* Menu Items Section */}
+          <Grid item xs={12} md={8} sx={{ height: "100%", overflow: "auto", p: 3, bgcolor: isDark ? alpha(theme.palette.background.paper, 0.5) : '#f8f9fa' }}>
+            <Stack spacing={3}>
+              {/* Search and Categories */}
+              <Box>
+                <TextField 
+                  fullWidth 
+                  variant="outlined"
+                  placeholder="Search drinks or scan barcode..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  sx={{ 
+                    mb: 2,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 3,
+                      bgcolor: 'background.paper',
+                    }
+                  }} 
+                  InputProps={{ 
+                    startAdornment: <InputAdornment position="start"><Search color="primary" /></InputAdornment> 
+                  }} 
+                />
+                <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
+                  <Chip 
+                    label="All Items" 
+                    onClick={() => setSelectedCategory("all")} 
+                    variant={selectedCategory === "all" ? "filled" : "outlined"} 
+                    color={selectedCategory === "all" ? "primary" : "default"}
+                    sx={{ borderRadius: 1.5, fontWeight: 600 }}
+                  />
+                  {categories.map((c: any) => (
+                    <Chip 
+                      key={c.id} 
+                      label={c.name} 
+                      onClick={() => setSelectedCategory(c.id)} 
+                      variant={selectedCategory === c.id ? "filled" : "outlined"} 
+                      color={selectedCategory === c.id ? "primary" : "default"}
+                      sx={{ borderRadius: 1.5, fontWeight: 600 }}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+
+              {/* Items Grid */}
+              <Grid container spacing={2}>
+                {filteredItems.map((item: any) => {
+                  const inCart = activeCart.find(c => c.id === item.id);
+                  return (
+                    <Grid item xs={6} sm={4} md={3} lg={2.4} key={item.id}>
+                      <Card sx={{ 
+                        borderRadius: 3, 
+                        overflow: 'hidden', 
+                        border: '1px solid',
+                        borderColor: inCart ? 'primary.main' : 'divider',
+                        transition: 'all 0.2s',
+                        '&:hover': { transform: 'translateY(-4px)', boxShadow: theme.shadows[4] }
+                      }}>
+                        <CardActionArea onClick={() => addToCart(item)}>
+                          <Box sx={{ position: 'relative' }}>
+                            <CardMedia component="img" height="120" image={item.image_url} />
+                            {inCart && (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                top: 8, 
+                                right: 8, 
+                                bgcolor: 'primary.main', 
+                                color: 'white', 
+                                borderRadius: '50%', 
+                                width: 24, 
+                                height: 24, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '0.75rem',
+                                boxShadow: 2
+                              }}>
+                                {inCart.qty}
+                              </Box>
+                            )}
+                          </Box>
+                          <CardContent sx={{ p: 1.5 }}>
+                            <Typography variant="body2" noWrap fontWeight={600} sx={{ mb: 0.5 }}>{item.name}</Typography>
+                            <Typography variant="subtitle2" color="primary" fontWeight={800}>${item.price.toFixed(2)}</Typography>
+                          </CardContent>
+                        </CardActionArea>
+                      </Card>
                     </Grid>
-                  ))}
-               </Grid>
-            </Grid>
-            <Grid item xs={12} md={4} sx={{ height: "100%", bgcolor: "white", p: 3, display: "flex", flexDirection: "column" }}>
-               <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}><ReceiptIcon /> Summary</Typography>
-               <Box sx={{ flex: 1, overflow: "auto" }}>
-                  {activeCart.map((item: any) => (
-                    <Card key={item.id} sx={{ mb: 1, p: 1 }}><Box display="flex" justifyContent="space-between" alignItems="center"><Typography variant="subtitle2">{item.name}</Typography><IconButton size="small" onClick={() => removeFromCart(item.id)}><Close fontSize="small" /></IconButton></Box><Box display="flex" justifyContent="space-between"><Typography>x{item.qty}</Typography><Typography fontWeight="bold">${(item.price * item.qty).toFixed(2)}</Typography></Box></Card>
-                  ))}
-               </Box>
-               <Divider sx={{ my: 2 }} /><Box display="flex" justifyContent="space-between"><Typography variant="h6">Total</Typography><Typography variant="h5" color="primary" fontWeight="bold">${total.toFixed(2)}</Typography></Box>
-               <Button variant="contained" fullWidth sx={{ mt: 2 }} size="large">Submit</Button>
-            </Grid>
-         </Grid>
+                  );
+                })}
+              </Grid>
+            </Stack>
+          </Grid>
+
+          {/* Order Summary (Cart) Section */}
+          <Grid item xs={12} md={4} sx={{ 
+            height: "100%", 
+            bgcolor: "background.paper", 
+            p: 3, 
+            display: "flex", 
+            flexDirection: "column", 
+            borderLeft: '1px solid', 
+            borderColor: 'divider' 
+          }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
+              <ShoppingCart color="primary" />
+              <Typography variant="h6" fontWeight="800">Order Summary</Typography>
+              <Box sx={{ flex: 1 }} />
+              <Typography variant="caption" color="text.secondary">
+                {activeCart.length} items
+              </Typography>
+            </Stack>
+
+            <Box sx={{ flex: 1, overflow: "auto", mx: -1, px: 1 }}>
+              <Stack spacing={1.5}>
+                {activeCart.map((item: any) => (
+                  <Paper 
+                    key={item.id} 
+                    elevation={0}
+                    sx={{ 
+                      p: 1.5, 
+                      borderRadius: 2, 
+                      border: '1px solid', 
+                      borderColor: 'divider',
+                      bgcolor: isDark ? alpha(theme.palette.common.white, 0.03) : alpha(theme.palette.common.black, 0.02)
+                    }}
+                  >
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>{item.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">${item.price.toFixed(2)} each</Typography>
+                      </Box>
+                      <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Stack direction="row" spacing={1} alignItems="center">
+                         <Typography variant="body2" color="text.secondary">Qty:</Typography>
+                         <Typography variant="body2" fontWeight={800}>{item.qty}</Typography>
+                      </Stack>
+                      <Typography fontWeight={800} color="primary">${(item.price * item.qty).toFixed(2)}</Typography>
+                    </Box>
+                  </Paper>
+                ))}
+                {activeCart.length === 0 && (
+                  <Box sx={{ textAlign: 'center', py: 10, opacity: 0.3 }}>
+                    <ShoppingCart sx={{ fontSize: 64, mb: 2 }} />
+                    <Typography>Your cart is empty</Typography>
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+
+            <Box sx={{ mt: 3 }}>
+              <Paper sx={{ p: 2, borderRadius: 3, bgcolor: isDark ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.primary.main, 0.05), border: '1px dashed', borderColor: 'primary.main', mb: 2 }}>
+                <Stack spacing={1}>
+                   <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" color="text.secondary">Subtotal</Typography>
+                      <Typography variant="body1" fontWeight={600}>${total.toFixed(2)}</Typography>
+                   </Box>
+                   <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" color="text.secondary">Tax (0%)</Typography>
+                      <Typography variant="body1" fontWeight={600}>$0.00</Typography>
+                   </Box>
+                   <Divider sx={{ my: 1 }} />
+                   <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="h6" fontWeight={800}>Total</Typography>
+                      <Typography variant="h5" color="primary" fontWeight={900}>${total.toFixed(2)}</Typography>
+                   </Box>
+                </Stack>
+              </Paper>
+              <Button 
+                variant="contained" 
+                fullWidth 
+                size="large" 
+                disabled={activeCart.length === 0}
+                endIcon={<KeyboardArrowRight />}
+                sx={{ 
+                  borderRadius: 3, 
+                  py: 1.5, 
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.3)}`
+                }}
+              >
+                Proceed to Payment
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
       </Box>
     </Box>
   );

@@ -42,7 +42,7 @@ const SmallStat: React.FC<SmallStatProps> = ({ icon, label, value, accent }) => 
               ),
             })}
           >
-            {React.cloneElement(icon, { sx: { fontSize: 28 } })}
+            {React.cloneElement(icon as React.ReactElement<any>, { sx: { fontSize: 28 } })}
           </Avatar>
 
           <Box sx={{ flex: 1 }}>
@@ -99,8 +99,8 @@ const ChefDashboard: React.FC = () => {
     unsubscribeFromOrderItems,
   ]);
 
-  const pendingCount = pendingMeals?.filter((meal: any) => meal?.item_status !== "preparing").length || 0;
-  const preparingCount = preparingMeals?.filter((meal: any) => meal?.item_status !== "pending").length || 0;
+  const pendingCount = pendingMeals?.filter((meal: any) => meal?.order_item_status !== "preparing").length || 0;
+  const preparingCount = preparingMeals?.filter((meal: any) => meal?.order_item_status !== "pending").length || 0;
   const readyCount = readyMeals?.length || 0;
   const servedCount = servedMeals?.length || 0;
 
@@ -121,34 +121,34 @@ const ChefDashboard: React.FC = () => {
 
           {/* KPI strip */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <SmallStat
                 icon={<Timer />}
-                label="Pending Orders"
+                label="Pending"
                 value={pendingCount}
                 accent="#ffe6e6"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <SmallStat
                 icon={<UpdateTwoToneIcon />}
-                label="In Progress"
+                label="Preparing"
                 value={preparingCount}
                 accent="#fff3e0"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <SmallStat
                 icon={<AlarmOnTwoToneIcon />}
-                label="Ready Orders"
+                label="Ready"
                 value={readyCount}
                 accent="#e3f2fd"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <SmallStat
                 icon={<RoomServiceTwoToneIcon />}
-                label="Completed Orders"
+                label="Served"
                 value={servedCount}
                 accent="#e8f5e9"
               />

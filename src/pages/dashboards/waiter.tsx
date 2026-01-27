@@ -45,21 +45,22 @@ interface StatCardProps {
 const StatCard: React.FC<StatCardProps> = ({ icon, value, subtitle, accent }) => (
   <Card
     sx={{
-      p: 2,
+      p: { xs: 1.5, md: 2 },
       display: "flex",
       alignItems: "center",
-      gap: 2,
+      gap: { xs: 1, md: 2 },
       borderRadius: 2,
+      height: "100%",
     }}
   >
-    <Avatar sx={{ bgcolor: accent ?? "primary.main", width: 56, height: 56 }}>
-      {icon}
+    <Avatar sx={{ bgcolor: accent ?? "primary.main", width: { xs: 40, md: 56 }, height: { xs: 40, md: 56 } }}>
+      {React.cloneElement(icon as React.ReactElement)}
     </Avatar>
     <Box>
-      <Typography variant="h6" sx={{ fontWeight: 700 }}>
+      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", md: "1.25rem" } }}>
         {value}
       </Typography>
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.2 }}>
         {subtitle}
       </Typography>
     </Box>
@@ -103,19 +104,38 @@ const WaiterDashboard: React.FC = () => {
     fetchSalesData,
     subscribeToSessions,
     unsubscribeFromSessions,
+    subscribeToOrderItems,
+    unsubscribeFromOrderItems,
+    dashboardKitchenTasks,
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const getItemStatusBreakdown = (itemId: string) => {
+    // If no kitchen tasks loaded yet, return null
+    if (!dashboardKitchenTasks || dashboardKitchenTasks.length === 0) return null;
+    
+    const tasks = dashboardKitchenTasks.filter((t: any) => t.order_item_id === itemId);
+    if (!tasks || tasks.length === 0) return null;
+    
+    const counts: Record<string, number> = {};
+    tasks.forEach((t: any) => {
+      counts[t.status] = (counts[t.status] || 0) + 1;
+    });
+    return counts;
+  };
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     getActiveSessionByRestaurant();
     fetchSalesData();
     subscribeToSessions();
+    subscribeToOrderItems();
 
     return () => {
       unsubscribeFromSessions();
+      unsubscribeFromOrderItems();
     };
-  }, [getActiveSessionByRestaurant, fetchSalesData, subscribeToSessions, unsubscribeFromSessions]);
+  }, [getActiveSessionByRestaurant, fetchSalesData, subscribeToSessions, unsubscribeFromSessions, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
   // ---- Derived Insights ----
   const totalRevenue = useMemo(
@@ -166,38 +186,38 @@ const WaiterDashboard: React.FC = () => {
 
           {/* ---- Top Stats ---- */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} md={3}>
               <StatCard
                 icon={<TableBar />}
                 value={assignedTables.length}
-                subtitle="Assigned Tables"
+                subtitle="Tables"
                 accent="#6a1b9a"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} md={3}>
               <StatCard
                 icon={<ListAlt />}
                 value={totalActiveOrders}
-                subtitle="Active Order Items"
+                subtitle="Active Items"
                 accent="#0d47a1"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} md={3}>
               <StatCard
                 icon={<LocalDining />}
                 value={
                   assignedTables.filter((t: any) => t.session_status === "billed")
                     .length
                 }
-                subtitle="Pending Bills"
+                subtitle="Billed"
                 accent="#f57c00"
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} md={3}>
               <StatCard
                 icon={<MonetizationOn />}
                 value={`$${totalRevenue}`}
-                subtitle="Revenue (this shift)"
+                subtitle="Revenue"
                 accent="#2e7d32"
               />
             </Grid>
@@ -247,23 +267,26 @@ const WaiterDashboard: React.FC = () => {
 
           {/* ---- Filters ---- */}
           <Stack
-            direction={{ xs: "column", sm: "row" }}
+            direction={{ xs: "column", md: "row" }}
             spacing={2}
-            alignItems="center"
+            alignItems={{ xs: "stretch", md: "center" }}
             justifyContent="space-between"
             sx={{ mb: 3 }}
           >
             <ToggleButtonGroup
               exclusive
+              fullWidth
               value={statusFilter}
               onChange={(_e, value) => value && setStatusFilter(value)}
               sx={{
+                flex: { md: "0 1 auto" },
                 "& .MuiToggleButton-root": {
-                  px: 3,
+                  px: { xs: 1.5, sm: 3 },
                   py: 1,
                   fontWeight: 600,
                   borderRadius: 2,
                   textTransform: "capitalize",
+                  fontSize: { xs: '0.8rem', md: '0.875rem' }
                 },
               }}
             >
@@ -274,7 +297,9 @@ const WaiterDashboard: React.FC = () => {
             </ToggleButtonGroup>
 
             <TextField
-              placeholder="Search table number..."
+              placeholder="Search table..."
+              fullWidth
+              sx={{ maxWidth: { md: 300 } }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -298,17 +323,18 @@ const WaiterDashboard: React.FC = () => {
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
+                    minHeight: 200,
                   }}
                 >
-                  <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
-                  <Typography variant="body1" fontWeight={600}>
+                  <InfoOutlinedIcon sx={{ mb: 1, opacity: 0.5 }} fontSize="large" />
+                  <Typography variant="body1" fontWeight={600} color="text.secondary">
                     No tables found
                   </Typography>
                 </Box>
               </Grid>
             ) : (
               filteredTables.map((session: any) => (
-                <Grid item xs={12} md={6} lg={3} key={session.session_id}>
+                <Grid item xs={12} sm={6} md={6} lg={3} key={session.session_id}>
                   <Card
                     sx={{
                       borderRadius: 2,
@@ -359,13 +385,32 @@ const WaiterDashboard: React.FC = () => {
                                 </Typography>
                               </Box>
 
-                              {order.item_status != "preparing" && (
-                                <StatusChip status={order.item_status} />
-                              )}
+                              {(() => {
+                                 const breakdown = getItemStatusBreakdown(order.id);
+                                 
+                                 if (breakdown) {
+                                   return (
+                                     <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: '40%' }}>
+                                       {breakdown['pending'] > 0 && <Chip label={`${breakdown['pending']} PENDING`} size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                       {breakdown['preparing'] > 0 && <Chip label={`${breakdown['preparing']} PREP`} size="small" color="warning" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                       {breakdown['ready'] > 0 && <Chip label={`${breakdown['ready']} READY`} size="small" color="success" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                       {breakdown['served'] > 0 && <Chip label={`${breakdown['served']} SERVED`} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                     </Stack>
+                                   );
+                                 }
 
-                              {order.item_status === "preparing" && (
-                                <CircularProgress size={20} color="warning" />
-                              )}
+                                 return (
+                                    <>
+                                      {order.item_status != "preparing" && (
+                                        <StatusChip status={order.item_status} />
+                                      )}
+
+                                      {order.item_status === "preparing" && (
+                                        <CircularProgress size={20} color="warning" />
+                                      )}
+                                    </>
+                                 );
+                               })()}
                             </ListItem>
                           ))}
                         </List>

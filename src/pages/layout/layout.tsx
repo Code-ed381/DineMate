@@ -2,8 +2,9 @@ import { Outlet } from "react-router-dom";
 import * as React from "react";
 import {
   styled,
-  Theme,
+  useTheme,
 } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import CssBaseline from "@mui/material/CssBaseline";
 import MuiDrawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
@@ -16,6 +17,9 @@ import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
 import dayjs from "dayjs";
+
+// At the top of the file
+import { testNotificationSystem, testRLSPolicies } from '../../utils/testNotification';
 
 // Icons
 import MenuIcon from "@mui/icons-material/Menu";
@@ -67,14 +71,14 @@ interface AppBarProps extends MuiAppBarProps {
 }
 
 const AppBar = styled(MuiAppBar, {
-  shouldForwardProp: (prop) => prop !== "open",
-})<AppBarProps>(({ theme, open }) => ({
+  shouldForwardProp: (prop) => prop !== "open" && prop !== "isMobile",
+})<AppBarProps & { isMobile?: boolean }>(({ theme, open, isMobile }) => ({
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  ...(open && {
+  ...(open && !isMobile && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
     transition: theme.transitions.create(["width", "margin"], {
@@ -111,6 +115,9 @@ const Drawer = styled(MuiDrawer, {
 }));
 
 const Layout: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isSmallMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [open, setOpen] = React.useState(false);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -136,19 +143,31 @@ const Layout: React.FC = () => {
 
 
   useEffect(() => {
+    if (!user?.id || !selectedRestaurant?.id) {
+      console.warn('⏸️  Waiting for user and restaurant data before initializing notifications...');
+      return;
+    }
+
+    console.log('🔔 Initializing notification system', {
+      userId: user.id,
+      restaurantId: selectedRestaurant.id
+    });
+    
     fetchNotifications();
     subscribeToNotifications();
 
     return () => {
+      console.log('🔕 Unsubscribing from notifications');
       unsubscribe();
     };
-  }, [subscribeToNotifications, fetchNotifications, unsubscribe]);
+  }, [user?.id, selectedRestaurant?.id, fetchNotifications, subscribeToNotifications, unsubscribe]);
 
   useEffect(() => {
     if (user?.id) {
         getRestaurants();
     }
   }, [getRestaurants, user?.id]);
+
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -169,6 +188,15 @@ const Layout: React.FC = () => {
     return dayjs(date).format("ddd, DD MMMM YYYY, h:mm:ss A");
   };
 
+
+// Inside useEffect or a button handler
+  useEffect(() => {
+    // Make functions available in console
+    (window as any).testNotificationSystem = testNotificationSystem;
+    (window as any).testRLSPolicies = testRLSPolicies;
+    console.log('🎯 Notification debugging tools ready!');
+  }, []);
+
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
@@ -185,6 +213,12 @@ const Layout: React.FC = () => {
 
   const toggleDrawer = () => {
     setOpen(!open);
+  };
+
+  const handleListItemClick = () => {
+    if (isMobile) {
+      setOpen(false);
+    }
   };
 
   const logout = async () => { 
@@ -227,16 +261,16 @@ const Layout: React.FC = () => {
         <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
           <CssBaseline />
 
-          <AppBar position="absolute" open={open}>
-            <Toolbar sx={{ pr: "20px" }}>
+          <AppBar position="fixed" open={open} {...{ isMobile } as any}>
+            <Toolbar sx={{ pr: isSmallMobile ? "10px" : "20px" }}>
               <IconButton
                 edge="start"
                 color="inherit"
                 aria-label="open drawer"
                 onClick={toggleDrawer}
                 sx={{
-                  marginRight: "30px",
-                  ...(open && { display: "none" }),
+                  marginRight: isSmallMobile ? "10px" : "30px",
+                  ...(open && !isMobile && { display: "none" }),
                 }}
               >
                 <MenuIcon />
@@ -250,31 +284,34 @@ const Layout: React.FC = () => {
 
               <Typography
                 component="h1"
-                variant="h5"
+                variant={isSmallMobile ? "h6" : "h5"}
                 color="inherit"
                 noWrap
-                sx={{ mr: 2, fontWeight: "900" }}
+                sx={{ mr: 1, fontWeight: "900", flexShrink: 1 }}
               >
                 {selectedRestaurant?.name}{" "}
-                {settings?.general?.show_breadcrumb && (
+                {settings?.general?.show_breadcrumb && !isSmallMobile && (
                   <span style={{ fontWeight: "normal", fontSize: "14px" }}>
                     * {breadcrumb}
                   </span>
                 )}
               </Typography>
 
-              {/* Centered Time & Date */}
-              <Box sx={{ mx: "auto" }}>
-                <Typography
-                  variant="subtitle1"
-                  color="inherit"
-                  sx={{ fontWeight: "900" }}
-                  noWrap
-                >
-                  {settings?.general?.show_date_and_time_on_navbar &&
-                    formatDate(currentTime)}
-                </Typography>
-              </Box>
+              {!isSmallMobile && (
+                <Box sx={{ mx: "auto" }}>
+                  <Typography
+                    variant="subtitle1"
+                    color="inherit"
+                    sx={{ fontWeight: "900" }}
+                    noWrap
+                  >
+                    {settings?.general?.show_date_and_time_on_navbar &&
+                      formatDate(currentTime)}
+                  </Typography>
+                </Box>
+              )}
+
+              {isSmallMobile && <Box sx={{ flexGrow: 1 }} />}
 
               {settings?.general?.show_light_night_toggle && <ThemeToggle />}
 
@@ -387,7 +424,50 @@ const Layout: React.FC = () => {
               </Box>
             </Toolbar>
           </AppBar>
-          <Drawer variant="permanent" open={open}>
+          {/* Mobile Drawer */}
+          <MuiDrawer
+            variant="temporary"
+            open={isMobile && open}
+            onClose={toggleDrawer}
+            ModalProps={{
+              keepMounted: true,
+            }}
+            sx={{
+              display: { xs: "block", md: "none" },
+              "& .MuiDrawer-paper": {
+                boxSizing: "border-box",
+                width: drawerWidth,
+              },
+            }}
+          >
+            <Toolbar
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                px: [1],
+              }}
+            >
+              <IconButton onClick={toggleDrawer}>
+                <ChevronLeftIcon />
+              </IconButton>
+            </Toolbar>
+            <Divider />
+            <List component="nav" onClick={handleListItemClick}>
+              <MainListItems />
+              <Divider sx={{ my: 1 }} />
+              <SecondaryListItems />
+            </List>
+          </MuiDrawer>
+
+          {/* Desktop Drawer */}
+          <Drawer
+            variant="permanent"
+            open={open}
+            sx={{
+              display: { xs: "none", md: "block" },
+            }}
+          >
             <Toolbar
               sx={{
                 display: "flex",

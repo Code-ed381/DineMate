@@ -17,7 +17,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import { useSettings } from "../../providers/settingsProvider";
 
 export const MainListItems: React.FC = () => {
-  const { selectedRestaurant, role }: any = useRestaurantStore();
+  const { role }: any = useRestaurantStore();
   const { setBreadcrumb }: any = useAppStore();
 
   return (
@@ -56,7 +56,7 @@ export const MainListItems: React.FC = () => {
 
 export const SecondaryListItems: React.FC = () => {
   const { setBreadcrumb }: any = useAppStore();
-  const { selectedRestaurant, role }: any = useRestaurantStore();
+  const { role }: any = useRestaurantStore();
   const { settings }: any = useSettings();
 
   const isOwnerOrAdmin = role === "owner" || role === "admin";

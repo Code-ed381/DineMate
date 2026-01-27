@@ -91,9 +91,7 @@ const useCashierStore = create<CashierState>()(
 
       subscribeToSessions: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant && ('restaurants' in selectedRestaurant 
-          ? selectedRestaurant.restaurants.id 
-          : (selectedRestaurant as any).id);
+        const restaurantId = selectedRestaurant?.id;
 
         if (!restaurantId) return;
 
@@ -143,9 +141,7 @@ const useCashierStore = create<CashierState>()(
 
       getActiveSessionByRestaurant: async () => {
         const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-        const selectedRestaurantId = selectedRestaurant && ('restaurants' in selectedRestaurant 
-          ? selectedRestaurant.restaurants.id 
-          : (selectedRestaurant as any).id);
+        const selectedRestaurantId = selectedRestaurant?.id;
 
         if (!selectedRestaurantId) {
           console.error("No restaurant selected");

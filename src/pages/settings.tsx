@@ -86,7 +86,7 @@ const Settings: React.FC = () => {
         <Tab label="Security" {...a11yProps(8)} />
       </Tabs>
       <TabPanel value={value} index={0}>
-        <RestaurantDetailsPanel restaurant={selectedRestaurant.restaurants} />
+        <RestaurantDetailsPanel restaurant={selectedRestaurant} />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <GeneralSettingsPanel />

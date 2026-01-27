@@ -57,8 +57,29 @@ const Profile: React.FC = () => {
     }
   };
 
-  if (loading || !editedProfile) {
-    return <Typography>Loading profile...</Typography>;
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+        <Typography>Loading profile...</Typography>
+      </Box>
+    );
+  }
+
+  if (!editedProfile) {
+    return (
+      <Box sx={{ p: 4, textAlign: "center" }}>
+        <Typography variant="h6" color="error">
+          Profile not found. Please ensure you are logged in correctly.
+        </Typography>
+        <Button 
+          variant="contained" 
+          sx={{ mt: 2 }} 
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
   }
 
   return (

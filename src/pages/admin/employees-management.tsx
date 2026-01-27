@@ -15,8 +15,6 @@ import AdminHeader from "../../components/admin-header";
 import DataTable from "../../components/data-table";
 
 import Swal from "sweetalert2";
-import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { supabase } from "../../lib/supabase";
 import useRestaurantStore from "../../lib/restaurantStore";
 import useEmployeesStore from "../../lib/employeesStore";
 import useAppStore from "../../lib/appstore";
@@ -41,7 +39,7 @@ interface EmployeeRow {
 const EmployeeManagement: React.FC = () => {
   const { employees, fetchEmployees, updateEmployeeDetailsAsAdmin } =
     useEmployeesStore();
-  const { selectedRestaurant, role: storeRole } = useRestaurantStore();
+  const { role: storeRole } = useRestaurantStore();
   const { uploadFile } = useAppStore();
   const { updateUserAvatarAsAdmin, updateUserDetailsAsAdmin } = useAuthStore();
   const { settings } = useSettings();

@@ -5,16 +5,6 @@ import { persist } from "zustand/middleware";
 import Swal from "sweetalert2";
 import { database_logs } from "./logActivities";
 import { Session, User } from "@supabase/supabase-js";
-import React from 'react';
-
-// Import components used in getStepContent
-// These will still be .js/.jsx for now, which is fine with allowJs: true
-// But we should try to type them as React components
-const PaymentForm = React.lazy(() => import("../pages/auth/components/PaymentForm"));
-const RestaurantForm = React.lazy(() => import("../pages/auth/components/RestaurantForm"));
-const Review = React.lazy(() => import("../pages/auth/components/Review"));
-const PersonalInformationForm = React.lazy(() => import("../pages/auth/components/PersonalInformationForm"));
-
 import useRestaurantStore from "./restaurantStore";
 
 export interface PersonalInfo {
@@ -51,6 +41,7 @@ export interface CardDetails {
   card_holder_name: string;
   card_expiry_date: string;
   card_cvv: string;
+  momo_number?: string;
 }
 
 export interface Subscription {
@@ -70,7 +61,7 @@ export interface AuthState {
   setMemberships: (memberships: any[]) => void;
   setCurrentMember: (member: any) => void;
   refreshSession: () => Promise<void>;
-  setAuth: (user: User | null, session: Session | null) => void;
+  setAuth: (data: { user: User | null; session: Session | null }) => void;
   clearAuth: () => void;
   personalInfo: PersonalInfo;
   restaurantInfo: RestaurantInfo;
@@ -112,7 +103,7 @@ export interface AuthState {
   updateConsent: (value: boolean) => void;
   updatePersonalInfo: (field: keyof PersonalInfo, value: string) => void;
   updateRestaurantInfo: (field: keyof RestaurantInfo, value: string) => void;
-  updateSubscription: (field: string, value: string, plans: any[]) => void;
+  updateSubscription: (field: string, value: any, plans?: any[]) => void;
   validatePersonalInfo: () => Record<string, string>;
   validateRestaurantInfo: () => Record<string, string>;
   validateSubscriptionInfo: () => Record<string, string>;
@@ -121,7 +112,6 @@ export interface AuthState {
   setActiveStep: (step: number) => void;
   handleNext: () => void;
   handleBack: () => void;
-  getStepContent: (step: number) => React.ReactNode;
   setUsername: (username: string) => void;
   setRole: (role: string) => void;
   setSelectedEmployee: (employee: any) => void;
@@ -163,7 +153,7 @@ const useAuthStore = create<AuthState>()(
           set({ user: null, session: null });
         }
       },
-      setAuth: (user, session) => set({ user, session }),
+      setAuth: (data) => set({ user: data.user, session: data.session }),
       clearAuth: () => set({ user: null, session: null }),
       personalInfo: {
         firstName: "",
@@ -366,7 +356,7 @@ const useAuthStore = create<AuthState>()(
           restaurantInfo: { ...state.restaurantInfo, [field]: value },
         })),
 
-      updateSubscription: (field, value, plans) => {
+      updateSubscription: (field, value, plans = []) => {
         set((state) => {
           if (value === "free") {
             return {
@@ -514,21 +504,6 @@ const useAuthStore = create<AuthState>()(
         set({ activeStep: activeStep - 1 });
       },
 
-      getStepContent: (step) => {
-        switch (step) {
-          case 0:
-            return <React.Suspense fallback={<div>Loading...</div>}><PersonalInformationForm /></React.Suspense>;
-          case 1:
-            return <React.Suspense fallback={<div>Loading...</div>}><RestaurantForm /></React.Suspense>;
-          case 2:
-            return <React.Suspense fallback={<div>Loading...</div>}><PaymentForm /></React.Suspense>;
-          case 3:
-            return <React.Suspense fallback={<div>Loading...</div>}><Review /></React.Suspense>;
-          default:
-            throw new Error("Unknown step");
-        }
-      },
-
       setUsername: (username) => set({ username }),
       setRole: (role) => set({ role }),
       setSelectedEmployee: (employee) => set({ selectedEmployee: employee, username: employee?.name || "" }),
@@ -588,7 +563,7 @@ const useAuthStore = create<AuthState>()(
 
         const { session, user } = data;
 
-        get().setAuth(user, session);
+        get().setAuth({ user, session });
 
         const { data: memberships } = await supabase
           .from("restaurant_members")
@@ -615,7 +590,7 @@ const useAuthStore = create<AuthState>()(
 
         if (error) throw error;
 
-        get().setAuth(data.user, data.session);
+        get().setAuth({ user: data.user, session: data.session });
         return data;
       },
 

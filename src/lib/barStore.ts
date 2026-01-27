@@ -8,13 +8,23 @@ import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface BarTask {
-  task_id: string;
+  kitchen_task_id: string; // Changed from task_id
   menu_item_name: string;
   task_number: number;
-  order_item_quantity: number;
-  task_status: string;
+  quantity: number; // Changed from order_item_quantity
+  order_item_status: string; // Changed from task_status
   order_item_id: string;
   order_id: string;
+  table_number: string;
+  waiter_id: string;
+  waiter_first_name?: string;
+  waiter_last_name?: string;
+  waiter_avatar?: string;
+  menu_item_preparation_time?: number;
+  task_created_at: string;
+  updated_at?: string;
+  completed_at?: string;
+  menu_item_image_url?: string;
 }
 
 interface CartItem {
@@ -42,17 +52,16 @@ interface BarState {
   orderItemsLoading: boolean;
   orderItems: BarTask[];
   pendingOrders: BarTask[];
-  pendingOrdersLoading: boolean;
   readyOrders: BarTask[];
-  readyOrdersLoading: boolean;
   servedOrders: BarTask[];
-  servedOrdersLoading: boolean;
   categories: Category[];
   selectedCategory: string;
   searchQuery: string;
   tabs: Tab[];
   activeTab: number;
   orderItemsChannel: RealtimeChannel | null;
+  dailyDrinkTasks: BarTask[];
+  loadingDailyTasks: boolean;
 
   setIsLoadingItems: (value: boolean) => void;
   setItems: (value: any[]) => void;
@@ -69,10 +78,11 @@ interface BarState {
   addToCart: (drink: any) => void;
   removeFromCart: (id: string) => void;
   handleFetchItems: () => Promise<void>;
-  handleFetchOrderItems: () => Promise<void>;
+  handleFetchOrderItems: (options?: { silent?: boolean }) => Promise<void>;
   handleFetchPendingOrders: () => Promise<void>;
   handleFetchReadyOrders: () => Promise<void>;
   handleFetchServedOrders: () => Promise<void>;
+  handleFetchDailyDrinkTasks: (options?: { silent?: boolean }) => Promise<void>;
   handleUpdateOrderItemStatus: (drink: BarTask) => Promise<void>;
 }
 
@@ -85,17 +95,16 @@ const useBarStore = create<BarState>()(
       orderItemsLoading: false,
       orderItems: [],
       pendingOrders: [],
-      pendingOrdersLoading: false,
       readyOrders: [],
-      readyOrdersLoading: false,
       servedOrders: [],
-      servedOrdersLoading: false,
       categories: [],
       selectedCategory: "all",
       searchQuery: "",
       tabs: [],
       activeTab: 0,
       orderItemsChannel: null,
+      dailyDrinkTasks: [],
+      loadingDailyTasks: false,
 
       setIsLoadingItems: (value) => set({ loadingItems: value }),
       setItems: (value) => set({ items: value }),
@@ -106,7 +115,7 @@ const useBarStore = create<BarState>()(
 
       subscribeToOrderItems: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
 
         if (!restaurantId) return;
 
@@ -119,9 +128,11 @@ const useBarStore = create<BarState>()(
             "postgres_changes",
             { event: "*", schema: "public", table: "kitchen_tasks" },
             () => {
+              get().handleFetchOrderItems({ silent: true }); // Refresh the main list
               get().handleFetchPendingOrders();
               get().handleFetchReadyOrders();
               get().handleFetchServedOrders();
+              get().handleFetchDailyDrinkTasks({ silent: true });
             }
           )
           .subscribe();
@@ -195,7 +206,7 @@ const useBarStore = create<BarState>()(
       handleFetchItems: async () => {
         set({ loadingItems: true });
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         try {
           const { data, error } = await supabase
             .from("menu_items_with_category")
@@ -216,20 +227,82 @@ const useBarStore = create<BarState>()(
         }
       },
 
-      handleFetchOrderItems: async () => {
-        set({ orderItemsLoading: true });
+      handleFetchOrderItems: async (options = {}) => {
+        if (!options.silent) set({ orderItemsLoading: true });
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
         try {
           const { data, error } = await supabase
             .from("kitchen_tasks_full")
             .select("*")
-            .eq("item_type", "drink")
-            .eq("restaurant_id", restaurantId)
-            .order("task_created_at", { ascending: false });
+            .ilike("item_type", "drink")
+            .eq("menu_item_restaurant_id", restaurantId)
+            .order("task_created_at", { ascending: true }); // Better for FIFO queue
 
           if (error) handleError(error);
-          set({ orderItems: (data as BarTask[]) || [], orderItemsLoading: false });
+          
+          const tasks = (data as BarTask[]) || [];
+          
+          // --- Waiter Resolution Logic ---
+          const tasksMissingWaiter = tasks.filter(t => !t.waiter_id && t.order_id);
+          const missingOrderIds = Array.from(new Set(tasksMissingWaiter.map(t => t.order_id)));
+          let resolvedWaitersByOrder: Record<string, string> = {};
+
+          if (missingOrderIds.length > 0) {
+              const { data: orders } = await supabase.from("orders").select("id, session_id").in("id", missingOrderIds);
+              const sessionIds = Array.from(new Set((orders || []).map((o: any) => o.session_id).filter(Boolean)));
+              if (sessionIds.length > 0) {
+                  const { data: sessions } = await supabase.from("table_sessions").select("id, waiter_id").in("id", sessionIds);
+                  const sessionWaiterMap: Record<string, string> = {};
+                  sessions?.forEach((s: any) => { if (s.waiter_id) sessionWaiterMap[s.id] = s.waiter_id; });
+                  orders?.forEach((o: any) => { if (sessionWaiterMap[o.session_id]) resolvedWaitersByOrder[o.id] = sessionWaiterMap[o.session_id]; });
+              }
+          }
+
+          const allWaiterIds = new Set<string>();
+          tasks.forEach(t => {
+              if (t.waiter_id) allWaiterIds.add(t.waiter_id);
+              else if (resolvedWaitersByOrder[t.order_id]) allWaiterIds.add(resolvedWaitersByOrder[t.order_id]);
+          });
+          
+          let waiterMap: Record<string, any> = {};
+          const uniqueWaiterIds = Array.from(allWaiterIds);
+          if (uniqueWaiterIds.length > 0) {
+            const { data: waiters } = await supabase.from("users").select("user_id, first_name, last_name, avatar_url").in("user_id", uniqueWaiterIds);
+            waiters?.forEach((w: any) => {
+               waiterMap[w.user_id] = { first_name: w.first_name, last_name: w.last_name, avatar: w.avatar_url };
+            });
+          }
+
+          const correctedTasks = tasks.map(task => {
+            const finalWaiterId = task.waiter_id || resolvedWaitersByOrder[task.order_id];
+            const waiter = waiterMap[finalWaiterId] || {};
+            return { 
+              ...task, 
+              waiter_id: finalWaiterId,
+              waiter_first_name: waiter.first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
+              waiter_last_name: waiter.last_name || "",
+              waiter_avatar: waiter.avatar
+            };
+          });
+
+          const taskCounts: Record<string, number> = {};
+          const tasksWithNumbers = correctedTasks.map(task => {
+            const id = task.order_item_id;
+            taskCounts[id] = (taskCounts[id] || 0) + 1;
+            return {
+              ...task,
+              task_number: taskCounts[id]
+            };
+          });
+
+          set({ 
+            orderItems: tasksWithNumbers, 
+            pendingOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'pending' || t.order_item_status?.toLowerCase() === 'preparing'),
+            readyOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'ready'),
+            servedOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'served'),
+            orderItemsLoading: false 
+          });
         } catch (error) {
           console.error("Error fetching order items:", error);
           set({ orderItemsLoading: false });
@@ -237,77 +310,51 @@ const useBarStore = create<BarState>()(
       },
 
       handleFetchPendingOrders: async () => {
-        set({ pendingOrdersLoading: true });
-        const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
-        try {
-          const { data, error } = await supabase
-            .from("kitchen_tasks_full")
-            .select("*")
-            .eq("item_type", "drink")
-            .eq("task_status", "pending")
-            .eq("restaurant_id", restaurantId)
-            .order("task_created_at", { ascending: false });
-
-          if (error) handleError(error);
-          set({ pendingOrders: (data as BarTask[]) || [], pendingOrdersLoading: false });
-        } catch (error) {
-          console.error("Error fetching pending orders:", error);
-          set({ pendingOrdersLoading: false });
-        }
+        get().handleFetchOrderItems();
       },
 
       handleFetchReadyOrders: async () => {
-        set({ readyOrdersLoading: true });
-        const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
-        try {
-          const { data, error } = await supabase
-            .from("kitchen_tasks_full")
-            .select("*")
-            .eq("task_status", "ready")
-            .eq("item_type", "drink")
-            .eq("restaurant_id", restaurantId)
-            .order("task_created_at", { ascending: false });
-
-          if (error) handleError(error);
-          set({ readyOrders: (data as BarTask[]) || [], readyOrdersLoading: false });
-        } catch (error) {
-          console.error("Error fetching ready orders:", error);
-          set({ readyOrdersLoading: false });
-        }
+        get().handleFetchOrderItems();
       },
 
       handleFetchServedOrders: async () => {
-        set({ servedOrdersLoading: true });
+        get().handleFetchOrderItems();
+      },
+
+      handleFetchDailyDrinkTasks: async (options = {}) => {
         const { selectedRestaurant } = useRestaurantStore.getState();
-        const restaurantId = selectedRestaurant?.restaurants?.id;
+        const restaurantId = selectedRestaurant?.id;
+        if (!restaurantId) return;
+
+        if (!options.silent) set({ loadingDailyTasks: true });
         try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
           const { data, error } = await supabase
             .from("kitchen_tasks_full")
             .select("*")
-            .eq("task_status", "served")
-            .eq("item_type", "drink")
-            .eq("restaurant_id", restaurantId)
-            .order("task_created_at", { ascending: false });
+            .ilike("item_type", "drink")
+            .eq("menu_item_restaurant_id", restaurantId)
+            .gte("task_created_at", today.toISOString());
 
-          if (error) handleError(error);
-          set({ servedOrders: (data as BarTask[]) || [], servedOrdersLoading: false });
+          if (error) throw error;
+          set({ dailyDrinkTasks: (data as BarTask[]) || [], loadingDailyTasks: false });
         } catch (error) {
-          console.error("Error fetching served orders:", error);
-          set({ servedOrdersLoading: false });
+          console.error("Error fetching daily drink tasks:", error);
+          set({ loadingDailyTasks: false });
         }
       },
 
       handleUpdateOrderItemStatus: async (drink) => {
         const { user } = useAuthStore.getState();
-        const userId = user?.user?.id;
+        const userId = user?.id;
 
-        if (drink.task_status === "pending") {
+        if (drink.order_item_status === "pending") {
           try {
             Swal.fire({
               title: `Start preparing "${drink.menu_item_name}"?`,
-              html: `Task ${drink.task_number} of ${drink.order_item_quantity}<br/>Automatically marking as preparing in <b>5</b>s...`,
+              html: `Task ${drink.task_number} of ${drink.quantity}<br/>Automatically marking as preparing in <b>5</b>s...`,
               icon: "warning",
               timer: 5000,
               timerProgressBar: true,
@@ -317,18 +364,18 @@ const useBarStore = create<BarState>()(
                   .from("kitchen_tasks")
                   .update({
                     status: "preparing",
-                    updated_at: new Date(),
+                    updated_at: new Date().toISOString(),
                     prepared_by: userId,
                   })
-                  .eq("id", drink.task_id);
+                  .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
-                get().handleFetchPendingOrders();
+                get().handleFetchOrderItems({ silent: true });
               }
             });
           } catch (error) {
             console.error("Error updating task status:", error);
           }
-        } else if (drink.task_status === "preparing") {
+        } else if (drink.order_item_status?.toLowerCase() === "preparing") {
           try {
             Swal.fire({
               title: `Mark "${drink?.menu_item_name}" as ready?`,
@@ -342,19 +389,18 @@ const useBarStore = create<BarState>()(
                   .from("kitchen_tasks")
                   .update({
                     status: "ready",
-                    updated_at: new Date(),
-                    completed_at: new Date(),
+                    updated_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString(),
                   })
-                  .eq("id", drink.task_id);
+                  .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
-                get().handleFetchPendingOrders();
-                get().handleFetchReadyOrders();
+                get().handleFetchOrderItems({ silent: true });
               }
             });
           } catch (error) {
             console.error("Error updating task status:", error);
           }
-        } else if (drink.task_status === "ready") {
+        } else if (drink.order_item_status?.toLowerCase() === "ready") {
           Swal.fire({
             title: "Mark as Served?",
             html: `Task ${drink.task_number}<br/>This drink will auto-update in <b>5</b> seconds.`,
@@ -366,11 +412,10 @@ const useBarStore = create<BarState>()(
               try {
                 const { error } = await supabase
                   .from("kitchen_tasks")
-                  .update({ status: "served", updated_at: new Date() })
-                  .eq("id", drink.task_id);
+                  .update({ status: "served", updated_at: new Date().toISOString() })
+                  .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
-                get().handleFetchReadyOrders();
-                get().handleFetchServedOrders();
+                get().handleFetchOrderItems({ silent: true });
               } catch (error) {
                 console.error("Error updating task status:", error);
               }

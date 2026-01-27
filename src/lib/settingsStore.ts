@@ -39,12 +39,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   updateSetting: async (key, value) => {
     const { selectedRestaurant } = useRestaurantStore.getState();
-    const restaurantId = selectedRestaurant?.restaurants?.id;
+    const restaurantId = selectedRestaurant?.id;
     if (!restaurantId) return;
 
     const { error } = await supabase.from("restaurant_settings").upsert(
       { restaurant_id: restaurantId, key, value },
-      { onConflict: ["restaurant_id", "key"] }
+      { onConflict: "restaurant_id, key" }
     );
 
     if (error) console.error(error);

@@ -58,7 +58,10 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
                 "0%, 100%": { boxShadow: overdue ? "0 4px 12px rgba(211,47,47,0.3)" : "0 4px 12px rgba(255,152,0,0.3)" },
                 "50%": { boxShadow: overdue ? "0 8px 24px rgba(211,47,47,0.6)" : "0 8px 24px rgba(255,152,0,0.6)" },
               },
-              display: "flex", alignItems: "center", cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              display: "flex", 
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { xs: "flex-start", sm: "center" },
+              cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               "&:hover": {
                  backgroundColor: overdue ? "#ffcdd2" : nearDeadline ? "#ffecb3" : "#f5f5f5",
                  transform: "translateY(-2px)", boxShadow: 4,
@@ -66,10 +69,19 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
             }}
             onClick={() => handleUpdateOrderItemStatus(dish)}
           >
-            <Avatar src={dish.menu_item_image_url} alt={dish.menu_item_name} variant="rounded" sx={{ width: 72, height: 72, mr: 2.5, borderRadius: 2, boxShadow: 2, border: "2px solid #fff" }}>
-              <RestaurantIcon sx={{ fontSize: 32, color: "#757575" }} />
-            </Avatar>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', width: { xs: '100%', sm: 'auto' }, alignItems: 'center', mb: { xs: 2, sm: 0 } }}>
+              <Avatar src={dish.menu_item_image_url} alt={dish.menu_item_name} variant="rounded" sx={{ width: 72, height: 72, mr: 2.5, borderRadius: 2, boxShadow: 2, border: "2px solid #fff" }}>
+                <RestaurantIcon sx={{ fontSize: 32, color: "#757575" }} />
+              </Avatar>
+              {/* Mobile text header if needed, or keep Avatar separate. 
+                  Actually, cleaner to keep Avatar + Content split. 
+                  Below styling assumes Avatar is on distinct row on mobile? No, maybe Avatar + Name row?
+                  Let's stick to simple stacking: Avatar block (maybe with name?) then details.
+                  Or just keep Avatar as block.
+               */}
+            </Box>
+            
+            <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#d84315", fontSize: "1.1rem", mb: 1 }}>{dish.menu_item_name}</Typography>
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
                 <Chip label={`Order #${dish.order_id}`} size="small" sx={{ bgcolor: "#e3f2fd", color: "#1976d2", fontWeight: 500 }} />
@@ -83,7 +95,7 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
               </Box>
             </Box>
             {dish?.order_item_status === "preparing" && (
-              <Box sx={{ width: 140, ml: 2, position: "relative" }}>
+              <Box sx={{ width: { xs: "100%", sm: 140 }, ml: { xs: 0, sm: 2 }, mt: { xs: 2, sm: 0 }, position: "relative" }}>
                 <LinearProgress variant="determinate" value={Math.min(progressValue(dish?.order_item_updated_at, prepTime), 100)} sx={{ height: 10, borderRadius: 5, backgroundColor: "#ffe0b2", "& .MuiLinearProgress-bar": { bgcolor: overdue ? "#c62828" : nearDeadline ? "#f57c00" : "#ff5722", borderRadius: 5 } }} />
                 <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: overdue ? "#c62828" : nearDeadline ? "#f57c00" : "#6d4c41", fontWeight: 600, textAlign: "center" }}>{Math.min(Math.floor(timeFromUpdate), prepTime)}/{prepTime} min</Typography>
               </Box>
