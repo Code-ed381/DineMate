@@ -14,12 +14,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ allSessions }) 
     { field: "opened_at", headerName: "Date", flex: 1.5, renderCell: (params) => new Date(params.value).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) },
     { field: "waiter", headerName: "Waiter", flex: 1.5, renderCell: (params) => `${params.row?.waiter_first_name ?? ""} ${params.row?.waiter_last_name ?? ""}`.trim() || "System" },
     { field: "order_total", headerName: "Amount", type: "number", flex: 1, align: "right", headerAlign: "right", renderCell: (params) => `£${Number(params.value || 0).toFixed(2)}` },
+    { field: "discount", headerName: "Disc.", type: "number", flex: 0.8, align: "right", headerAlign: "right", renderCell: (params) => params.value > 0 ? `${params.value}%` : "-" },
     {
       field: "payment_method", headerName: "Method", flex: 1, renderCell: (params) => {
         switch (params.value) {
           case "cash": return <Chip icon={<AttachMoney />} label="Cash" size="small" />;
           case "card": return <Chip icon={<CreditCard />} label="Card" size="small" />;
           case "momo": return <Chip icon={<Smartphone />} label="MoMo" size="small" />;
+          case "online": return <Chip label="Online" size="small" color="primary" variant="outlined" />;
+          case "card+cash": return <Chip label="Card+Cash" size="small" color="secondary" variant="outlined" />;
           default: return <Chip label="Not Paid" size="small" color="error" />;
         }
       }

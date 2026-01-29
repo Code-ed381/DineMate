@@ -21,6 +21,7 @@ import ResetPassword from "./pages/auth/resetPassword";
 import Onboarding from "./pages/auth/onboarding";
 import Tables from "./pages/tables";
 import Index from "./pages/index";
+import CashierDetailedReports from "./pages/cashier-detailed-reports";
 
 const App: React.FC = () => {
   return (
@@ -62,6 +63,7 @@ const App: React.FC = () => {
           <Route path="report" element={<Report />} />
           <Route path="kitchen" element={<Kitchen />} />
           <Route path="cashier" element={<Cashier />} />
+          <Route path="cashier-reports" element={<CashierDetailedReports />} />
           <Route path="bar" element={<Bar />} />
           <Route path="settings" element={<Settings />} />
         </Route>

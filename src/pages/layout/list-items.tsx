@@ -9,6 +9,7 @@ import TableRestaurantIcon from "@mui/icons-material/TableRestaurant";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import SoupKitchenIcon from "@mui/icons-material/SoupKitchen";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import useAppStore from "../../lib/appstore";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import useRestaurantStore from "../../lib/restaurantStore";
@@ -46,9 +47,14 @@ export const MainListItems: React.FC = () => {
           </Link>
       )}
       {role === "cashier" && (
+        <>
           <Link to="/app/cashier" style={{ textDecoration: "none", color: "inherit" }} onClick={() => setBreadcrumb("Cashier")}>
             <ListItemButton><ListItemIcon><PriceCheckIcon /></ListItemIcon><ListItemText primary="Cashier" /></ListItemButton>
           </Link>
+          <Link to="/app/cashier-reports" style={{ textDecoration: "none", color: "inherit" }} onClick={() => setBreadcrumb("Detailed Reports")}>
+            <ListItemButton><ListItemIcon><AssessmentIcon /></ListItemIcon><ListItemText primary="Audit Logs" /></ListItemButton>
+          </Link>
+        </>
       )}
     </React.Fragment>
   );
@@ -77,9 +83,14 @@ export const SecondaryListItems: React.FC = () => {
         </>
       )}
       {(role === "owner" || (role === "admin" && settings?.employee_permissions?.admins_view_report)) && (
+        <>
           <Link to="/app/report" style={{ textDecoration: "none", color: "inherit" }} onClick={() => setBreadcrumb("Reports")}>
             <ListItemButton><ListItemIcon><TrendingUpIcon /></ListItemIcon><ListItemText primary="Reports" /></ListItemButton>
           </Link>
+          <Link to="/app/cashier-reports" style={{ textDecoration: "none", color: "inherit" }} onClick={() => setBreadcrumb("Detailed Reports")}>
+            <ListItemButton><ListItemIcon><AssessmentIcon /></ListItemIcon><ListItemText primary="Audit Logs" /></ListItemButton>
+          </Link>
+        </>
       )}
       {isOwnerOrAdmin && (
           <Link to="/app/settings" style={{ textDecoration: "none", color: "inherit" }} onClick={() => setBreadcrumb("Settings")}>

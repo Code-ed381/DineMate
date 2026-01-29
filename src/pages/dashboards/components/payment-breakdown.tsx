@@ -20,12 +20,16 @@ const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessio
       if (t.payment_method === "cash") acc.Cash += amount;
       else if (t.payment_method === "card") acc.Card += amount;
       else if (t.payment_method === "momo") acc.MoMo += amount;
+      else if (t.payment_method === "online") acc.Online += amount;
+      else if (t.payment_method === "card+cash") acc.Split += amount;
       return acc;
-    }, { Cash: 0, Card: 0, MoMo: 0 });
+    }, { Cash: 0, Card: 0, MoMo: 0, Online: 0, Split: 0 });
     return [
       { name: "Cash", value: totals.Cash },
       { name: "Card", value: totals.Card },
       { name: "MoMo", value: totals.MoMo },
+      { name: "Online", value: totals.Online },
+      { name: "Split", value: totals.Split },
     ];
   }, [allSessions]);
 
