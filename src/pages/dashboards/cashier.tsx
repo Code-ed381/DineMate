@@ -21,20 +21,19 @@ interface Transaction {
 }
 
 interface CashierReportsProps {
-  initialTransactions?: Transaction[];
   salesData?: { day: string; sales: number }[];
 }
 
 const CashierReports: React.FC<CashierReportsProps> = () => {
   const {
       activeSeesionByRestaurantLoaded,
-      getActiveSessionByRestaurant,
+      fetchReportSessions,
       allSessions,
   } = useCashierStore();
 
   useEffect(() => {
-    getActiveSessionByRestaurant();
-  }, [getActiveSessionByRestaurant]);
+    fetchReportSessions();
+  }, [fetchReportSessions]);
 
   return (
     <>

@@ -16,9 +16,12 @@ import {
   IconButton,
   Badge,
   Avatar,
+  alpha,
+  Stepper,
+  Step,
+  StepLabel,
   Divider,
   useTheme,
-  alpha,
 } from "@mui/material";
 import {
   Close,
@@ -33,6 +36,8 @@ import {
 } from "@mui/icons-material";
 import useBarStore from "../lib/barStore";
 import BarTakeAwaySkeleton from "./skeletons/bar-takeaway-skeleton";
+import { printReceipt } from "./PrintWindow";
+import Swal from "sweetalert2";
 
 const OTCTabs: React.FC = () => {
   const theme = useTheme();
@@ -55,6 +60,15 @@ const OTCTabs: React.FC = () => {
     setActiveTab,
     activeTab,
     loadingItems,
+    activeStep,
+    setActiveStep,
+    cash,
+    setCash,
+    card,
+    setCard,
+    completeOTCPayment,
+    isProcessingPayment,
+    formatCashInput,
   } = useBarStore();
 
   useEffect(() => {
@@ -71,6 +85,44 @@ const OTCTabs: React.FC = () => {
 
   const activeCart = getActiveCart();
   const total = getTotal();
+
+  const handlePrintReceipt = async (isFinal: boolean = false) => {
+    const activeTabObj = tabs[activeTab];
+    if (!activeTabObj) return;
+
+    const cashValue = parseFloat(cash) || 0;
+    const cardValue = parseFloat(card) || 0;
+    const change = (cashValue + cardValue - total).toFixed(2);
+
+    printReceipt(
+      isFinal ? "OTC-" + Date.now().toString().slice(-6) : "PROFORMA",
+      "Bartender",
+      "OTC",
+      activeCart.reduce((sum, item) => sum + item.qty, 0),
+      total,
+      activeCart.map(item => ({ ...item, item_name: item.name, quantity: item.qty, unit_price: item.price })),
+      (cashValue + cardValue).toFixed(2),
+      cashValue.toFixed(2),
+      cardValue.toFixed(2),
+      change
+    );
+  };
+
+  const handleNext = async () => {
+    if (activeStep === 0) {
+      if (activeCart.length === 0) return;
+      setActiveStep(1);
+    } else {
+      const success = await completeOTCPayment();
+      if (success) {
+        handlePrintReceipt(true);
+      }
+    }
+  };
+
+  const handleBack = () => {
+    setActiveStep(0);
+  };
 
   const removeTab = (id: string) => {
     const newTabs = tabs.filter((tab: any) => tab.id !== id);
@@ -237,7 +289,7 @@ const OTCTabs: React.FC = () => {
                           </Box>
                           <CardContent sx={{ p: 1.5 }}>
                             <Typography variant="body2" noWrap fontWeight={600} sx={{ mb: 0.5 }}>{item.name}</Typography>
-                            <Typography variant="subtitle2" color="primary" fontWeight={800}>${item.price.toFixed(2)}</Typography>
+                            <Typography variant="subtitle2" color="primary" fontWeight={800}>£{formatCashInput(item.price)}</Typography>
                           </CardContent>
                         </CardActionArea>
                       </Card>
@@ -258,6 +310,14 @@ const OTCTabs: React.FC = () => {
             borderLeft: '1px solid', 
             borderColor: 'divider' 
           }}>
+            <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+              {["Items", "Pay"].map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
               <ShoppingCart color="primary" />
               <Typography variant="h6" fontWeight="800">Order Summary</Typography>
@@ -284,7 +344,7 @@ const OTCTabs: React.FC = () => {
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>{item.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">${item.price.toFixed(2)} each</Typography>
+                        <Typography variant="caption" color="text.secondary">£{formatCashInput(item.price)} each</Typography>
                       </Box>
                       <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                         <DeleteOutline fontSize="small" />
@@ -295,7 +355,7 @@ const OTCTabs: React.FC = () => {
                          <Typography variant="body2" color="text.secondary">Qty:</Typography>
                          <Typography variant="body2" fontWeight={800}>{item.qty}</Typography>
                       </Stack>
-                      <Typography fontWeight={800} color="primary">${(item.price * item.qty).toFixed(2)}</Typography>
+                       <Typography fontWeight={800} color="primary">£{formatCashInput(item.price * item.qty)}</Typography>
                     </Box>
                   </Paper>
                 ))}
@@ -313,35 +373,94 @@ const OTCTabs: React.FC = () => {
                 <Stack spacing={1}>
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">Subtotal</Typography>
-                      <Typography variant="body1" fontWeight={600}>${total.toFixed(2)}</Typography>
+                      <Typography variant="body1" fontWeight={600}>£{formatCashInput(total)}</Typography>
                    </Box>
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">Tax (0%)</Typography>
-                      <Typography variant="body1" fontWeight={600}>$0.00</Typography>
+                      <Typography variant="body1" fontWeight={600}>£0.00</Typography>
                    </Box>
                    <Divider sx={{ my: 1 }} />
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="h6" fontWeight={800}>Total</Typography>
-                      <Typography variant="h5" color="primary" fontWeight={900}>${total.toFixed(2)}</Typography>
+                      <Typography variant="h5" color="primary" fontWeight={900}>£{formatCashInput(total)}</Typography>
                    </Box>
                 </Stack>
               </Paper>
-              <Button 
-                variant="contained" 
-                fullWidth 
-                size="large" 
-                disabled={activeCart.length === 0}
-                endIcon={<KeyboardArrowRight />}
-                sx={{ 
-                  borderRadius: 3, 
-                  py: 1.5, 
-                  fontWeight: 800,
-                  fontSize: '1.1rem',
-                  boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.3)}`
-                }}
-              >
-                Proceed to Payment
-              </Button>
+              
+              {activeStep === 1 && (
+                <Stack spacing={2} sx={{ mb: 3 }}>
+                   <TextField 
+                    fullWidth 
+                    label="Cash Amount" 
+                    type="number" 
+                    value={cash} 
+                    onChange={(e) => setCash(e.target.value)}
+                    InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                  />
+                  <TextField 
+                    fullWidth 
+                    label="Card Amount" 
+                    type="number" 
+                    value={card} 
+                    onChange={(e) => setCard(e.target.value)}
+                    InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                  />
+                  {(parseFloat(cash) || 0) + (parseFloat(card) || 0) > total && (
+                    <Box sx={{ p: 1, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" fontWeight="bold">Change:</Typography>
+                      <Typography variant="body2" fontWeight="bold" color="success.main">
+                        £{((parseFloat(cash) || 0) + (parseFloat(card) || 0) - total).toFixed(2)}
+                      </Typography>
+                    </Box>
+                  )}
+                </Stack>
+              )}
+
+              <Stack direction="row" spacing={1}>
+                {activeStep === 1 && (
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    size="large" 
+                    onClick={handleBack}
+                    sx={{ borderRadius: 3, py: 1.5, fontWeight: 700 }}
+                  >
+                    Back
+                  </Button>
+                )}
+                <Button 
+                  variant="contained" 
+                  fullWidth 
+                  size="large" 
+                  disabled={activeCart.length === 0 || isProcessingPayment}
+                  onClick={handleNext}
+                  endIcon={activeStep === 0 ? <KeyboardArrowRight /> : undefined}
+                  sx={{ 
+                    borderRadius: 3, 
+                    py: 1.5, 
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                    boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.3)}`,
+                    bgcolor: activeStep === 1 ? 'success.main' : 'primary.main',
+                    '&:hover': {
+                      bgcolor: activeStep === 1 ? 'success.dark' : 'primary.dark',
+                    }
+                  }}
+                >
+                  {activeStep === 0 ? "Proceed to Payment" : "Confirm & Pay"}
+                </Button>
+              </Stack>
+              
+              {activeStep === 0 && activeCart.length > 0 && (
+                <Button 
+                  fullWidth 
+                  startIcon={<ReceiptIcon />} 
+                  onClick={() => handlePrintReceipt(false)}
+                  sx={{ mt: 1, color: 'text.secondary' }}
+                >
+                  Print Proforma
+                </Button>
+              )}
             </Box>
           </Grid>
         </Grid>

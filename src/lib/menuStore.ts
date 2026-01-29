@@ -396,6 +396,9 @@ const useMenuStore = create<MenuState>()(
           const total = (data || []).reduce((sum, item) => sum + (item.sum_price || 0), 0);
           set({ totalOrdersPrice: total });
 
+          // Synchronize the total to the database orders table
+          await supabase.from("orders").update({ total }).eq("id", id);
+
           return data || [];
         } catch (error) {
           console.error("Error fetching order items:", error);

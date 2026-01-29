@@ -62,6 +62,12 @@ interface BarState {
   orderItemsChannel: RealtimeChannel | null;
   dailyDrinkTasks: BarTask[];
   loadingDailyTasks: boolean;
+  dailyOTCDrinks: any[];
+  loadingDailyOTCDrinks: boolean;
+  activeStep: number;
+  cash: string;
+  card: string;
+  isProcessingPayment: boolean;
 
   setIsLoadingItems: (value: boolean) => void;
   setItems: (value: any[]) => void;
@@ -83,7 +89,13 @@ interface BarState {
   handleFetchReadyOrders: () => Promise<void>;
   handleFetchServedOrders: () => Promise<void>;
   handleFetchDailyDrinkTasks: (options?: { silent?: boolean }) => Promise<void>;
+  handleFetchDailyOTCDrinks: (options?: { silent?: boolean }) => Promise<void>;
   handleUpdateOrderItemStatus: (drink: BarTask) => Promise<void>;
+  setActiveStep: (step: number) => void;
+  setCash: (value: string) => void;
+  setCard: (value: string) => void;
+  formatCashInput: (amount: string | number) => string;
+  completeOTCPayment: () => Promise<boolean>;
 }
 
 const useBarStore = create<BarState>()(
@@ -105,6 +117,12 @@ const useBarStore = create<BarState>()(
       orderItemsChannel: null,
       dailyDrinkTasks: [],
       loadingDailyTasks: false,
+      dailyOTCDrinks: [],
+      loadingDailyOTCDrinks: false,
+      activeStep: 0,
+      cash: "",
+      card: "",
+      isProcessingPayment: false,
 
       setIsLoadingItems: (value) => set({ loadingItems: value }),
       setItems: (value) => set({ items: value }),
@@ -112,6 +130,117 @@ const useBarStore = create<BarState>()(
       setSelectedCategory: (value) => set({ selectedCategory: value }),
       setSearchQuery: (value) => set({ searchQuery: value }),
       setActiveTab: (index) => set({ activeTab: index }),
+      setActiveStep: (step) => set({ activeStep: step }),
+      setCash: (value) => set({ cash: value }),
+      setCard: (value) => set({ card: value }),
+
+      formatCashInput: (amount) => {
+        const numericValue = String(amount).replace(/[^0-9.]/g, "");
+        if (numericValue === "") return "";
+        const formattedValue = parseFloat(numericValue).toFixed(2);
+        return formattedValue;
+      },
+
+      completeOTCPayment: async () => {
+        const { tabs, activeTab, cash, card, getTotal } = get();
+        const activeTabObj = tabs[activeTab];
+        if (!activeTabObj || activeTabObj.cart.length === 0) return false;
+
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const { user } = useAuthStore.getState();
+        const restaurantId = selectedRestaurant?.id;
+        const userId = user?.id;
+
+        if (!restaurantId || !userId) {
+          Swal.fire("Error", "Missing restaurant or user information", "error");
+          return false;
+        }
+
+        const total = getTotal();
+        const cashValue = parseFloat(cash) || 0;
+        const cardValue = parseFloat(card) || 0;
+
+        if (cashValue + cardValue < total) {
+          Swal.fire("Error", "Insufficient payment amount", "error");
+          return false;
+        }
+
+        set({ isProcessingPayment: true });
+
+        try {
+          // 1. Create a "walk-in" session if no table exists
+          // For now, we'll try to insert without table_id if allowed, or we might need a dummy table
+          const { data: session, error: sessionError } = await supabase
+            .from("table_sessions")
+            .insert({
+              restaurant_id: restaurantId,
+              waiter_id: userId,
+              status: "close",
+              closed_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (sessionError) throw sessionError;
+
+          // 2. Create Order
+          const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .insert({
+              session_id: session.id,
+              restaurant_id: restaurantId,
+              total: total,
+              status: "served",
+            })
+            .select()
+            .single();
+
+          if (orderError) throw orderError;
+
+          // 3. Create Order Items
+          const orderItemsData = activeTabObj.cart.map((item) => ({
+            order_id: order.id,
+            menu_item_id: item.id,
+            quantity: item.qty,
+            unit_price: item.price,
+            sum_price: item.price * item.qty,
+            status: "served",
+            type: "drink",
+            prepared_by: userId,  
+            completed_at: new Date().toISOString(), 
+            
+          }));
+
+          const { error: itemsError } = await supabase
+            .from("order_items")
+            .insert(orderItemsData);
+
+          if (itemsError) throw itemsError;
+
+          // 4. Success - Clear the tab and reset state
+          Swal.fire({
+            title: "Payment Successful",
+            text: "Order has been processed and completed.",
+            icon: "success",
+          });
+
+          set((state) => ({
+            tabs: state.tabs.filter((_, idx) => idx !== activeTab),
+            activeTab: 0,
+            activeStep: 0,
+            cash: "",
+            card: "",
+          }));
+
+          return true;
+        } catch (error: any) {
+          console.error("Payment error:", error);
+          Swal.fire("Error", error.message || "Failed to process payment", "error");
+          return false;
+        } finally {
+          set({ isProcessingPayment: false });
+        }
+      },
 
       subscribeToOrderItems: () => {
         const { selectedRestaurant } = useRestaurantStore.getState();
@@ -346,6 +475,33 @@ const useBarStore = create<BarState>()(
         }
       },
 
+      handleFetchDailyOTCDrinks: async (options = {}) => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.id;
+        if (!restaurantId) return;
+
+        if (!options.silent) set({ loadingDailyOTCDrinks: true });
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Fetch order items that are direct OTC (session has no table)
+          const { data, error } = await supabase
+            .from("order_items_full")
+            .select("*")
+            .eq("restaurant_id", restaurantId)
+            .eq("item_type", "drink")
+            .is("table_id", null) 
+            .gte("created_at", today.toISOString());
+
+          if (error) throw error;
+          set({ dailyOTCDrinks: data || [], loadingDailyOTCDrinks: false });
+        } catch (error) {
+          console.error("Error fetching daily OTC drinks:", error);
+          set({ loadingDailyOTCDrinks: false });
+        }
+      },
+
       handleUpdateOrderItemStatus: async (drink) => {
         const { user } = useAuthStore.getState();
         const userId = user?.id;
@@ -432,6 +588,9 @@ const useBarStore = create<BarState>()(
         barOptionSelected: state.barOptionSelected,
         selectedCategory: state.selectedCategory,
         searchQuery: state.searchQuery,
+        activeStep: state.activeStep,
+        cash: state.cash,
+        card: state.card,
       }),
     }
   )

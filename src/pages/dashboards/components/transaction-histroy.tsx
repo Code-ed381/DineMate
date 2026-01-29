@@ -9,11 +9,11 @@ interface TransactionHistoryProps {
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ allSessions }) => {
   const columns: GridColDef[] = [
-    { field: "order_id", headerName: "Order ID", flex: 1, renderCell: (params) => `ORD-${params.value}` },
-    { field: "table_number", headerName: "Table Number", flex: 1 },
+    { field: "order_id", headerName: "Order ID", flex: 1, renderCell: (params) => `ORD-${params.value?.toString().slice(0, 8)}` },
+    { field: "table_number", headerName: "Table", flex: 1 },
     { field: "opened_at", headerName: "Date", flex: 1.5, renderCell: (params) => new Date(params.value).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) },
-    { field: "waiter", headerName: "Waiter", flex: 1.5, renderCell: (params) => `${params.row?.waiter_first_name ?? ""} ${params.row?.waiter_last_name ?? ""}` },
-    { field: "order_total", headerName: "Amount", type: "number", flex: 1, align: "right", headerAlign: "right", renderCell: (params) => `$${Number(params.value || 0).toFixed(2)}` },
+    { field: "waiter", headerName: "Waiter", flex: 1.5, renderCell: (params) => `${params.row?.waiter_first_name ?? ""} ${params.row?.waiter_last_name ?? ""}`.trim() || "System" },
+    { field: "order_total", headerName: "Amount", type: "number", flex: 1, align: "right", headerAlign: "right", renderCell: (params) => `£${Number(params.value || 0).toFixed(2)}` },
     {
       field: "payment_method", headerName: "Method", flex: 1, renderCell: (params) => {
         switch (params.value) {

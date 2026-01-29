@@ -20,8 +20,10 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ allSessions }) => {
       daysMap[key] = { day: formatDay(d), sales: 0 };
     }
     allSessions.forEach((s) => {
-      const key = new Date(s.opened_at).toISOString().split("T")[0];
-      if (daysMap[key]) daysMap[key].sales += Number(s.order_total) || 0;
+      const dateVal = s.opened_at || s.session_created_at || s.created_at;
+      if (!dateVal) return;
+      const key = new Date(dateVal).toISOString().split("T")[0];
+      if (daysMap[key]) daysMap[key].sales += Number(s.order_total || s.total || 0);
     });
     return Object.values(daysMap);
   }, [allSessions]);
@@ -33,8 +35,8 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ allSessions }) => {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={salesData}>
             <XAxis dataKey="day" />
-            <YAxis />
-            <RTooltip />
+            <YAxis tickFormatter={(value) => `£${value}`} />
+            <RTooltip formatter={(value: number) => [`£${value.toFixed(2)}`, "Sales"]} />
             <Line type="monotone" dataKey="sales" stroke="#1976d2" strokeWidth={3} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>

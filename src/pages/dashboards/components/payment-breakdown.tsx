@@ -12,10 +12,14 @@ const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessio
   const paymentBreakdown = useMemo(() => {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const totals = allSessions.filter((t) => new Date(t.opened_at) >= twentyFourHoursAgo).reduce((acc, t) => {
-      if (t.payment_method === "cash") acc.Cash += Number(t.order_total) || 0;
-      else if (t.payment_method === "card") acc.Card += Number(t.order_total) || 0;
-      else if (t.payment_method === "momo") acc.MoMo += Number(t.order_total) || 0;
+    const totals = allSessions.filter((t) => {
+      const dateVal = t.opened_at || t.session_created_at || t.created_at;
+      return dateVal && new Date(dateVal) >= twentyFourHoursAgo;
+    }).reduce((acc, t) => {
+      const amount = Number(t.order_total || t.total || 0);
+      if (t.payment_method === "cash") acc.Cash += amount;
+      else if (t.payment_method === "card") acc.Card += amount;
+      else if (t.payment_method === "momo") acc.MoMo += amount;
       return acc;
     }, { Cash: 0, Card: 0, MoMo: 0 });
     return [
@@ -35,7 +39,7 @@ const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessio
               {paymentBreakdown.map((_, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
             </Pie>
             <Legend />
-            <RTooltip />
+            <RTooltip formatter={(value: number) => `£${value.toFixed(2)}`} />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

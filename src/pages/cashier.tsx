@@ -24,6 +24,11 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Stack,
+  InputAdornment,
+  CircularProgress,
+  LinearProgress,
+  ListItemText,
+  alpha,
 } from "@mui/material";
 import Swal from "sweetalert2";
 import {
@@ -46,6 +51,7 @@ import MoneyTwoToneIcon from "@mui/icons-material/MoneyTwoTone";
 import PriceCheckTwoToneIcon from "@mui/icons-material/PriceCheckTwoTone";
 import SecurityUpdateGoodTwoToneIcon from "@mui/icons-material/SecurityUpdateGoodTwoTone";
 import useCashierStore from "../lib/cashierStore";
+import { printReceipt } from "../components/PrintWindow";
 import {
   formatDateTime,
   formatDateTimeWithSuffix,
@@ -67,8 +73,12 @@ const CashierDashboard: React.FC = () => {
     setPaymentMethod,
     setSelectedSession,
     selectedSession,
+    selectedOrderItems,
+    loadingOrderItems,
+    isProcessingPayment,
     processPayment,
     handlePrintBill,
+    formatCashInput,
     closedSessions,
     allSessions,
     setSelected,
@@ -79,15 +89,40 @@ const CashierDashboard: React.FC = () => {
     unsubscribeFromSessions,
   } = useCashierStore();
 
-  const handlePrintBillClicked = async () => {
-    await handlePrintBill();
-    Swal.fire({
-      icon: "success",
-      title: "Success",
-      text: "Bill printed successfully",
-      showConfirmButton: false,
-      timer: 1500,
-    });
+  const handlePrintReceipt = async (isFinal: boolean = false) => {
+    if (!selectedSession) return;
+
+    const cashValue = parseFloat(cashAmount) || 0;
+    const cardValue = parseFloat(cardAmount) || 0;
+    const calculatedTotal = selectedOrderItems.length > 0 
+      ? selectedOrderItems.reduce((acc, item) => acc + (parseFloat(item.sum_price) || 0), 0)
+      : (selectedSession.order_total || selectedSession.total || 0);
+
+    const change = (cashValue + cardValue - calculatedTotal).toFixed(2);
+
+    printReceipt(
+      isFinal ? "ORD-" + selectedSession.order_id : "PROFORMA",
+      "Cashier",
+      selectedSession.table_number || "OTC",
+      selectedOrderItems.reduce((sum, item) => sum + (item.quantity || 1), 0),
+      calculatedTotal,
+      selectedOrderItems.map(item => ({ ...item, item_name: item.item_name, quantity: item.quantity, unit_price: item.unit_price })),
+      (cashValue + cardValue).toFixed(2),
+      cashValue.toFixed(2),
+      cardValue.toFixed(2),
+      change
+    );
+
+    if (!isFinal) {
+      await handlePrintBill();
+      Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Bill printed successfully",
+        showConfirmButton: false,
+        timer: 1500,
+      });
+    }
   };
 
   const [discount, setDiscount] = useState("0");
@@ -147,30 +182,20 @@ const CashierDashboard: React.FC = () => {
           return;
         } else if (cashAmountNum >= selectedSession.order_total) {
           Swal.fire({
-            title: `Total Amount: ${selectedSession.order_total.toFixed(2)}`,
-            html: '<div id="swal-content"></div>',
-            icon: "warning",
+            title: "Confirm Payment",
+            html: `
+              <div style="text-align: left; padding: 10px;">
+                <p><b>Total Due:</b> £${formatCashInput(selectedSession.order_total)}</p>
+                <p><b>Cash Paid:</b> £${formatCashInput(cashAmountNum)}</p>
+                <hr/>
+                <p style="font-size: 1.2rem; color: green;"><b>Change:</b> £${(cashAmountNum - selectedSession.order_total).toFixed(2)}</p>
+              </div>
+            `,
+            icon: "question",
             showCancelButton: true,
-            confirmButtonColor: "#3085d6",
-            cancelButtonColor: "#d33",
-            confirmButtonText: "Yes, confirm",
-            didOpen: () => {
-              const rootElement = document.getElementById("swal-content");
-              if (rootElement) {
-                const root = (require("react-dom/client") as any).createRoot(rootElement);
-                root.render(
-                  <Box>
-                    <Typography variant="h6" color="text.secondary">
-                      Cash Paid: {cashAmountNum.toFixed(2)}
-                    </Typography>
-                    <Typography variant="h6" color="text.secondary">
-                      Change:{" "}
-                      {(cashAmountNum - selectedSession.order_total).toFixed(2)}
-                    </Typography>
-                  </Box>
-                );
-              }
-            },
+            confirmButtonColor: theme.palette.success.main,
+            cancelButtonColor: theme.palette.error.main,
+            confirmButtonText: "Confirm & Print Receipt",
           }).then(async (result) => {
             if (result.isConfirmed) {
               await processPayment(
@@ -178,13 +203,7 @@ const CashierDashboard: React.FC = () => {
                 selectedSession.order_id,
                 selectedSession.table_id
               );
-              Swal.fire({
-                icon: "success",
-                title: "Success",
-                text: "Payment made successfully",
-                showConfirmButton: false,
-                timer: 1500,
-              });
+              handlePrintReceipt(true);
               setProceedToPayment(false);
             }
           });
@@ -212,10 +231,11 @@ const CashierDashboard: React.FC = () => {
   const sessionStats = useMemo(() => {
     return allSessions.reduce(
       (acc: any, session: any) => {
-        acc.total += session.order_total || 0;
+        const amount = parseFloat(session.order_total || session.total || 0);
+        acc.total += amount;
         if (session.payment_method) {
           acc[session.payment_method] =
-            (acc[session.payment_method] || 0) + (session.order_total || 0);
+            (acc[session.payment_method] || 0) + amount;
         }
         return acc;
       },
@@ -229,38 +249,38 @@ const CashierDashboard: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center" }}>
-            <Avatar sx={{ bgcolor: "primary.main", mr: 2 }}><PriceCheckTwoToneIcon /></Avatar>
+          <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: "primary.main", mr: 2 }}><PriceCheckTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h6">{sessionStats.total.toFixed(2)}</Typography>
-              <Typography variant="body2" color="text.secondary">Total</Typography>
+              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.total)}</Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>Total Sales</Typography>
             </Box>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center" }}>
-            <Avatar sx={{ bgcolor: "success.main", mr: 2 }}><MoneyTwoToneIcon /></Avatar>
+          <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: "success.main", mr: 2 }}><MoneyTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h6">{sessionStats.cash.toFixed(2)}</Typography>
-              <Typography variant="body2" color="text.secondary">Cash</Typography>
+              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.cash)}</Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>Cash Revenue</Typography>
             </Box>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center" }}>
-            <Avatar sx={{ bgcolor: "error.main", mr: 2 }}><CreditCardTwoToneIcon /></Avatar>
+          <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), color: "error.main", mr: 2 }}><CreditCardTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h6">{sessionStats.card.toFixed(2)}</Typography>
-              <Typography variant="body2" color="text.secondary">Card</Typography>
+              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.card)}</Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>Card Revenue</Typography>
             </Box>
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center" }}>
-            <Avatar sx={{ bgcolor: "warning.main", mr: 2 }}><SecurityUpdateGoodTwoToneIcon /></Avatar>
+          <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: "warning.main", mr: 2 }}><SecurityUpdateGoodTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h6">{sessionStats.momo.toFixed(2)}</Typography>
-              <Typography variant="body2" color="text.secondary">Momo</Typography>
+              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.momo)}</Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>MoMo Revenue</Typography>
             </Box>
           </Paper>
         </Grid>
@@ -311,8 +331,12 @@ const CashierDashboard: React.FC = () => {
                         <Chip label={session.session_status} color="warning" size="small" />
                       </Stack>
                       <Stack direction="row" spacing={2} mb={1}>
-                        <Box display="flex" alignItems="center" gap={0.5}><AttachMoney fontSize="small" />{session.order_total}</Box>
-                        <Box display="flex" alignItems="center" gap={0.5}><TableRestaurant fontSize="small" />T-{session.table_number}</Box>
+                        <Box display="flex" alignItems="center" gap={0.5} color="primary.main" fontWeight={700}>
+                          <AttachMoney fontSize="small" />£{formatCashInput(session.order_total || session.total)}
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={0.5} sx={{ opacity: 0.7 }}>
+                          <TableRestaurant fontSize="small" />T-{session.table_number || "OTC"}
+                        </Box>
                       </Stack>
                     </ListItem>
                   ))}
@@ -340,10 +364,12 @@ const CashierDashboard: React.FC = () => {
                     <TableBody>
                       {closedSessions.map((session: any) => (
                         <TableRow key={session.id}>
-                          <TableCell>{session.table_number}</TableCell>
+                          <TableCell>T-{session.table_number || "OTC"}</TableCell>
                           <TableCell>ORD-{session.order_id}</TableCell>
-                          <TableCell>{session.order_total}</TableCell>
-                          <TableCell>{session.payment_method}</TableCell>
+                          <TableCell>£{formatCashInput(session.order_total || session.total)}</TableCell>
+                          <TableCell>
+                            <Chip label={session.payment_method} size="small" variant="outlined" />
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -362,32 +388,106 @@ const CashierDashboard: React.FC = () => {
               </Typography>
               {selectedSession ? (
                 <Box>
-                   <Typography fontWeight="bold" sx={{ mb: 2 }}>ORD-{selectedSession.order_id}</Typography>
-                   {/* Items Table omitted for brevity but should be there in full impl */}
+                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                     <Typography fontWeight="bold">ORD-{selectedSession.order_id}</Typography>
+                     <Chip label={selectedSession.table_number ? `Table ${selectedSession.table_number}` : 'Takeaway'} color="info" variant="outlined" size="small" />
+                   </Stack>
+                   
+                   <Box sx={{ minHeight: 150, maxHeight: 300, overflowY: 'auto', mb: 2, bgcolor: alpha(theme.palette.background.default, 0.5), borderRadius: 2, p: 1 }}>
+                     {loadingOrderItems ? (
+                       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+                     ) : (
+                       <List disablePadding>
+                         {selectedOrderItems.map((item: any, i: number) => (
+                           <ListItem key={i} sx={{ px: 1, py: 0.5 }}>
+                             <Avatar 
+                               variant="rounded" 
+                               src={item.image_url || "/placeholder-item.png"} 
+                               sx={{ width: 40, height: 40, mr: 2, bgcolor: 'action.hover' }}
+                             >
+                               <Restaurant fontSize="small" />
+                             </Avatar>
+                             <ListItemText 
+                               primary={<Typography variant="body2" fontWeight={600}>{item.item_name}</Typography>}
+                               secondary={`${item.quantity} x £${formatCashInput(item.unit_price)}`}
+                             />
+                             <Typography variant="body2" fontWeight={700}>£{formatCashInput(item.sum_price)}</Typography>
+                           </ListItem>
+                         ))}
+                       </List>
+                     )}
+                   </Box>
+
                    <Divider sx={{ my: 2 }} />
                    <Stack spacing={1}>
-                      <Box display="flex" justifyContent="space-between"><span>Total</span><span>${selectedSession.order_total}</span></Box>
+                      <Box display="flex" justifyContent="space-between">
+                        <Typography variant="h6" fontWeight={800}>Total Due</Typography>
+                        <Typography variant="h6" color="primary" fontWeight={900}>
+                          £{formatCashInput(
+                            selectedOrderItems.length > 0 
+                              ? selectedOrderItems.reduce((acc, item) => acc + (parseFloat(item.sum_price) || 0), 0)
+                              : (selectedSession.order_total || selectedSession.total || 0)
+                          )}
+                        </Typography>
+                      </Box>
                    </Stack>
+                   
                    <Divider sx={{ my: 2 }} />
-                   {proceedToPayment && (
-                     <ToggleButtonGroup
-                        value={paymentMethod}
-                        exclusive
-                        fullWidth
-                        onChange={(_e, val) => val && setPaymentMethod(val)}
+                   
+                   {proceedToPayment ? (
+                     <Box>
+                       <TextField 
+                        fullWidth 
+                        label="Cash Amount" 
+                        type="number" 
+                        value={cashAmount} 
+                        onChange={handleCashChange}
                         sx={{ mb: 2 }}
-                     >
-                        <ToggleButton value="cash">Cash</ToggleButton>
-                        <ToggleButton value="card">Card</ToggleButton>
-                        <ToggleButton value="momo">MoMo</ToggleButton>
-                     </ToggleButtonGroup>
+                        InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                      />
+                       <ToggleButtonGroup
+                          value={paymentMethod}
+                          exclusive
+                          fullWidth
+                          onChange={(_e, val) => val && setPaymentMethod(val)}
+                          sx={{ mb: 2 }}
+                       >
+                          <ToggleButton value="cash">Cash</ToggleButton>
+                          <ToggleButton value="card">Card</ToggleButton>
+                          <ToggleButton value="momo">MoMo</ToggleButton>
+                       </ToggleButtonGroup>
+                     </Box>
+                   ) : (
+                     <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <Paper variant="outlined" sx={{ flex: 1, p: 1, textAlign: 'center', borderRadius: 2 }}>
+                          <Typography variant="caption" color="text.secondary">Quantity</Typography>
+                          <Typography variant="body1" fontWeight={700}>{selectedOrderItems.reduce((acc, i) => acc + (i.quantity || 1), 0)}</Typography>
+                        </Paper>
+                        <Paper variant="outlined" sx={{ flex: 1, p: 1, textAlign: 'center', borderRadius: 2 }}>
+                          <Typography variant="caption" color="text.secondary">Tax</Typography>
+                          <Typography variant="body1" fontWeight={700}>£0.00</Typography>
+                        </Paper>
+                     </Box>
                    )}
+
                    <Stack direction="row" spacing={2} mt={2}>
-                      <Button fullWidth variant="outlined" startIcon={<ReceiptLong />} onClick={handlePrintBillClicked}>Print Bill</Button>
-                      <Button fullWidth variant="contained" color="success" onClick={handleProceedToPayment}>
-                        {proceedToPayment ? "Pay" : "Proceed"}
+                      {!proceedToPayment && (
+                        <Button fullWidth variant="outlined" startIcon={<ReceiptLong />} onClick={() => handlePrintReceipt(false)}>Bill</Button>
+                      )}
+                      <Button 
+                        fullWidth 
+                        variant="contained" 
+                        color={proceedToPayment ? "success" : "primary"}
+                        onClick={handleProceedToPayment}
+                        disabled={isProcessingPayment}
+                        startIcon={isProcessingPayment ? <CircularProgress size={20} color="inherit" /> : null}
+                      >
+                        {proceedToPayment ? "Confirm Pay" : "Proceed to Pay"}
                       </Button>
                    </Stack>
+                   {proceedToPayment && (
+                     <Button fullWidth onClick={() => setProceedToPayment(false)} sx={{ mt: 1 }}>Back to Summary</Button>
+                   )}
                 </Box>
               ) : (
                 <Typography>Select an order to process</Typography>

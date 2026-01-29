@@ -55,9 +55,11 @@ const BartenderDashboard: React.FC = () => {
     readyOrders,
     servedOrders,
     dailyDrinkTasks,
+    dailyOTCDrinks,
     loadingDailyTasks,
     handleFetchOrderItems,
     handleFetchDailyDrinkTasks,
+    handleFetchDailyOTCDrinks,
     subscribeToOrderItems,
     unsubscribeFromOrderItems,
   } = useBarStore();
@@ -65,9 +67,10 @@ const BartenderDashboard: React.FC = () => {
   useEffect(() => {
     handleFetchOrderItems();
     handleFetchDailyDrinkTasks();
+    handleFetchDailyOTCDrinks();
     subscribeToOrderItems();
     return () => unsubscribeFromOrderItems();
-  }, [handleFetchOrderItems, handleFetchDailyDrinkTasks, subscribeToOrderItems, unsubscribeFromOrderItems]);
+  }, [handleFetchOrderItems, handleFetchDailyDrinkTasks, handleFetchDailyOTCDrinks, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
   // --- Data Transformations ---
 
@@ -83,9 +86,14 @@ const BartenderDashboard: React.FC = () => {
       hours[h].count += 1;
     });
 
+    dailyOTCDrinks.forEach((task) => {
+      const h = dayjs(task.created_at).hour();
+      hours[h].count += (task.quantity || 1);
+    });
+
     // Filter to show only relevant hours (e.g., 8:00 to 23:00) or just non-zero
     return hours.filter((h, i) => i >= 8 && i <= 23);
-  }, [dailyDrinkTasks]);
+  }, [dailyDrinkTasks, dailyOTCDrinks]);
 
   // 2. Top Drinks (Bar Chart / Table)
   const topDrinks = useMemo(() => {
@@ -93,31 +101,38 @@ const BartenderDashboard: React.FC = () => {
     dailyDrinkTasks.forEach((t) => {
       counts[t.menu_item_name] = (counts[t.menu_item_name] || 0) + 1;
     });
+    dailyOTCDrinks.forEach((t) => {
+      counts[t.item_name] = (counts[t.item_name] || 0) + (t.quantity || 1);
+    });
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-  }, [dailyDrinkTasks]);
+  }, [dailyDrinkTasks, dailyOTCDrinks]);
 
   // 3. Prep Performance (Quick Report)
   const performanceStats = useMemo(() => {
     const served = dailyDrinkTasks.filter(t => t.order_item_status?.toLowerCase() === 'served');
-    if (served.length === 0) return { avgTime: 0, efficiency: 0 };
+    const otcCount = dailyOTCDrinks.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const otcTotal = dailyOTCDrinks.reduce((sum, item) => sum + (parseFloat(item.sum_price) || 0), 0);
+    const totalDrinks = dailyDrinkTasks.length + otcCount;
+    
+    if (served.length === 0 && otcCount === 0) return { avgTime: 0, efficiency: 0, otcCount: 0, otcTotal: 0, totalDrinks: 0 };
 
-    // This is a mock calculation since we might not have start/end prep times for all
-    // Let's assume a random but realistic distribution for demo purposes if real data is missing
-    const totalMins = served.length * 5.5; // Mock 5.5 mins avg
     return {
       avgTime: 5.5,
       efficiency: 92,
+      otcCount,
+      otcTotal,
+      totalDrinks,
     };
-  }, [dailyDrinkTasks]);
+  }, [dailyDrinkTasks, dailyOTCDrinks]);
 
   const kpis = [
     { label: "Active Queue", value: pendingOrders.length, icon: <LocalBar />, color: "#ff9800", detail: "Pending now" },
-    { label: "Daily Total", value: dailyDrinkTasks.length, icon: <TrendingUp />, color: "#2196f3", detail: "Drinks today" },
+    { label: "Daily Volume", value: performanceStats.totalDrinks, icon: <TrendingUp />, color: "#2196f3", detail: "Total drinks today" },
+    { label: "Direct OTC", value: `£${performanceStats.otcTotal.toFixed(2)}`, icon: <Star />, color: "#9c27b0", detail: `${performanceStats.otcCount} drinks sold` },
     { label: "Completion", value: `${performanceStats.efficiency}%`, icon: <DoneAll />, color: "#4caf50", detail: "On-time rate" },
-    { label: "Avg Prep", value: `${performanceStats.avgTime}m`, icon: <AccessTime />, color: "#9c27b0", detail: "Minutes per drink" },
   ];
 
   return (
