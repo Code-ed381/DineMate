@@ -1,19 +1,20 @@
 import { PaletteOptions } from "@mui/material";
 
 export const lightPalette: PaletteOptions = {
-  primary: { main: "#1976d2" },
-  secondary: { main: "#9c27b0" },
+  primary: { main: "#2563EB" }, // Modern Blue
+  secondary: { main: "#7C3AED" }, // Modern Purple
   background: {
-    default: "#fafafa",
-    paper: "#fff",
+    default: "#F8FAFC",
+    paper: "#FFFFFF",
   },
 };
 
 export const darkPalette: PaletteOptions = {
-  primary: { main: "#90caf9" },
-  secondary: { main: "#ce93d8" },
+  primary: { main: "#60A5FA" }, // Lighter Blue for dark mode
+  secondary: { main: "#A78BFA" }, // Lighter Purple for dark mode
   background: {
-    default: "#121212",
-    paper: "#1d1d1d",
+    default: "#0F172A",
+    paper: "#1E293B",
   },
 };
+
