@@ -59,6 +59,8 @@ export interface TableState {
   sessionsOverview: any[];
   loadingSessionsOverview: boolean;
   sessionsOverviewLoaded: boolean;
+  serviceRequests: any[];
+  loadingServiceRequests: boolean;
 
   setTable: (table: any) => void;
   setSelectedTable: (table: Partial<RestaurantTable>) => void;
@@ -78,6 +80,8 @@ export interface TableState {
   getSessionOverview: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<any>;
   startSession: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<void>;
   endSession: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<void>;
+  getServiceRequests: () => Promise<void>;
+  resolveServiceRequest: (requestId: string) => Promise<void>;
   updateTablePosition: (tableId: string, x: number, y: number, rotation?: number) => Promise<void>;
   handleRemoveItem: (itemId: any) => Promise<void>;
   transferTable: (sessionId: string, sourceTableId: string, destTableId: string) => Promise<void>;
@@ -111,6 +115,8 @@ const useTablesStore = create<TableState>()(
       sessionsOverview: [],
       loadingSessionsOverview: false,
       sessionsOverviewLoaded: false,
+      serviceRequests: [],
+      loadingServiceRequests: false,
 
       setTable: (table) => {
         set({ table });
@@ -131,6 +137,7 @@ const useTablesStore = create<TableState>()(
       getTablesOverview: () => {
         get().getTables();
         get().getSessionsOverview();
+        get().getServiceRequests();
       },
 
       getTables: async () => {
@@ -195,6 +202,19 @@ const useTablesStore = create<TableState>()(
             },
             () => {
               get().getTablesOverview();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "service_requests",
+              filter: `restaurant_id=eq.${restaurantId}`,
+            },
+            () => {
+              get().getServiceRequests();
+              set({ snackbar: { open: true, message: "New Service Request!", severity: "info", id: Date.now() }});
             }
           )
           .subscribe();
@@ -460,6 +480,46 @@ const useTablesStore = create<TableState>()(
           throw error;
         } finally {
           set({ loadingSessionsOverview: false });
+        }
+      },
+
+      getServiceRequests: async () => {
+        const { selectedRestaurant } = useRestaurantStore.getState() as any;
+        const restaurantId = selectedRestaurant?.id;
+        if (!restaurantId) return;
+
+        set({ loadingServiceRequests: true });
+        try {
+          const { data, error } = await supabase
+            .from("service_requests")
+            .select("*")
+            .eq("restaurant_id", restaurantId)
+            .eq("status", "pending")
+            .order("created_at", { ascending: false });
+
+          if (error) throw error;
+          set({ serviceRequests: data || [] });
+        } catch (error) {
+          console.error("Error fetching service requests:", error);
+        } finally {
+          set({ loadingServiceRequests: false });
+        }
+      },
+
+      resolveServiceRequest: async (requestId) => {
+        try {
+          const { error } = await supabase
+            .from("service_requests")
+            .update({ status: "resolved", resolved_at: new Date().toISOString() })
+            .eq("id", requestId);
+
+          if (error) throw error;
+          
+          set((state) => ({
+            serviceRequests: state.serviceRequests.filter((r) => r.id !== requestId)
+          }));
+        } catch (error) {
+          handleError(error as Error);
         }
       },
 

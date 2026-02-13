@@ -38,6 +38,7 @@ import {
   MenuItem as MuiMenuItem,
   ToggleButton,
   ToggleButtonGroup,
+  Divider,
 } from "@mui/material";
 import {
   TableRestaurant as TableRestaurantIcon,
@@ -52,10 +53,15 @@ import {
   MoreVert as MoreVertIcon,
   Block as BlockIcon,
   LocalOffer as LocalOfferIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
+  Star as StarIcon,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
+import useAuthStore from "../lib/authStore";
 import useMenuStore from "../lib/menuStore";
 import useTablesStore from "../lib/tablesStore";
+import useRestaurantStore from "../lib/restaurantStore";
 import { printReceipt } from "../components/PrintWindow";
 import MenuSkeleton from "../components/skeletons/menu-section-skeleton";
 import { useCurrency } from "../utils/currency";
@@ -115,6 +121,11 @@ const Menu: React.FC = () => {
     resetOrder,
     selectedCourse,
     setSelectedCourse,
+    tipAmount,
+    setTipAmount,
+    favoriteItemIds,
+    toggleFavorite,
+    isFavorite,
   } = useMenuStore();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -127,6 +138,7 @@ const Menu: React.FC = () => {
 
   const [splitBillOpen, setSplitBillOpen] = useState(false);
 
+  const { selectedRestaurant } = useRestaurantStore();
   const { payForItems, payAllItems } = useMenuStore();
 
   const handlePayPartial = async (itemIds: string[], cash: number, card: number) => {
@@ -288,6 +300,9 @@ const Menu: React.FC = () => {
     if (category.name === selectedCategory) {
       setFilteredMenuItems(menuItems);
       setSelectedCategory({ id: "", name: "", restaurant_id: "" } as any); 
+    } else if (category.name === "Favorites") {
+      setSelectedCategory(category);
+      setFilteredMenuItems(menuItems.filter(item => isFavorite(item.id)));
     } else {
       setSelectedCategory(category);
       filterMenuItemsByCategory();
@@ -299,8 +314,15 @@ const Menu: React.FC = () => {
     const orderItems = currentOrderItems || [];
     console.log("🖨️ handlePrintReceipt - Current Order Items:", orderItems);
     
-    const waiterName = currentSession?.waiter_name || "Unknown";
+    const { user } = useAuthStore.getState();
+    console.log("DEBUG: handlePrintReceipt - User:", user);
+    console.log("DEBUG: handlePrintReceipt - Session:", currentSession);
+    const firstName = user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
+    const lastName = user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
+    const userName = (firstName + " " + lastName).trim() || user?.email || "Unknown";
+    const waiterName = currentSession?.waiter_name || userName;
     const tableNo = currentSession?.table_number || "N/A";
+    const displayOrderId = (currentOrder as any)?.order_no || (currentOrder as any)?.order_id || String(currentOrder?.id || "N/A").slice(-6).toUpperCase();
 
     if (orderItems.length === 0) {
       console.warn("⚠️ handlePrintReceipt - No items to print!");
@@ -313,7 +335,7 @@ const Menu: React.FC = () => {
          if (fetchedItems && fetchedItems.length > 0) {
              const newTotalQty = fetchedItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
              printReceipt(
-              currentOrder?.id || "N/A",
+              displayOrderId,
               waiterName,
               tableNo,
               newTotalQty,
@@ -322,7 +344,8 @@ const Menu: React.FC = () => {
               totalOrdersPrice?.toFixed(2) || "0.00", 
               cash || "0.00",
               card || "0.00",
-              (Number(cash || 0) + Number(card || 0) - (totalOrdersPrice || 0)).toFixed(2) 
+              (Number(cash || 0) + Number(card || 0) - (totalOrdersPrice || 0)).toFixed(2),
+              selectedRestaurant
             );
             return;
          }
@@ -332,16 +355,17 @@ const Menu: React.FC = () => {
     const totalQty = orderItems.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0);
 
     printReceipt(
-      currentOrder?.id || "N/A",
+      displayOrderId,
       waiterName,
       tableNo,
       totalQty,
       totalOrdersPrice || 0,
       orderItems,
-      totalOrdersPrice?.toFixed(2) || "0.00", 
+      totalOrdersPrice?.toFixed(2) || "0.00",
       cash || "0.00",
       card || "0.00",
-      (Number(cash || 0) + Number(card || 0) - (totalOrdersPrice || 0)).toFixed(2) 
+      (Number(cash || 0) + Number(card || 0) - (totalOrdersPrice || 0)).toFixed(2),
+      selectedRestaurant
     );
   };
 
@@ -505,18 +529,62 @@ const Menu: React.FC = () => {
           </>
         );
       case 1:
+        const subtotal = totalRemaining;
+        const totalWithTip = subtotal + tipAmount;
+        
         return (
-          <Stack spacing={3} mt={4} alignItems="center">
-            <Typography variant="h6">{totalRemaining < totalOrdersPrice ? "Remaining to Pay" : "Total Amount"}</Typography>
-            <Typography variant="h2"><strong>{currencySymbol} {formatCashInput(totalRemaining)}</strong></Typography>
-            {totalRemaining < totalOrdersPrice && (
-              <Typography variant="body2" color="textSecondary">
-                Total Order: {currencySymbol}{totalOrdersPrice.toFixed(2)}
-              </Typography>
-            )}
+          <Stack spacing={3} mt={2} alignItems="center">
+            <Box width="100%">
+              <Typography variant="caption" color="text.secondary" fontWeight="bold">SELECT TIP</Typography>
+              <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
+                {[0, 5, 10, 15].map((pct) => {
+                  const calculatedTip = Math.round((subtotal * pct / 100) * 100) / 100;
+                  const isSelected = tipAmount === calculatedTip;
+                  return (
+                    <Button
+                      key={pct}
+                      variant={isSelected ? "contained" : "outlined"}
+                      size="small"
+                      onClick={() => setTipAmount(calculatedTip)}
+                      sx={{ borderRadius: 2, minWidth: 60, flex: 1 }}
+                    >
+                      {pct}%
+                    </Button>
+                  );
+                })}
+                <TextField 
+                  size="small" 
+                  placeholder="Custom Tip" 
+                  type="number"
+                  value={tipAmount || ""}
+                  onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)}
+                  sx={{ flex: 2, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
+                />
+              </Stack>
+            </Box>
+
+            <Divider sx={{ width: '100%' }} />
+
+            <Stack spacing={1} width="100%" sx={{ bgcolor: 'action.hover', p: 2, borderRadius: 2 }}>
+               <Stack direction="row" justifyContent="space-between">
+                 <Typography variant="body2">Subtotal</Typography>
+                 <Typography variant="body2">{currencySymbol}{subtotal.toFixed(2)}</Typography>
+               </Stack>
+               <Stack direction="row" justifyContent="space-between">
+                 <Typography variant="body2">Tip</Typography>
+                 <Typography variant="body2" color="primary">+{currencySymbol}{tipAmount.toFixed(2)}</Typography>
+               </Stack>
+               <Divider sx={{ my: 0.5 }} />
+               <Stack direction="row" justifyContent="space-between">
+                 <Typography variant="h6" fontWeight="bold">Total to Pay</Typography>
+                 <Typography variant="h6" fontWeight="bold" color="primary">{currencySymbol}{totalWithTip.toFixed(2)}</Typography>
+               </Stack>
+            </Stack>
+
             <Stack spacing={2} width="100%">
-               <TextField fullWidth label="Card" type="number" value={card} onChange={(e) => setCard(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} />
-               <TextField fullWidth label="Cash" type="number" value={cash} onChange={(e) => setCash(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} />
+               <TextField fullWidth label="Card Payment" type="number" value={card} onChange={(e) => setCard(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+               <TextField fullWidth label="Cash Payment" type="number" value={cash} onChange={(e) => setCash(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
                <Button 
                 variant="outlined" 
                 onClick={() => setSplitBillOpen(true)}
@@ -562,6 +630,7 @@ const Menu: React.FC = () => {
                       </Button>
                    ))}
                </Stack>
+               
             </Card>
 
             {currentSession ? (
@@ -581,16 +650,26 @@ const Menu: React.FC = () => {
                   {loadingCategories ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} variant="rectangular" width={100} height={40} sx={{ borderRadius: 2, flexShrink: 0 }} />)
                   ) : (
-                    categories.map((c: any, idx) => (
+                    <>
                       <Button 
-                        key={idx} 
-                        variant={c.name === selectedCategory ? "contained" : "outlined"} 
-                        onClick={() => handleCategoryClick(c)}
+                        variant={"Favorites" === selectedCategory ? "contained" : "outlined"} 
+                        onClick={() => handleCategoryClick({ name: "Favorites" })}
+                        startIcon={"Favorites" === selectedCategory ? <StarIcon /> : <StarIcon color="warning" />}
                         sx={{ borderRadius: 2, px: 3, textTransform: 'none', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}
                       >
-                        {c.name}
+                        Favorites
                       </Button>
-                    ))
+                      {categories.map((c: any, idx) => (
+                        <Button 
+                          key={idx} 
+                          variant={c.name === selectedCategory ? "contained" : "outlined"} 
+                          onClick={() => handleCategoryClick(c)}
+                          sx={{ borderRadius: 2, px: 3, textTransform: 'none', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
+                          {c.name}
+                        </Button>
+                      ))}
+                    </>
                   )}
                 </Stack>
 
@@ -604,7 +683,7 @@ const Menu: React.FC = () => {
                    ) : searchFilter.length > 0 ? (
                      searchFilter.map((item: any, idx) => (
                        <Grid item xs={12} sm={6} md={3} key={idx}>
-                          <Card sx={{ borderRadius: 3, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 10 } }}>
+                          <Card sx={{ borderRadius: 3, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 10 }, position: 'relative' }}>
                              <CardActionArea 
                                onClick={() => {
                                  if (item.modifier_groups?.length > 0) {
@@ -636,6 +715,23 @@ const Menu: React.FC = () => {
                                     </Stack>
                                  </CardContent>
                               </CardActionArea>
+                              <IconButton 
+                                size="small" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(item.id);
+                                }}
+                                sx={{ 
+                                  position: 'absolute', 
+                                  top: 5, 
+                                  right: 5, 
+                                  bgcolor: 'rgba(255,255,255,0.8)',
+                                  '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
+                                  zIndex: 2
+                                }}
+                              >
+                                {isFavorite(item.id) ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
+                              </IconButton>
                            </Card>
                         </Grid>
                       ))
@@ -684,17 +780,38 @@ const Menu: React.FC = () => {
                   </Stepper>
                   <Box sx={{ minHeight: isMobile ? 'auto' : 300 }}>{getStepContent(activeStep)}</Box>
                   <CardActions sx={{ mt: 4, p: 0 }}>
-                     {proceedToCheckOut ? (
-                       <Stack direction="row" spacing={2} width="100%">
-                         <Button fullWidth variant="outlined" size="large" onClick={handleBack} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Back</Button>
-                         <Button fullWidth variant="contained" color="success" size="large" onClick={handleNext} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Pay</Button>
-                       </Stack>
-                     ) : (
-                       <Stack direction="row" spacing={2} width="100%">
-                         <Button fullWidth variant="contained" size="large" onClick={() => handlePrintReceipt("billed")} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Print Bill</Button>
-                         <Button fullWidth variant="contained" color="success" size="large" disabled={!isBilled && totalOrdersPrice > 0} onClick={handleNext} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Check Out</Button>
-                       </Stack>
-                     )}
+                      {proceedToCheckOut ? (
+                        <Stack direction="row" spacing={2} width="100%">
+                          <Button fullWidth variant="outlined" size="large" onClick={handleBack} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Back</Button>
+                          <Button fullWidth variant="contained" color="success" size="large" disabled={currentOrderItems.length === 0} onClick={handleNext} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Pay</Button>
+                        </Stack>
+                      ) : (
+                        <Stack direction="row" spacing={2} width="100%">
+                          <Button 
+                            fullWidth 
+                            variant="contained" 
+                            size="large" 
+                            disabled={currentOrderItems.length === 0} 
+                            onClick={() => handlePrintReceipt("billed")} 
+                            sx={{ borderRadius: 2, fontWeight: 'bold' }}
+                          >
+                            Print Bill
+                          </Button>
+                          {isBilled && (
+                            <Button 
+                              fullWidth 
+                              variant="contained" 
+                              color="success" 
+                              size="large" 
+                              disabled={currentOrderItems.length === 0} 
+                              onClick={handleNext} 
+                              sx={{ borderRadius: 2, fontWeight: 'bold' }}
+                            >
+                              Check Out
+                            </Button>
+                          )}
+                        </Stack>
+                      )}
                   </CardActions>
                </Card>
              ) : (

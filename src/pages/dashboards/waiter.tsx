@@ -17,6 +17,8 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
+  Button,
+  IconButton,
 } from "@mui/material";
 import {
   TableBar,
@@ -26,7 +28,15 @@ import {
   Search,
   GridView as GridViewIcon,
   Map as MapIcon,
+  TrendingUp,
+  Replay,
+  AddCircleOutline,
+  Person,
+  Star,
+  Edit,
 } from "@mui/icons-material";
+import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BarChartTwoToneIcon from "@mui/icons-material/BarChartTwoTone";
 import useMenuStore from "../../lib/menuStore";
@@ -37,6 +47,7 @@ import WaiterDashboardSkeleton from "./components/skeletons/waiter-dashboard-ske
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
 import SalesBarChart from "./components/sales-data-chart";
 import RevenueLineChartCard from "./components/revenue-line-chart-card";
+import { formatCurrency } from "../../utils/currency";
 
 // ----- Helper Components -----
 interface StatCardProps {
@@ -100,6 +111,7 @@ const StatusChip: React.FC<StatusChipProps> = ({ status }) => {
 
 // ----- Main Dashboard -----
 const WaiterDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const {
     getActiveSessionByRestaurant,
     assignedTables,
@@ -111,6 +123,10 @@ const WaiterDashboard: React.FC = () => {
     subscribeToOrderItems,
     unsubscribeFromOrderItems,
     dashboardKitchenTasks,
+    reorderItem,
+    repeatRound,
+    setCurrentOrder,
+    setCurrentOrderItems,
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
@@ -131,6 +147,86 @@ const WaiterDashboard: React.FC = () => {
     return counts;
   };
   const [statusFilter, setStatusFilter] = useState("all");
+  const [customerNames, setCustomerNames] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("DineMate_Customers") || "{}");
+    } catch { return {}; }
+  });
+  const [feedbacks, setFeedbacks] = useState<Record<string, { rating: number, comment: string }>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("DineMate_Feedback") || "{}");
+    } catch { return {}; }
+  });
+
+  const handleSetCustomer = async (sessionId: string) => {
+    const { value: name } = await Swal.fire({
+      title: 'Customer Name',
+      input: 'text',
+      inputLabel: 'Enter name or phone for this guest',
+      inputValue: customerNames[sessionId] || '',
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (!value) return 'You need to write something!'
+        return null;
+      }
+    });
+
+    if (name) {
+      const newNames = { ...customerNames, [sessionId]: name };
+      setCustomerNames(newNames);
+      localStorage.setItem("DineMate_Customers", JSON.stringify(newNames));
+    }
+  };
+
+  const handleCaptureFeedback = async (sessionId: string) => {
+    const { value: formValues } = await Swal.fire({
+      title: 'Guest Feedback',
+      html:
+        '<input id="swal-input1" class="swal2-input" placeholder="Rating (1-5)" type="number" min="1" max="5">' +
+        '<textarea id="swal-input2" class="swal2-textarea" placeholder="Optional comments..."></textarea>',
+      focusConfirm: false,
+      preConfirm: () => {
+        return {
+          rating: (document.getElementById('swal-input1') as HTMLInputElement).value,
+          comment: (document.getElementById('swal-input2') as HTMLTextAreaElement).value
+        }
+      }
+    });
+
+    if (formValues) {
+      const newFeedbacks = { ...feedbacks, [sessionId]: formValues };
+      setFeedbacks(newFeedbacks);
+      localStorage.setItem("DineMate_Feedback", JSON.stringify(newFeedbacks));
+      Swal.fire('Saved!', 'Feedback recorded.', 'success');
+    }
+  };
+
+  const handleRepeatItem = async (item: any, session: any) => {
+    // 1. Prepare store state for current session/order if not active
+    setCurrentOrder({ id: item.order_id, session_id: session.id, restaurant_id: session.restaurant_id, status: session.status } as any);
+    setCurrentOrderItems(session.order_items);
+    
+    // 2. Call reorderItem
+    await reorderItem(item);
+    
+    // 3. Refresh sessions to show updated quantity
+    getActiveSessionByRestaurant();
+  };
+
+  const handleRepeatRound = async (session: any) => {
+     // 1. Prepare store state
+     const orderId = session.order_items?.[0]?.order_id;
+     if (!orderId) return;
+
+     setCurrentOrder({ id: orderId, session_id: session.id, restaurant_id: session.restaurant_id, status: session.status } as any);
+     setCurrentOrderItems(session.order_items);
+
+     // 2. Call repeatRound
+     await repeatRound();
+
+     // 3. Refresh
+     getActiveSessionByRestaurant();
+  };
 
   useEffect(() => {
     getActiveSessionByRestaurant();
@@ -190,6 +286,23 @@ const WaiterDashboard: React.FC = () => {
             description="Track tables, monitor active orders, and manage sessions in real-time."
             background="linear-gradient(135deg,rgb(5, 146, 165) 0%, rgb(224, 21, 140) 100%)"
             color="#fff"
+            action={
+              <Button
+                variant="contained"
+                startIcon={<TrendingUp />}
+                onClick={() => navigate("/app/performance")}
+                sx={{ 
+                  bgcolor: 'rgba(255, 255, 255, 0.2)', 
+                  backdropFilter: 'blur(10px)',
+                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.3)' },
+                  fontWeight: 'bold',
+                  textTransform: 'none',
+                  borderRadius: 2
+                }}
+              >
+                Performance Insights
+              </Button>
+            }
           />
 
           {/* ---- Top Stats ---- */}
@@ -224,7 +337,7 @@ const WaiterDashboard: React.FC = () => {
             <Grid item xs={6} md={3}>
               <StatCard
                 icon={<MonetizationOn />}
-                value={`$${totalRevenue}`}
+                value={formatCurrency(totalRevenue)}
                 subtitle="Revenue"
                 accent="#2e7d32"
               />
@@ -382,11 +495,46 @@ const WaiterDashboard: React.FC = () => {
                       }}
                     >
                       <CardHeader
-                        title={`Table ${session.table_number}`}
+                        title={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="h6" fontWeight={800}>Table {session.table_number}</Typography>
+                            <IconButton size="small" onClick={() => handleSetCustomer(session.session_id)}>
+                              <Person sx={{ fontSize: 18, color: customerNames[session.session_id] ? 'primary.main' : 'action.disabled' }} />
+                            </IconButton>
+                          </Box>
+                        }
+                        subheader={customerNames[session.session_id] || "Guest Session"}
                         titleTypographyProps={{ variant: 'h6', fontWeight: 800 }}
-                        action={<StatusChip status={session.session_status} />}
+                        action={
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            {(session.order_items ?? []).length > 0 && (
+                              <Chip 
+                                icon={<Replay sx={{ fontSize: '1rem !important' }} />}
+                                label="ROUND" 
+                                size="small" 
+                                color="primary" 
+                                variant="outlined"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRepeatRound(session);
+                                }}
+                                sx={{ height: 24, fontSize: '0.7rem', fontWeight: 700 }}
+                              />
+                            )}
+                            <StatusChip status={session.session_status} />
+                          </Stack>
+                        }
                         sx={{ pb: 1 }}
                       />
+                      <Divider />
+                      <Box sx={{ px: 2, py: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'action.hover' }}>
+                         <Typography variant="caption" color="text.secondary">
+                           {feedbacks[session.session_id] ? `Rating: ${feedbacks[session.session_id].rating}/5 ⭐` : "No feedback yet"}
+                         </Typography>
+                         <IconButton size="small" onClick={() => handleCaptureFeedback(session.session_id)}>
+                           <Star sx={{ fontSize: 16, color: feedbacks[session.session_id] ? '#ffb400' : 'action.disabled' }} />
+                         </IconButton>
+                      </Box>
                       <Divider />
                       <CardContent sx={{ flex: 1, p: 1.5 }}>
                         {(session.order_items ?? []).length === 0 ? (
@@ -421,37 +569,54 @@ const WaiterDashboard: React.FC = () => {
                                     variant="caption"
                                     color="text.secondary"
                                   >
-                                    x{order.quantity} • ${order.menu_item.price}
+                                    x{order.quantity} • {formatCurrency(order.menu_item.price)}
                                   </Typography>
                                 </Box>
 
-                                {(() => {
-                                   const breakdown = getItemStatusBreakdown(order.id);
-                                   
-                                   if (breakdown) {
-                                     return (
-                                       <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: '40%' }}>
-                                         {breakdown['pending'] > 0 && <Chip label={`${breakdown['pending']} PENDING`} size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                         {breakdown['preparing'] > 0 && <Chip label={`${breakdown['preparing']} PREP`} size="small" color="warning" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                         {breakdown['ready'] > 0 && <Chip label={`${breakdown['ready']} READY`} size="small" color="success" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                         {breakdown['served'] > 0 && <Chip label={`${breakdown['served']} SERVED`} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                       </Stack>
-                                     );
-                                   }
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Chip
+                                      icon={<AddCircleOutline sx={{ fontSize: '14px !important' }} />}
+                                      label="ONE"
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRepeatItem(order, session);
+                                      }}
+                                      sx={{ 
+                                        height: 20, 
+                                        fontSize: '0.6rem', 
+                                        bgcolor: 'action.hover',
+                                        '&:hover': { bgcolor: 'action.selected' }
+                                      }}
+                                    />
+                                    {(() => {
+                                      const breakdown = getItemStatusBreakdown(order.id);
+                                      
+                                      if (breakdown) {
+                                        return (
+                                          <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: '60%' }}>
+                                            {breakdown['pending'] > 0 && <Chip label={`${breakdown['pending']} P`} size="small" color="default" sx={{ height: 18, fontSize: '0.6rem' }} />}
+                                            {breakdown['preparing'] > 0 && <Chip label={`${breakdown['preparing']} PR`} size="small" color="warning" variant="filled" sx={{ height: 18, fontSize: '0.6rem' }} />}
+                                            {breakdown['ready'] > 0 && <Chip label={`${breakdown['ready']} RD`} size="small" color="success" variant="filled" sx={{ height: 18, fontSize: '0.6rem' }} />}
+                                            {breakdown['served'] > 0 && <Chip label={`${breakdown['served']} SV`} size="small" color="success" sx={{ height: 18, fontSize: '0.6rem' }} />}
+                                          </Stack>
+                                        );
+                                      }
 
-                                   return (
-                                      <>
-                                        {order.item_status !== "preparing" && (
-                                          <StatusChip status={order.item_status} />
-                                        )}
+                                      return (
+                                        <>
+                                          {order.item_status !== "preparing" && (
+                                            <StatusChip status={order.item_status} />
+                                          )}
 
-                                        {order.item_status === "preparing" && (
-                                          <CircularProgress size={20} color="warning" />
-                                        )}
-                                      </>
-                                   );
-                                 })()}
-                              </ListItem>
+                                          {order.item_status === "preparing" && (
+                                            <CircularProgress size={20} color="warning" />
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </Box>
+                                </ListItem>
                             ))}
                           </List>
                         )}
@@ -466,7 +631,7 @@ const WaiterDashboard: React.FC = () => {
                         }}
                       >
                         <Typography variant="subtitle2" fontWeight={700}>
-                          Total: ${session.order_total?.toFixed(2) ?? "0.00"}
+                          Total: {formatCurrency(session.order_total)}
                         </Typography>
                         <Stack direction="row" spacing={1}>
                           <Typography variant="subtitle2" fontWeight={700}>

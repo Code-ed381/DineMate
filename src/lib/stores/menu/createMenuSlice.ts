@@ -19,6 +19,9 @@ export interface MenuSlice {
   filterMenuItemsByCategory: () => void;
   setFilteredMenuItems: (menuItems: MenuItem[]) => void;
   isSelectedCategory: (category: Category) => boolean;
+  favoriteItemIds: string[];
+  toggleFavorite: (itemId: string) => void;
+  isFavorite: (itemId: string) => boolean;
 }
 
 export const createMenuSlice: StateCreator<MenuState, [], [], MenuSlice> = (set, get) => ({
@@ -30,6 +33,7 @@ export const createMenuSlice: StateCreator<MenuState, [], [], MenuSlice> = (set,
   categories: [],
   loadingCategories: false,
   selectedCategory: "",
+  favoriteItemIds: [],
 
   fetchCategories: async () => {
     set({ loadingCategories: true });
@@ -92,5 +96,18 @@ export const createMenuSlice: StateCreator<MenuState, [], [], MenuSlice> = (set,
 
   setFilteredMenuItems: (menuItems) => {
     set({ filteredMenuItems: menuItems });
+  },
+  
+  toggleFavorite: (itemId) => {
+    const { favoriteItemIds } = get();
+    if (favoriteItemIds.includes(itemId)) {
+      set({ favoriteItemIds: favoriteItemIds.filter(id => id !== itemId) });
+    } else {
+      set({ favoriteItemIds: [...favoriteItemIds, itemId] });
+    }
+  },
+
+  isFavorite: (itemId) => {
+    return (get().favoriteItemIds || []).includes(itemId);
   },
 });

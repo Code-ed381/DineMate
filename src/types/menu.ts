@@ -86,6 +86,7 @@ export interface Order {
   printed: boolean;
   opened_at: string;
   order_total?: number; // From view
+  tip?: number;
 }
 
 export interface OrderItem {
@@ -183,6 +184,7 @@ export interface MenuState {
   proceedToPrint: boolean;
   cash: string;
   card: string;
+  tipAmount: number;
   totalCashCardAmount: number;
   selectedTableOrders: OrderItem[];
   noTablesFound: boolean;
@@ -197,6 +199,7 @@ export interface MenuState {
   loadingMenuItems: boolean;
   categories: Category[];
   loadingCategories: boolean;
+  favoriteItemIds: string[];
   chosenTableSession: TableSession | null;
   chosenTableOrderItems: OrderItem[];
   loadingActiveSessionByTableNumber: boolean;
@@ -233,7 +236,7 @@ export interface MenuState {
   fetchCategories: () => Promise<void>;
   fetchMenuItems: () => Promise<void>;
   setTableSelected: () => void;
-  confirmPayment: () => Promise<void>;
+  confirmPayment: () => Promise<boolean>;
   handleNext: () => Promise<void>;
   handleBack: () => void;
   resetStepper: () => void;
@@ -257,6 +260,9 @@ export interface MenuState {
   fetchSalesData: () => Promise<void>;
   setCash: (value: string) => void;
   setCard: (value: string) => void;
+  setTipAmount: (amount: number) => void;
+  toggleFavorite: (itemId: string) => void;
+  isFavorite: (itemId: string) => boolean;
   updateItemNote: (orderItemId: string, note: string) => Promise<void>;
   payForItems: (itemIds: string[], cash: number, card: number) => Promise<boolean>;
   payAllItems: (cash: number, card: number) => Promise<boolean>;
@@ -270,5 +276,7 @@ export interface MenuState {
   setSelectedCourse: (course: number) => void;
   startCourse: (orderId: string, course: number) => Promise<void>;
   recalculateTotals: () => void;
+  reorderItem: (item: OrderItem) => Promise<void>;
+  repeatRound: () => Promise<void>;
   fetchMyOrderHistory: (waiterId: string, startDate: string, endDate: string) => Promise<void>;
 }

@@ -25,7 +25,7 @@ const RevenueLineChartCard: React.FC<RevenueLineChartCardProps> = ({ orders = []
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="time" />
                 <YAxis />
-                <Tooltip formatter={(val: number) => `$${val.toFixed(2)}`} />
+                <Tooltip formatter={(val: number) => `₵${val.toFixed(2)}`} />
                 <Line type="monotone" dataKey="revenue" stroke="#1976d2" strokeWidth={3} dot={{ r: 5, stroke: "#1976d2", strokeWidth: 2, fill: "#fff" }} />
               </LineChart>
             </ResponsiveContainer>

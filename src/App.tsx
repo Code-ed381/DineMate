@@ -23,6 +23,8 @@ import Tables from "./pages/tables";
 import Index from "./pages/index";
 import CashierDetailedReports from "./pages/cashier-detailed-reports";
 import OrderHistory from "./pages/waiter/order-history";
+import WaiterPerformance from "./pages/waiter/performance";
+import GuestCall from "./pages/guest/GuestCall";
 
 const App: React.FC = () => {
   return (
@@ -42,6 +44,7 @@ const App: React.FC = () => {
           />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="onboarding" element={<Onboarding />} />
+          <Route path="guest/call/:restaurantId/:tableId" element={<GuestCall />} />
         </Route>
         <Route
           path="/app/"
@@ -66,6 +69,7 @@ const App: React.FC = () => {
           <Route path="cashier" element={<Cashier />} />
           <Route path="cashier-reports" element={<CashierDetailedReports />} />
           <Route path="order-history" element={<OrderHistory />} />
+          <Route path="performance" element={<WaiterPerformance />} />
           <Route path="bar" element={<Bar />} />
           <Route path="settings" element={<Settings />} />
         </Route>

@@ -1,5 +1,6 @@
 import { StateCreator } from "zustand";
 import { MenuState } from "../../../types/menu";
+import { handleError } from "../../../components/Error";
 
 export interface UISlice {
   activeStep: number;
@@ -23,13 +24,21 @@ export const createUISlice: StateCreator<MenuState, [], [], UISlice> = (set, get
   showFilter: false,
 
   handleNext: async () => {
-    if (get().activeStep === 1) {
-      await get().confirmPayment();
+    try {
+      if (get().activeStep === 1) {
+        const success = await get().confirmPayment();
+        if (!success) return;
+        // The order is reset internally on success, so we stay at step 0
+        return; 
+      }
+      set((state: any) => ({
+        activeStep: state.activeStep + 1,
+        proceedToCheckOut: true,
+      }));
+    } catch (error) {
+      console.error("Error in handleNext:", error);
+      handleError(error as Error);
     }
-    set((state: any) => ({
-      activeStep: state.activeStep + 1,
-      proceedToCheckOut: true,
-    }));
   },
 
   handleBack: () => {

@@ -54,6 +54,7 @@ const useMenuStore = create<MenuState>()(
         chosenTable: state.chosenTable,
         chosenTableOrderItems: (state as any).chosenTableOrderItems,
         chosenTableSession: state.chosenTableSession,
+        favoriteItemIds: state.favoriteItemIds,
       }),
     }
   )

@@ -1,5 +1,5 @@
-import useRestaurantStore from '../lib/restaurantStore';
 import { getCurrencySymbol } from '../utils/currency';
+import { Restaurant } from '../lib/restaurantStore';
 
 export const printReceipt = async (
   orderId: string,
@@ -11,9 +11,10 @@ export const printReceipt = async (
   totalPaid: string,
   cash: string,
   card: string,
-  change: string
+  change: string,
+  restaurant?: Restaurant | null
 ) => {
-  const printWindow = window.open("", "", `width=350,height=500`) as unknown as Window;
+  const printWindow = window.open("", "", `width=400,height=600`) as unknown as Window;
   if (!printWindow) return;
   const htmlContent = generatePrintHTML(
     orderId,
@@ -25,14 +26,15 @@ export const printReceipt = async (
     totalPaid,
     cash,
     card,
-    change
+    change,
+    restaurant
   );
   printWindow.document.open();
   printWindow.document.writeln(htmlContent);
   printWindow.document.close();
   printWindow.onload = () => {
     const bodyHeight = printWindow.document.body.scrollHeight;
-    printWindow.resizeTo(350, bodyHeight + 50);
+    printWindow.resizeTo(400, bodyHeight + 50);
     printWindow.print();
     printWindow.close();
   };
@@ -48,46 +50,109 @@ const generatePrintHTML = (
   totalPaid: string,
   cash: string,
   card: string,
-  change: string
+  change: string,
+  restaurant?: Restaurant | null
 ) => {
-  // Use passed arguments instead of store
-  const { selectedRestaurant } = useRestaurantStore.getState(); // Keep restaurant store for name
   const currency = getCurrencySymbol();
 
   const rows = (orderItems || []).map((item: any) => `
     <tr>
-      <td>
-        ${(item?.menu_item_name || item?.item_name || item?.name || "Unknown Item").toUpperCase()}
-        ${item?.selected_modifiers?.length > 0 ? `<br/><small> + ${item.selected_modifiers.map((m: any) => m.name).join(", ")}</small>` : ''}
-        ${item?.notes ? `<br/><small style="font-style: italic">Note: ${item.notes}</small>` : ''}
+      <td style="padding: 4px 0;">
+        <div style="font-weight: bold;">${(item?.menu_item_name || item?.item_name || item?.name || "Unknown Item").toUpperCase()}</div>
+        ${item?.selected_modifiers?.length > 0 ? `<div style="font-size: 0.8em; color: #555;"> + ${item.selected_modifiers.map((m: any) => m.name).join(", ")}</div>` : ''}
+        ${item?.notes ? `<div style="font-size: 0.8em; font-style: italic;">Note: ${item.notes}</div>` : ''}
       </td>
-      <td style="text-align: right">${currency}${(item?.unit_price || item?.price)?.toFixed(2)}</td>
-      <td style="text-align: center">${item?.quantity || item?.qty}</td>
-      <td style="text-align: right">${currency}${((item?.unit_price || item?.price) * (item?.quantity || item?.qty)).toFixed(2)}</td>
+      <td style="text-align: right; vertical-align: top; padding: 4px 0;">${currency}${(item?.unit_price || item?.price)?.toFixed(2)}</td>
+      <td style="text-align: center; vertical-align: top; padding: 4px 0;">${item?.quantity || item?.qty}</td>
+      <td style="text-align: right; vertical-align: top; padding: 4px 0;">${currency}${((item?.unit_price || item?.price) * (item?.quantity || item?.qty)).toFixed(2)}</td>
     </tr>
   `).join("");
 
   return `
     <html>
-      <head><style>body { font-family: sans-serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #000; padding: 5px; }</style></head>
+      <head>
+        <style>
+          body { font-family: 'Courier New', Courier, monospace; font-size: 14px; line-height: 1.2; color: #000; margin: 0; padding: 10px; }
+          .container { max-width: 300px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 15px; }
+          .logo { max-width: 80px; max-height: 80px; margin-bottom: 5px; }
+          .restaurant-name { font-size: 18px; font-weight: bold; margin: 5px 0; }
+          .details { font-size: 12px; margin-bottom: 2px; }
+          .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          .order-info { margin-bottom: 10px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+          th { border-bottom: 1px dashed #000; padding: 5px 0; text-align: left; }
+          tfoot th, tfoot td { padding-top: 5px; }
+          .total-row { font-weight: bold; font-size: 16px; }
+          .footer { text-align: center; margin-top: 20px; font-size: 12px; }
+        </style>
+      </head>
       <body>
-        <h2 style="text-align: center">${selectedRestaurant?.name?.toUpperCase() || "DINEMATE"}</h2>
-        <p style="text-align: center">Official Receipt</p>
-        <hr/>
-        <p>Order No: ${orderId || "N/A"}</p>
-        <p>Table: ${tableNo || "N/A"}</p>
-        <p>Waiter: ${waiterName || "N/A"}</p>
-        <table>
-          <thead><tr><th>Item</th><th>Price</th><th>Qty</th><th>Total</th></tr></thead>
-          <tbody>${rows}</tbody>
-          <tfoot>
-            <tr><th colspan="3">Grand Total</th><th>${currency}${totalPrice?.toFixed(2) || "0.00"}</th></tr>
-            <tr><th colspan="3">Cash Paid</th><th>${currency}${cash}</th></tr>
-            <tr><th colspan="3">Card Paid</th><th>${currency}${card}</th></tr>
-            <tr><th colspan="3">Change</th><th>${currency}${change}</th></tr>
-          </tfoot>
-        </table>
-        <p style="text-align: center; margin-top: 20px"><small>THANK YOU!</small></p>
+        <div class="container">
+          <div class="header">
+            ${restaurant?.logo ? `<img src="${restaurant.logo}" class="logo" />` : ''}
+            <div class="restaurant-name">${restaurant?.name?.toUpperCase() || "DINEMATE"}</div>
+            ${restaurant?.address_line_1 ? `<div class="details">${restaurant.address_line_1}</div>` : ''}
+            ${restaurant?.city ? `<div class="details">${restaurant.city}${restaurant.state ? `, ${restaurant.state}` : ''}</div>` : ''}
+            ${restaurant?.phone_number ? `<div class="details">Tel: ${restaurant.phone_number}</div>` : ''}
+            ${restaurant?.website ? `<div class="details">${restaurant.website}</div>` : ''}
+          </div>
+
+          <div class="divider"></div>
+          
+          <div class="order-info">
+            <div><strong>Order:</strong> ${String(orderId || "N/A").slice(-6).toUpperCase()}</div>
+            <div><strong>Table:</strong> ${tableNo || "N/A"}</div>
+            <div><strong>Waiter:</strong> ${waiterName || "N/A"}</div>
+            <div><strong>Date:</strong> ${new Date().toLocaleString()}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 45%;">Item</th>
+                <th style="text-align: right; width: 20%;">Price</th>
+                <th style="text-align: center; width: 15%;">Qty</th>
+                <th style="text-align: right; width: 20%;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+
+          <table>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="3">GRAND TOTAL</td>
+                <td style="text-align: right;">${currency}${totalPrice?.toFixed(2) || "0.00"}</td>
+              </tr>
+              <tr>
+                <td colspan="3">CASH PAID</td>
+                <td style="text-align: right;">${currency}${parseFloat(cash).toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td colspan="3">CARD PAID</td>
+                <td style="text-align: right;">${currency}${parseFloat(card).toFixed(2)}</td>
+              </tr>
+              <tr style="font-weight: bold;">
+                <td colspan="3">CHANGE</td>
+                <td style="text-align: right;">${currency}${change}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="divider"></div>
+          
+          <div class="footer">
+            <div>THANK YOU FOR DINING WITH US!</div>
+            <div style="margin-top: 5px;">Powered by DineMate</div>
+          </div>
+        </div>
       </body>
     </html>
   `;

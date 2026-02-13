@@ -36,6 +36,7 @@ import {
   LocalDining,
   Map as MapIcon,
   GridView as GridViewIcon,
+  NotificationsActive,
 } from "@mui/icons-material";
 import FloorPlan from "../components/FloorPlan";
 import useMenuStore from "../lib/menuStore";
@@ -46,6 +47,7 @@ import EnhancedSnackbar from "../components/snackbar";
 import TransferTableDialog from "../components/TransferTableDialog";
 import useAuthStore from "../lib/authStore";
 import useRestaurantStore from "../lib/restaurantStore";
+import TableTimer from "../components/TableTimer";
 
 const statusColors: Record<string, any> = {
   available: { color: "success", icon: CheckCircle, main: "success.main" },
@@ -72,7 +74,12 @@ const TableManagement: React.FC = () => {
     getSession, 
     updateTablePosition,
     cancelReservation,
-    transferTable
+    transferTable,
+    sessionsOverview,
+    subscribeToTables,
+    unsubscribeFromTables,
+    serviceRequests,
+    resolveServiceRequest
   } = useTablesStore();
 
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -117,7 +124,9 @@ const TableManagement: React.FC = () => {
   useEffect(() => {
     getTables();
     getSessionsOverview();
-  }, [getTables, getSessionsOverview]);
+    subscribeToTables();
+    return () => unsubscribeFromTables();
+  }, [getTables, getSessionsOverview, subscribeToTables, unsubscribeFromTables]);
 
   const handleTransferClick = async (table: any) => {
     if (!user?.id || !selectedRestaurant?.id) return;
@@ -215,9 +224,38 @@ const TableManagement: React.FC = () => {
                   <Card sx={{ height: "100%", borderRadius: 3, borderLeft: `6px solid ${statusColors[status]?.main}` }}>
                     <CardContent sx={{ p: 2.5 }}>
                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                          <Typography variant="h6" fontWeight="bold">Table {table.table_number}</Typography>
-                          <Chip icon={<StatusIcon />} label={status.toUpperCase()} color={statusColors[status]?.color} size="small" />
-                       </Stack>
+                           <Typography variant="h6" fontWeight="bold">Table {table.table_number}</Typography>
+                           <Stack direction="row" spacing={1} alignItems="center">
+                              {status === 'occupied' && (() => {
+                                const session = sessionsOverview?.find((s: any) => s.table_id === table.id);
+                                return session?.opened_at ? <TableTimer startDate={session.opened_at} /> : null;
+                              })()}
+                              
+                              {/* Service Request Alert */}
+                              {(() => {
+                                 const request = serviceRequests?.find((r: any) => r.table_id === table.id);
+                                 if (request) { 
+                                   return (
+                                     <Chip 
+                                       icon={<NotificationsActive />} 
+                                       label="SERVICE" 
+                                       color="error" 
+                                       size="small" 
+                                       sx={{ 
+                                         animation: 'pulse 1.5s infinite',
+                                         '@keyframes pulse': {
+                                           '0%': { opacity: 1, transform: 'scale(1)' },
+                                           '50%': { opacity: 0.8, transform: 'scale(1.05)' },
+                                           '100%': { opacity: 1, transform: 'scale(1)' },
+                                         }
+                                       }}
+                                     />
+                                   )
+                                 }
+                                 return <Chip icon={<StatusIcon />} label={status.toUpperCase()} color={statusColors[status]?.color} size="small" />;
+                              })()}
+                           </Stack>
+                        </Stack>
                        <Stack direction="row" spacing={1} mb={1}><People fontSize="small" /><Typography variant="body2">{table.capacity} seats</Typography></Stack>
                        {table.location && <Typography variant="body2">📍 {table.location}</Typography>}
                     </CardContent>
@@ -242,7 +280,7 @@ const TableManagement: React.FC = () => {
                                Transfer
                             </Button>
                           )}
-                          {status === "reserved" && (
+                           {status === "reserved" && (
                             <Button 
                               fullWidth 
                               onClick={() => cancelReservation(table, 'cancelled')} 
@@ -253,6 +291,25 @@ const TableManagement: React.FC = () => {
                                Cancel
                             </Button>
                           )}
+                          
+                          {/* Resolve Service Request Button */}
+                          {(() => {
+                             const request = serviceRequests?.find((r: any) => r.table_id === table.id);
+                             if (request) {
+                               return (
+                                 <Button 
+                                    fullWidth 
+                                    onClick={() => resolveServiceRequest(request.id)} 
+                                    color="secondary" 
+                                    variant="contained"
+                                    sx={{ px: 1, bgcolor: 'error.main', '&:hover': { bgcolor: 'error.dark' } }}
+                                 >
+                                    Resolve Alert
+                                 </Button>
+                               );
+                             }
+                             return null;
+                          })()}
                         </Stack>
                      </Box>
                   </Card>
@@ -262,9 +319,11 @@ const TableManagement: React.FC = () => {
           </Grid>
           ) : (
             <FloorPlan 
-              tables={filteredTables} 
+              tables={tables} 
+              sessionsOverview={sessionsOverview}
+              serviceRequests={serviceRequests}
               onTableClick={handleTableActionButtonClick}
-              onUpdatePosition={updateTablePosition}
+              onUpdatePosition={(id, x, y) => updateTablePosition(id, x, y)}
               onCancelReservation={(table) => cancelReservation(table, 'cancelled')}
             />
           )}

@@ -18,6 +18,7 @@ export interface OrderSlice {
   totalOrdersPrice: number;
   totalOrdersQty: number;
   totalRemaining: number;
+  tipAmount: number;
   orderId: string | null;
   cash: string;
   card: string;
@@ -34,6 +35,8 @@ export interface OrderSlice {
   setSelectedCourse: (course: number) => void;
   startCourse: (orderId: string, course: number) => Promise<void>;
   recalculateTotals: () => void;
+  reorderItem: (item: OrderItem) => Promise<void>;
+  repeatRound: () => Promise<void>;
 
   setCurrentOrder: (order: Order | null) => void;
   setCurrentOrderItems: (items: OrderItem[]) => void;
@@ -46,13 +49,14 @@ export interface OrderSlice {
   addOrUpdateObject: (orderItem: MenuItem, selectedModifiers?: Modifier[]) => Promise<void>;
   updateQuantity: (item: OrderItem, action: 'increase' | 'decrease') => Promise<void>;
   handleRemoveItem: (item: OrderItem) => Promise<void>;
-  confirmPayment: () => Promise<void>;
+  confirmPayment: () => Promise<boolean>;
   subscribeToOrderItems: () => void;
   unsubscribeFromOrderItems: () => void;
   updateItemNote: (orderItemId: string, note: string) => Promise<void>;
   fetchSalesData: () => Promise<void>;
   setCash: (value: string) => void;
   setCard: (value: string) => void;
+  setTipAmount: (amount: number) => void;
   payAllItems: (cash: number, card: number) => Promise<boolean>;
   payForItems: (itemIds: string[], cash: number, card: number) => Promise<boolean>;
   voidItem: (orderItemId: string, reason: string) => Promise<void>;
@@ -72,6 +76,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
   orderId: null,
   cash: "",
   card: "",
+  tipAmount: 0,
   currentKitchenTasks: [],
   dashboardKitchenTasks: [],
   loadingCurrentKitchenTasks: false,
@@ -85,6 +90,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
 
   setCash: (value) => set({ cash: value }),
   setCard: (value) => set({ card: value }),
+  setTipAmount: (amount) => set({ tipAmount: amount }),
   setSelectedCourse: (course) => set({ selectedCourse: course }),
   setCurrentOrder: (order) => set({ currentOrder: order }),
   setCurrentOrderItems: (items) => set({ currentOrderItems: items }),
@@ -213,6 +219,52 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
       return items;
     } finally {
       set({ loadingCurrentOrderItems: false });
+    }
+  },
+
+  reorderItem: async (item) => {
+    // 1. Find the menu item to get fresh data/modifiers
+    const { menuItems } = get();
+    let menuItem = menuItems.find(mi => mi.id === item.menu_item_id);
+    
+    if (!menuItem) {
+      // Reconstruct MenuItem from OrderItem if not in current list
+      menuItem = {
+        id: item.menu_item_id,
+        name: item.item_name || item.name || "Unknown Item",
+        price: item.unit_price,
+        category_id: "", 
+        type: (item.type || "food") as "food" | "drink",
+        restaurant_id: useRestaurantStore.getState().selectedRestaurant?.id || "",
+      };
+    }
+
+    try {
+      await get().addOrUpdateObject(menuItem, item.selected_modifiers);
+    } catch (error) {
+      handleError(error as Error);
+    }
+  },
+
+  repeatRound: async () => {
+    const items = get().currentOrderItems.filter(i => i.status !== 'cancelled' && i.payment_status !== 'completed');
+    if (items.length === 0) return;
+
+    try {
+      // We loop through items and re-add them
+      // To avoid multiple notifications/swals, we could optimize, but addOrUpdateObject is sequential
+      for (const item of items) {
+        await get().reorderItem(item);
+      }
+      Swal.fire({
+        title: "Round Repeated",
+        text: "All active items have been duplicated.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      handleError(error as Error);
     }
   },
 
@@ -491,32 +543,31 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
   },
 
   confirmPayment: async () => {
-    const { cash, card, totalRemaining } = get();
+    const { cash, card, totalRemaining, tipAmount } = get();
     const cashVal = parseFloat(cash) || 0;
     const cardVal = parseFloat(card) || 0;
     const totalPaid = cashVal + cardVal;
 
     const roundedTotalPaid = Math.round(totalPaid * 100) / 100;
     const roundedRemaining = Math.round(totalRemaining * 100) / 100;
+    const totalWithTip = Math.round((roundedRemaining + tipAmount) * 100) / 100;
 
-    if (roundedTotalPaid < roundedRemaining) {
-      Swal.fire("INSUFFICIENT PAYMENT", `The total payment is ${(roundedRemaining - roundedTotalPaid).toFixed(2)} short.`, "error");
-      return;
+    if (roundedTotalPaid < totalWithTip) {
+      Swal.fire("INSUFFICIENT PAYMENT", `The total payment (including tip) is ${(totalWithTip - roundedTotalPaid).toFixed(2)} short.`, "error");
+      return false;
     }
 
-    Swal.fire({
+    const { isConfirmed } = await Swal.fire({
       title: "Confirm payment?",
-      html: `<h6>Cash: ${cashVal.toFixed(2)}</h6> <h6>Card: ${cardVal.toFixed(2)}</h6><hr/><h3><strong>Total: ${totalPaid.toFixed(2)}</strong><h3>`,
+      html: `<h6>Subtotal: ${roundedRemaining.toFixed(2)}</h6><h6>Tip: ${tipAmount.toFixed(2)}</h6><hr/><h6>Cash: ${cashVal.toFixed(2)}</h6> <h6>Card: ${cardVal.toFixed(2)}</h6><hr/><h3><strong>Total: ${totalPaid.toFixed(2)}</strong><h3>`,
       icon: "info",
       showCancelButton: true,
-    }).then(async (result) => {
-      if (!result.isConfirmed) return;
-      
-      const success = await get().payAllItems(cashVal, cardVal);
-      if (success) {
-        (get() as any).resetStepper?.();
-      }
     });
+
+    if (!isConfirmed) return false;
+
+    const success = await get().payAllItems(cashVal, cardVal);
+    return success;
   },
 
   updateItemNote: async (orderItemId, note) => {
@@ -610,20 +661,41 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
 
     try {
       const { user } = useAuthStore.getState();
-      const effectiveWaiterName = waiterName || user?.user_metadata?.first_name || "Staff";
+      const firstName = user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
+      const lastName = user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
+      const userName = (firstName + " " + lastName).trim() || user?.email || "Staff";
+      const effectiveWaiterName = waiterName || userName;
       const oId = (orderId || currentOrder?.id) as string;
+      const displayOrderId = (currentOrder as any)?.order_no || (currentOrder as any)?.order_id || String(oId).slice(-6).toUpperCase();
 
       await menuService.updateOrderItemPaymentStatus(itemIds, 'completed');
       await getOrderItemsByOrderId(oId);
 
+      const { selectedRestaurant } = useRestaurantStore.getState();
       const paidItemsCount = itemsToPay.length;
-      printReceipt(oId, effectiveWaiterName, chosenTableNum.toString(), paidItemsCount, totalToPay, itemsToPay, totalPaid.toFixed(2), cashVal.toFixed(2), cardVal.toFixed(2), (totalPaid - totalToPay).toFixed(2));
+      printReceipt(
+        displayOrderId, 
+        effectiveWaiterName, 
+        chosenTableNum.toString(), 
+        paidItemsCount, 
+        totalToPay, 
+        itemsToPay, 
+        totalPaid.toFixed(2), 
+        cashVal.toFixed(2), 
+        cardVal.toFixed(2), 
+        (totalPaid - totalToPay).toFixed(2),
+        selectedRestaurant
+      );
       
       const allItems = await getOrderItemsByOrderId(oId as string);
       const allPaid = allItems.every((item: OrderItem) => item.payment_status === 'completed');
       
       if (allPaid) {
-        await supabase.from("orders").update({ status: "served" }).eq("id", oId);
+        const { tipAmount } = get();
+        await supabase.from("orders").update({ 
+          status: "served",
+          tip: tipAmount 
+        }).eq("id", oId);
         const sId = currentOrder?.session_id;
         if (sId) {
           const session = await menuService.closeSession(sId);
@@ -682,11 +754,14 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
       totalRemaining: 0,
       cash: "",
       card: "",
+      tipAmount: 0,
+      totalCashCardAmount: 0,
       currentKitchenTasks: [],
       chosenTableSession: null,
       chosenTable: null
     });
     useTablesStore.getState().setSelectedSession(null);
+    get().resetStepper();
   },
 
   fetchMyOrderHistory: async (waiterId, startDate, endDate) => {

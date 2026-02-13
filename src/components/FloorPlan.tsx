@@ -10,14 +10,18 @@ import {
 } from '@mui/icons-material';
 import { RestaurantTable } from '../lib/tablesStore';
 
+import TableTimer from './TableTimer';
+
 interface FloorPlanProps {
   tables: RestaurantTable[];
+  sessionsOverview?: any[];
+  serviceRequests?: any[];
   onTableClick: (table: RestaurantTable) => void;
   onUpdatePosition: (id: string, x: number, y: number) => Promise<void>;
   onCancelReservation?: (table: RestaurantTable) => void;
 }
 
-const FloorPlan: React.FC<FloorPlanProps> = ({ tables, onTableClick, onUpdatePosition, onCancelReservation }) => {
+const FloorPlan: React.FC<FloorPlanProps> = ({ tables, sessionsOverview, serviceRequests, onTableClick, onUpdatePosition, onCancelReservation }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [tempPositions, setTempPositions] = useState<Record<string, { x: number, y: number }>>({});
   const containerRef = useRef<HTMLDivElement>(null);
@@ -99,6 +103,7 @@ const FloorPlan: React.FC<FloorPlanProps> = ({ tables, onTableClick, onUpdatePos
               };
               
               const statusColor = getStatusColor(table.status);
+              const hasServiceRequest = serviceRequests?.some((r: any) => r.table_id === table.id && r.status === "pending");
 
               return (
                 <motion.div
@@ -132,6 +137,9 @@ const FloorPlan: React.FC<FloorPlanProps> = ({ tables, onTableClick, onUpdatePos
                           position: 'relative',
                           transform: `rotate(${table.rotation || 0}deg)`,
                           transition: 'border-color 0.3s, box-shadow 0.3s',
+                          boxShadow: hasServiceRequest 
+                            ? "0 0 0 4px #d32f2f, 0 0 20px rgba(211, 47, 47, 0.6)" 
+                            : (table.status === 'occupied' ? "0 4px 12px rgba(0,0,0,0.1)" : "none"),
                           '&:hover': {
                             boxShadow: isEditMode ? 20 : 6
                           }
@@ -143,6 +151,16 @@ const FloorPlan: React.FC<FloorPlanProps> = ({ tables, onTableClick, onUpdatePos
                         <Typography variant="caption" color="text.secondary" fontWeight="bold">
                           {table.capacity} SEATS
                         </Typography>
+
+                        {/* Timer */}
+                        {!isEditMode && table.status === 'occupied' && (() => {
+                          const session = sessionsOverview?.find((s: any) => s.table_id === table.id);
+                          return session?.opened_at ? (
+                            <Box sx={{ mt: 0.5 }}>
+                               <TableTimer startDate={session.opened_at} />
+                            </Box>
+                          ) : null;
+                        })()}
                         
                         {/* Status Dot */}
                         <Box sx={{ 
