@@ -73,12 +73,6 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
               <Avatar src={dish.menu_item_image_url} alt={dish.menu_item_name} variant="rounded" sx={{ width: 72, height: 72, mr: 2.5, borderRadius: 2, boxShadow: 2, border: "2px solid #fff" }}>
                 <RestaurantIcon sx={{ fontSize: 32, color: "#757575" }} />
               </Avatar>
-              {/* Mobile text header if needed, or keep Avatar separate. 
-                  Actually, cleaner to keep Avatar + Content split. 
-                  Below styling assumes Avatar is on distinct row on mobile? No, maybe Avatar + Name row?
-                  Let's stick to simple stacking: Avatar block (maybe with name?) then details.
-                  Or just keep Avatar as block.
-               */}
             </Box>
             
             <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
@@ -86,6 +80,17 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1 }}>
                 <Chip label={`Order #${dish.order_id}`} size="small" sx={{ bgcolor: "#e3f2fd", color: "#1976d2", fontWeight: 500 }} />
                 <Chip label={`Table ${dish.table_number}`} size="small" sx={{ bgcolor: "#f3e5f5", color: "#7b1fa2", fontWeight: 500 }} />
+                <Chip 
+                  label={
+                    dish.course === 1 ? "STARTER" :
+                    dish.course === 2 ? "MAIN" :
+                    dish.course === 3 ? "DESSERT" :
+                    dish.course === 4 ? "DRINKS" :
+                    `Course ${dish.course || 1}`
+                  } 
+                  size="small" 
+                  sx={{ bgcolor: "#fff3e0", color: "#e65100", fontWeight: 500 }} 
+                />
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -93,6 +98,33 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
                   <Typography variant="caption" sx={{ color: "#757575", fontWeight: 500 }}>{getTimeAgo(dish.order_item_created_at)}</Typography>
                 </Box>
               </Box>
+              {dish.notes && (
+                <Box sx={{ mt: 1, p: 1, borderRadius: 1.5, bgcolor: 'rgba(216, 67, 21, 0.08)', borderLeft: '4px solid #d84315' }}>
+                  <Typography variant="body2" sx={{ fontStyle: 'italic', fontWeight: 600, color: '#bf360c' }}>
+                    Note: {dish.notes}
+                  </Typography>
+                </Box>
+              )}
+              {dish.notes?.includes('[COMP') && (
+                <Chip 
+                  label="FREE / COMP" 
+                  size="small" 
+                  color="success" 
+                  sx={{ mt: 1, fontWeight: 'bold', fontSize: '0.7rem' }} 
+                />
+              )}
+              {dish.modifier_names?.length > 0 && (
+                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {dish.modifier_names.map((m: any, idx: number) => (
+                    <Chip 
+                      key={idx} 
+                      label={m.name} 
+                      size="small" 
+                      sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.contrastText' }} 
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
             {dish?.order_item_status === "preparing" && (
               <Box sx={{ width: { xs: "100%", sm: 140 }, ml: { xs: 0, sm: 2 }, mt: { xs: 2, sm: 0 }, position: "relative" }}>

@@ -25,6 +25,7 @@ interface BarTask {
   updated_at?: string;
   completed_at?: string;
   menu_item_image_url?: string;
+  notes?: string;
 }
 
 interface CartItem {

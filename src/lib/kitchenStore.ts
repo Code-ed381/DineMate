@@ -22,6 +22,8 @@ interface KitchenTask {
   waiter_last_name?: string;
   waiter_avatar?: string;
   menu_item_preparation_time?: number; // Added to support SLA
+  modifier_names?: { name: string }[];
+  course?: number;
 }
 
 interface KitchenState {
@@ -204,7 +206,28 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         }
       }
 
-      // 5. Map attributes to tasks
+      // 5. Fetch Modifiers and Course
+      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+      let modMap: Record<string, { name: string }[]> = {};
+      let courseMap: Record<string, number> = {};
+      
+      if (orderItemIds.length > 0) {
+        const [modsResult, itemsResult] = await Promise.all([
+          supabase.from("order_item_modifiers").select("order_item_id, name").in("order_item_id", orderItemIds),
+          supabase.from("order_items").select("id, course").in("id", orderItemIds)
+        ]);
+          
+        modsResult.data?.forEach(m => {
+          if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
+          modMap[m.order_item_id].push({ name: m.name });
+        });
+
+        itemsResult.data?.forEach(i => {
+          courseMap[i.id] = i.course;
+        });
+      }
+
+      // 6. Map attributes to tasks
       const correctedTasks = tasks.map(task => {
         const finalWaiterId = task.waiter_id || resolvedWaitersByOrder[task.order_id];
         const waiter = waiterMap[finalWaiterId] || {};
@@ -212,10 +235,12 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         return { 
           ...task, 
           quantity: 1,
-          waiter_id: finalWaiterId || task.waiter_id, // Update the ID if we resolved it
+          waiter_id: finalWaiterId || task.waiter_id, 
           waiter_first_name: waiter.first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
           waiter_last_name: waiter.last_name || "",
-          waiter_avatar: waiter.avatar
+          waiter_avatar: waiter.avatar,
+          modifier_names: modMap[task.order_item_id] || [],
+          course: courseMap[task.order_item_id] || 1
         };
       });
 
@@ -235,6 +260,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       const { data, error } = await supabase
         .from("kitchen_tasks_full")
         .select("*")
+        .eq("item_type", "food")
         .or(`order_item_status.eq.pending,order_item_status.eq.preparing`)
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
@@ -242,7 +268,34 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       if (error) throw error;
 
       const tasks = (data as KitchenTask[]) || [];
-      const correctedTasks = tasks.map(task => ({ ...task, quantity: 1 }));
+      
+      // Manually fetch modifiers and course to avoid view limitations
+      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+      let modMap: Record<string, { name: string }[]> = {};
+      let courseMap: Record<string, number> = {};
+      
+      if (orderItemIds.length > 0) {
+        const [modsResult, itemsResult] = await Promise.all([
+          supabase.from("order_item_modifiers").select("order_item_id, name").in("order_item_id", orderItemIds),
+          supabase.from("order_items").select("id, course").in("id", orderItemIds)
+        ]);
+          
+        modsResult.data?.forEach(m => {
+          if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
+          modMap[m.order_item_id].push({ name: m.name });
+        });
+
+        itemsResult.data?.forEach(i => {
+          courseMap[i.id] = i.course;
+        });
+      }
+
+      const correctedTasks = tasks.map(task => ({ 
+        ...task, 
+        quantity: 1,
+        modifier_names: modMap[task.order_item_id] || [],
+        course: courseMap[task.order_item_id] || 1
+      }));
       set({ pendingMeals: correctedTasks, loadingPending: false });
     } catch (error) {
       console.error("Error fetching pending and preparing tasks:", error);
@@ -259,6 +312,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       const { data, error } = await supabase
         .from("kitchen_tasks_full")
         .select("*")
+        .eq("item_type", "food")
         .eq("order_item_status", "preparing")
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
@@ -266,7 +320,34 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       if (error) throw error;
 
       const tasks = (data as KitchenTask[]) || [];
-      const correctedTasks = tasks.map(task => ({ ...task, quantity: 1 }));
+      
+      // Manually fetch modifiers and course
+      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+      let modMap: Record<string, { name: string }[]> = {};
+      let courseMap: Record<string, number> = {};
+      
+      if (orderItemIds.length > 0) {
+        const [modsResult, itemsResult] = await Promise.all([
+          supabase.from("order_item_modifiers").select("order_item_id, name").in("order_item_id", orderItemIds),
+          supabase.from("order_items").select("id, course").in("id", orderItemIds)
+        ]);
+          
+        modsResult.data?.forEach(m => {
+          if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
+          modMap[m.order_item_id].push({ name: m.name });
+        });
+
+        itemsResult.data?.forEach(i => {
+          courseMap[i.id] = i.course;
+        });
+      }
+
+      const correctedTasks = tasks.map(task => ({ 
+        ...task, 
+        quantity: 1, 
+        modifier_names: modMap[task.order_item_id] || [],
+        course: courseMap[task.order_item_id] || 1
+      }));
       set({ preparingMeals: correctedTasks, loadingPreparing: false });
     } catch (error) {
       console.error("Error fetching preparing tasks:", error);
@@ -283,6 +364,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       const { data, error } = await supabase
         .from("kitchen_tasks_full")
         .select("*")
+        .eq("item_type", "food")
         .eq("order_item_status", "ready")
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
@@ -290,7 +372,34 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       if (error) throw error;
 
       const tasks = (data as KitchenTask[]) || [];
-      const correctedTasks = tasks.map(task => ({ ...task, quantity: 1 }));
+      
+      // Manually fetch modifiers and course
+      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+      let modMap: Record<string, { name: string }[]> = {};
+      let courseMap: Record<string, number> = {};
+      
+      if (orderItemIds.length > 0) {
+        const [modsResult, itemsResult] = await Promise.all([
+          supabase.from("order_item_modifiers").select("order_item_id, name").in("order_item_id", orderItemIds),
+          supabase.from("order_items").select("id, course").in("id", orderItemIds)
+        ]);
+          
+        modsResult.data?.forEach(m => {
+          if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
+          modMap[m.order_item_id].push({ name: m.name });
+        });
+
+        itemsResult.data?.forEach(i => {
+          courseMap[i.id] = i.course;
+        });
+      }
+
+      const correctedTasks = tasks.map(task => ({ 
+        ...task, 
+        quantity: 1,
+        modifier_names: modMap[task.order_item_id] || [],
+        course: courseMap[task.order_item_id] || 1
+      }));
       set({ readyMeals: correctedTasks, loadingReady: false });
     } catch (error) {
       console.error("Error fetching ready tasks:", error);
@@ -308,6 +417,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       const { data, error } = await supabase
         .from("kitchen_tasks_full")
         .select("*")
+        .eq("item_type", "food")
         .eq("order_item_status", "served")
         .eq("menu_item_restaurant_id", restaurantId)
         .gte("task_created_at", fromTime)
@@ -316,7 +426,26 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       if (error) throw error;
 
       const tasks = (data as KitchenTask[]) || [];
-      const correctedTasks = tasks.map(task => ({ ...task, quantity: 1 }));
+      
+      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+      let courseMap: Record<string, number> = {};
+
+      if (orderItemIds.length > 0) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("id, course")
+          .in("id", orderItemIds);
+        
+        items?.forEach(i => {
+          courseMap[i.id] = i.course;
+        });
+      }
+
+      const correctedTasks = tasks.map(task => ({ 
+        ...task, 
+        quantity: 1,
+        course: courseMap[task.order_item_id] || 1
+      }));
       set({ servedMeals: correctedTasks, loadingServed: false });
     } catch (error) {
       console.error("Error fetching served tasks:", error);

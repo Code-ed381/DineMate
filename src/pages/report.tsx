@@ -17,6 +17,7 @@ import {
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { TrendingUp, FilterList, Download, CreditCard, AttachMoney, ReceiptLong } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
+import { getCurrencySymbol } from "../utils/currency";
 
 // Dummy Data
 const dummyRows = [
@@ -97,7 +98,7 @@ const ReportDashboard: React.FC = () => {
           <Card sx={getCardStyle("#E3F2FD")}>
             <CardHeader title="Cash Total" sx={{ p: 1 }} />
             <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1 }}>
-              <Typography variant="h5" fontWeight={700}>£210</Typography>
+              <Typography variant="h5" fontWeight={700}>{getCurrencySymbol()}210</Typography>
               <AttachMoney color={isDark ? "primary" : "inherit"} />
             </CardContent>
           </Card>
@@ -106,7 +107,7 @@ const ReportDashboard: React.FC = () => {
           <Card sx={getCardStyle("#E8F5E9")}>
             <CardHeader title="Card Total" sx={{ p: 1 }} />
             <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1 }}>
-              <Typography variant="h5" fontWeight={700}>£165</Typography>
+              <Typography variant="h5" fontWeight={700}>{getCurrencySymbol()}165</Typography>
               <CreditCard color={isDark ? "success" : "inherit"} />
             </CardContent>
           </Card>

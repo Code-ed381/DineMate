@@ -3,17 +3,20 @@ import { Box, Card, CardContent, Stack, Typography, Divider, Chip } from "@mui/m
 import { AttachMoney, CreditCard, Smartphone } from "@mui/icons-material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 
+import { useCurrency } from "../../../utils/currency";
+
 interface TransactionHistoryProps {
   allSessions: any[];
 }
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ allSessions }) => {
+  const { currencySymbol } = useCurrency();
   const columns: GridColDef[] = [
     { field: "order_id", headerName: "Order ID", flex: 1, renderCell: (params) => `ORD-${params.value?.toString().slice(0, 8)}` },
     { field: "table_number", headerName: "Table", flex: 1 },
     { field: "opened_at", headerName: "Date", flex: 1.5, renderCell: (params) => new Date(params.value).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) },
     { field: "waiter", headerName: "Waiter", flex: 1.5, renderCell: (params) => `${params.row?.waiter_first_name ?? ""} ${params.row?.waiter_last_name ?? ""}`.trim() || "System" },
-    { field: "order_total", headerName: "Amount", type: "number", flex: 1, align: "right", headerAlign: "right", renderCell: (params) => `£${Number(params.value || 0).toFixed(2)}` },
+    { field: "order_total", headerName: "Amount", type: "number", flex: 1, align: "right", headerAlign: "right", renderCell: (params) => `${currencySymbol}${Number(params.value || 0).toFixed(2)}` },
     { field: "discount", headerName: "Disc.", type: "number", flex: 0.8, align: "right", headerAlign: "right", renderCell: (params) => params.value > 0 ? `${params.value}%` : "-" },
     {
       field: "payment_method", headerName: "Method", flex: 1, renderCell: (params) => {

@@ -42,6 +42,33 @@ const ServedMealsList: React.FC<ServedMealsListProps> = ({ servedMeals }) => {
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}><AccessTimeIcon sx={{ fontSize: 14, color: "#43a047" }} /><Typography variant="caption" sx={{ color: "#43a047", fontWeight: 500 }}>{formatDateTimeWithSuffix(dish?.task_updated_at)}</Typography></Box>
               <Typography variant="caption" sx={{ color: "#2e7d32", fontWeight: 600 }}>Served</Typography>
             </Box>
+            {dish.notes && (
+              <Box sx={{ mt: 1, p: 1, borderRadius: 1.5, bgcolor: 'rgba(46, 125, 50, 0.08)', borderLeft: '4px solid #43a047' }}>
+                <Typography variant="body2" sx={{ fontStyle: 'italic', fontWeight: 600, color: '#1b5e20' }}>
+                  Note: {dish.notes}
+                </Typography>
+              </Box>
+            )}
+            {dish.notes?.includes('[COMP') && (
+              <Chip 
+                label="FREE / COMP" 
+                size="small" 
+                color="success" 
+                sx={{ mt: 1, fontWeight: 'bold', fontSize: '0.7rem' }} 
+              />
+            )}
+            {dish.modifier_names?.length > 0 && (
+                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {dish.modifier_names.map((m: any, idx: number) => (
+                    <Chip 
+                      key={idx} 
+                      label={m.name} 
+                      size="small" 
+                      sx={{ height: 20, fontSize: '0.7rem', bgcolor: 'primary.light', color: 'primary.contrastText' }} 
+                    />
+                  ))}
+                </Box>
+              )}
           </Box>
         </ListItem>
       ))}

@@ -142,8 +142,15 @@ const Layout: React.FC = () => {
     role,
   } = useRestaurantStore();
   const { settings } = useSettings() as any;
-  const { notifications, setNotifications, subscribeToNotifications, unsubscribe, fetchNotifications } =
-    useNotificationStore();
+  const { 
+    notifications, 
+    setNotifications, 
+    subscribeToNotifications, 
+    unsubscribe, 
+    fetchNotifications,
+    deleteNotification,
+    clearAllNotifications
+  } = useNotificationStore();
   const isOnline = useOnlineStatus();
 
   const { fetchUser } = useDashboardStore();
@@ -193,7 +200,7 @@ const Layout: React.FC = () => {
       setSelectedRestaurant(restaurants[0].restaurants);
       setRole(restaurants[0].role);
     }
-  }, [restaurants, selectedRestaurant, setSelectedRestaurant]);
+  }, [restaurants, selectedRestaurant, setSelectedRestaurant, setRole]);
 
   const formatDate = (date: Date) => {
     return dayjs(date).format("ddd, DD MMMM YYYY, h:mm:ss A");
@@ -245,8 +252,8 @@ const Layout: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const handleDelete = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
+  const handleDelete = async (id: string) => {
+    await deleteNotification(id);
   };
 
   const handleMarkAsRead = (id: string) => {
@@ -291,9 +298,11 @@ const Layout: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate, setBreadcrumb, role]);
 
-  const handleClearAll = () => {
-    setNotifications([]);
-    handleClose();
+  const handleClearAll = async () => {
+    if (user?.id && selectedRestaurant?.id) {
+      await clearAllNotifications(user.id, selectedRestaurant.id);
+      handleClose();
+    }
   };
 
   const UserProfileCard = ({ collapsed }: { collapsed?: boolean }) => (

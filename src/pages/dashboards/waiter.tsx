@@ -24,10 +24,14 @@ import {
   LocalDining,
   MonetizationOn,
   Search,
+  GridView as GridViewIcon,
+  Map as MapIcon,
 } from "@mui/icons-material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BarChartTwoToneIcon from "@mui/icons-material/BarChartTwoTone";
 import useMenuStore from "../../lib/menuStore";
+import useTablesStore from "../../lib/tablesStore";
+import FloorPlan from "../../components/FloorPlan";
 import DashboardHeader from "./components/dashboard-header";
 import WaiterDashboardSkeleton from "./components/skeletons/waiter-dashboard-skeleton";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
@@ -109,6 +113,9 @@ const WaiterDashboard: React.FC = () => {
     dashboardKitchenTasks,
   } = useMenuStore();
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
+  const { tables, getTables, updateTablePosition } = useTablesStore();
+
   
   const getItemStatusBreakdown = (itemId: string) => {
     // If no kitchen tasks loaded yet, return null
@@ -128,6 +135,7 @@ const WaiterDashboard: React.FC = () => {
   useEffect(() => {
     getActiveSessionByRestaurant();
     fetchSalesData();
+    getTables();
     subscribeToSessions();
     subscribeToOrderItems();
 
@@ -135,7 +143,7 @@ const WaiterDashboard: React.FC = () => {
       unsubscribeFromSessions();
       unsubscribeFromOrderItems();
     };
-  }, [getActiveSessionByRestaurant, fetchSalesData, subscribeToSessions, unsubscribeFromSessions, subscribeToOrderItems, unsubscribeFromOrderItems]);
+  }, [getActiveSessionByRestaurant, fetchSalesData, getTables, subscribeToSessions, unsubscribeFromSessions, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
   // ---- Derived Insights ----
   const totalRevenue = useMemo(
@@ -296,6 +304,27 @@ const WaiterDashboard: React.FC = () => {
               <ToggleButton value="closed">Closed</ToggleButton>
             </ToggleButtonGroup>
 
+            <ToggleButtonGroup
+              exclusive
+              value={viewMode}
+              onChange={(_e, value) => value && setViewMode(value)}
+              sx={{
+                "& .MuiToggleButton-root": {
+                  px: 2,
+                  py: 1,
+                  fontWeight: 600,
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <ToggleButton value="grid">
+                <GridViewIcon sx={{ mr: 1 }} /> Grid
+              </ToggleButton>
+              <ToggleButton value="floor">
+                <MapIcon sx={{ mr: 1 }} /> Floor Plan
+              </ToggleButton>
+            </ToggleButtonGroup>
+
             <TextField
               placeholder="Search table..."
               fullWidth
@@ -313,132 +342,152 @@ const WaiterDashboard: React.FC = () => {
           </Stack>
 
           {/* ---- Table Sessions ---- */}
-          <Grid container spacing={2}>
-            {filteredTables.length === 0 ? (
-              <Grid item xs={12}>
-                <Box
-                  sx={{
-                    p: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 200,
-                  }}
-                >
-                  <InfoOutlinedIcon sx={{ mb: 1, opacity: 0.5 }} fontSize="large" />
-                  <Typography variant="body1" fontWeight={600} color="text.secondary">
-                    No tables found
-                  </Typography>
-                </Box>
-              </Grid>
-            ) : (
-              filteredTables.map((session: any) => (
-                <Grid item xs={12} sm={6} md={6} lg={3} key={session.session_id}>
-                  <Card
+          {viewMode === "grid" ? (
+            <Grid container spacing={2}>
+              {filteredTables.length === 0 ? (
+                // ... existing empty state
+                <Grid item xs={12}>
+                  <Box
                     sx={{
-                      borderRadius: 2,
-                      height: 450,
+                      p: 2,
                       display: "flex",
                       flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minHeight: 200,
                     }}
                   >
-                    <CardHeader
-                      title={`Table ${session.table_number}`}
-                      action={<StatusChip status={session.session_status} />}
-                    />
-                    <Divider />
-                    <CardContent sx={{ flex: 1, overflowY: "auto", p: 1 }}>
-                      {(session.order_items ?? []).length === 0 ? (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          align="center"
-                          sx={{ mt: 4 }}
-                        >
-                          No orders yet 🍽️
-                        </Typography>
-                      ) : (
-                        <List dense>
-                          {session.order_items.map((order: any) => (
-                            <ListItem
-                              key={order.id}
-                              sx={{
-                                mb: 1,
-                                py: 1,
-                                px: 2,
-                                borderRadius: 2,
-                                bgcolor: "background.default",
-                                display: "flex",
-                                justifyContent: "space-between",
-                              }}
-                            >
-                              <Box>
-                                <Typography sx={{ fontWeight: 600 }}>
-                                  {order.menu_item.name}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  x{order.quantity} • ${order.menu_item.price}
-                                </Typography>
-                              </Box>
-
-                              {(() => {
-                                 const breakdown = getItemStatusBreakdown(order.id);
-                                 
-                                 if (breakdown) {
-                                   return (
-                                     <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: '40%' }}>
-                                       {breakdown['pending'] > 0 && <Chip label={`${breakdown['pending']} PENDING`} size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                       {breakdown['preparing'] > 0 && <Chip label={`${breakdown['preparing']} PREP`} size="small" color="warning" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                       {breakdown['ready'] > 0 && <Chip label={`${breakdown['ready']} READY`} size="small" color="success" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                       {breakdown['served'] > 0 && <Chip label={`${breakdown['served']} SERVED`} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />}
-                                     </Stack>
-                                   );
-                                 }
-
-                                 return (
-                                    <>
-                                      {order.item_status != "preparing" && (
-                                        <StatusChip status={order.item_status} />
-                                      )}
-
-                                      {order.item_status === "preparing" && (
-                                        <CircularProgress size={20} color="warning" />
-                                      )}
-                                    </>
-                                 );
-                               })()}
-                            </ListItem>
-                          ))}
-                        </List>
-                      )}
-                    </CardContent>
-                    <Divider />
-                    <Box
+                    <InfoOutlinedIcon sx={{ mb: 1, opacity: 0.5 }} fontSize="large" />
+                    <Typography variant="body1" fontWeight={600} color="text.secondary">
+                      No tables found
+                    </Typography>
+                  </Box>
+                </Grid>
+              ) : (
+                filteredTables.map((session: any) => (
+                  <Grid item xs={12} sm={6} md={6} lg={3} key={session.session_id}>
+                    {/* ... existing card ... */}
+                    <Card
                       sx={{
-                        p: 1.5,
+                        borderRadius: 2,
+                        minHeight: 300,
+                        height: "100%",
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        flexDirection: "column",
+                        transition: "all 0.3s ease",
+                        "&:hover": {
+                          boxShadow: 6,
+                          transform: "translateY(-4px)"
+                        }
                       }}
                     >
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        Total: ${session.order_total?.toFixed(2) ?? "0.00"}
-                      </Typography>
-                      <Stack direction="row" spacing={1}>
+                      <CardHeader
+                        title={`Table ${session.table_number}`}
+                        titleTypographyProps={{ variant: 'h6', fontWeight: 800 }}
+                        action={<StatusChip status={session.session_status} />}
+                        sx={{ pb: 1 }}
+                      />
+                      <Divider />
+                      <CardContent sx={{ flex: 1, p: 1.5 }}>
+                        {(session.order_items ?? []).length === 0 ? (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            align="center"
+                            sx={{ mt: 4 }}
+                          >
+                            No orders yet 🍽️
+                          </Typography>
+                        ) : (
+                          <List dense>
+                            {session.order_items.map((order: any) => (
+                              <ListItem
+                                key={order.id}
+                                sx={{
+                                  mb: 1,
+                                  py: 1,
+                                  px: 2,
+                                  borderRadius: 2,
+                                  bgcolor: "background.default",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                }}
+                              >
+                                <Box>
+                                  <Typography sx={{ fontWeight: 600 }}>
+                                    {order.menu_item.name}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    x{order.quantity} • ${order.menu_item.price}
+                                  </Typography>
+                                </Box>
+
+                                {(() => {
+                                   const breakdown = getItemStatusBreakdown(order.id);
+                                   
+                                   if (breakdown) {
+                                     return (
+                                       <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end" sx={{ maxWidth: '40%' }}>
+                                         {breakdown['pending'] > 0 && <Chip label={`${breakdown['pending']} PENDING`} size="small" color="default" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                         {breakdown['preparing'] > 0 && <Chip label={`${breakdown['preparing']} PREP`} size="small" color="warning" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                         {breakdown['ready'] > 0 && <Chip label={`${breakdown['ready']} READY`} size="small" color="success" variant="filled" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                         {breakdown['served'] > 0 && <Chip label={`${breakdown['served']} SERVED`} size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                                       </Stack>
+                                     );
+                                   }
+
+                                   return (
+                                      <>
+                                        {order.item_status !== "preparing" && (
+                                          <StatusChip status={order.item_status} />
+                                        )}
+
+                                        {order.item_status === "preparing" && (
+                                          <CircularProgress size={20} color="warning" />
+                                        )}
+                                      </>
+                                   );
+                                 })()}
+                              </ListItem>
+                            ))}
+                          </List>
+                        )}
+                      </CardContent>
+                      <Divider />
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <Typography variant="subtitle2" fontWeight={700}>
-                          {formatDateTimeWithSuffix(session.opened_at)}
+                          Total: ${session.order_total?.toFixed(2) ?? "0.00"}
                         </Typography>
-                      </Stack>
-                    </Box>
-                  </Card>
-                </Grid>
-              ))
-            )}
-          </Grid>
+                        <Stack direction="row" spacing={1}>
+                          <Typography variant="subtitle2" fontWeight={700}>
+                            {formatDateTimeWithSuffix(session.opened_at)}
+                          </Typography>
+                        </Stack>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))
+              )}
+            </Grid>
+          ) : (
+            <FloorPlan 
+              tables={tables} 
+              onTableClick={(table) => {
+                // If the table has an active session, we could focus it or open it.
+              }}
+              onUpdatePosition={updateTablePosition}
+            />
+          )}
         </>
       )}
     </Box>

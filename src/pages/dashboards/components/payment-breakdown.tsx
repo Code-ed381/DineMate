@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, Typography } from "@mui/material";
 import { PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
+import { useCurrency } from "../../../utils/currency";
 
 const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#f44336"];
 
@@ -9,6 +10,7 @@ interface PaymentBreakdownChartProps {
 }
 
 const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessions }) => {
+  const { currencySymbol } = useCurrency();
   const paymentBreakdown = useMemo(() => {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -43,7 +45,7 @@ const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessio
               {paymentBreakdown.map((_, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
             </Pie>
             <Legend />
-            <RTooltip formatter={(value: number) => `£${value.toFixed(2)}`} />
+            <RTooltip formatter={(value: number) => `${currencySymbol}${value.toFixed(2)}`} />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

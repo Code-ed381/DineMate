@@ -49,6 +49,8 @@ export interface NotificationState {
   fetchNotificationById: (notificationId: string) => Promise<void>;
   markAsRead: (userNotificationId: string) => Promise<void>;
   markAllAsRead: (userId: string, restaurantId: string) => Promise<void>;
+  deleteNotification: (userNotificationId: string) => Promise<void>;
+  clearAllNotifications: (userId: string, restaurantId: string) => Promise<void>;
   subscribeToNotifications: () => void;
   unsubscribe: () => void;
   showToastNotification: (notification: NotificationData) => void;
@@ -201,6 +203,45 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
       }));
     } catch (error) {
       console.error("Error marking all as read:", error);
+    }
+  },
+
+  deleteNotification: async (userNotificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("user_notifications")
+        .delete()
+        .eq("id", userNotificationId);
+
+      if (error) throw error;
+
+      set((state) => ({
+        notifications: state.notifications.filter((n) => n.id !== userNotificationId),
+        unreadCount: state.notifications.find((n) => n.id === userNotificationId)?.is_read 
+          ? state.unreadCount 
+          : Math.max(0, state.unreadCount - 1),
+      }));
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+  },
+
+  clearAllNotifications: async (userId: string, restaurantId: string) => {
+    try {
+      const { error } = await supabase
+        .from("user_notifications")
+        .delete()
+        .eq("user_id", userId)
+        .eq("restaurant_id", restaurantId);
+
+      if (error) throw error;
+
+      set({
+        notifications: [],
+        unreadCount: 0,
+      });
+    } catch (error) {
+      console.error("Error clearing all notifications:", error);
     }
   },
 

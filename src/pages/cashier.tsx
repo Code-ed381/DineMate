@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useTheme } from "@mui/material/styles";
 import {
   Box,
@@ -32,19 +32,12 @@ import {
 } from "@mui/material";
 import Swal from "sweetalert2";
 import {
-  Receipt,
   ShoppingCart,
   Payment,
-  AttachMoney,
-  CreditCard,
-  Smartphone,
   History,
   ReceiptLong,
-  ShoppingCartCheckout,
-  AccessTime,
   Restaurant,
   TableRestaurant,
-  Person,
 } from "@mui/icons-material";
 import CreditCardTwoToneIcon from "@mui/icons-material/CreditCardTwoTone";
 import MoneyTwoToneIcon from "@mui/icons-material/MoneyTwoTone";
@@ -52,13 +45,11 @@ import PriceCheckTwoToneIcon from "@mui/icons-material/PriceCheckTwoTone";
 import SecurityUpdateGoodTwoToneIcon from "@mui/icons-material/SecurityUpdateGoodTwoTone";
 import useCashierStore from "../lib/cashierStore";
 import { printReceipt } from "../components/PrintWindow";
-import {
-  formatDateTime,
-  formatDateTimeWithSuffix,
-} from "../utils/format-datetime";
 import CashierDashboardSkeleton from "../components/skeletons/cashier-panel-skeleton";
+import { useCurrency } from "../utils/currency";
 
 const CashierDashboard: React.FC = () => {
+  const { currencySymbol } = useCurrency();
   const {
     activeSessions,
     loadingActiveSessionByRestaurant,
@@ -212,15 +203,15 @@ const CashierDashboard: React.FC = () => {
         title: "Confirm Payment",
         html: `
           <div style="text-align: left; padding: 10px;">
-            <p><b>Subtotal:</b> £${formatCashInput(baseTotal)}</p>
-            ${discountPercent > 0 ? `<p style="color: red;"><b>Discount (${discountPercent}%):</b> -£${formatCashInput(discountAmount)}</p>` : ""}
-            <p><b>Total Due:</b> £${formatCashInput(totalDue)}</p>
+            <p><b>Subtotal:</b> ${currencySymbol}${formatCashInput(baseTotal)}</p>
+            ${discountPercent > 0 ? `<p style="color: red;"><b>Discount (${discountPercent}%):</b> -${currencySymbol}${formatCashInput(discountAmount)}</p>` : ""}
+            <p><b>Total Due:</b> ${currencySymbol}${formatCashInput(totalDue)}</p>
             <p><b>Method:</b> ${paymentMethod.toUpperCase()}</p>
             <hr/>
-            ${cashNum > 0 ? `<p><b>Cash:</b> £${formatCashInput(cashNum)}</p>` : ""}
-            ${cardNum > 0 ? `<p><b>Card:</b> £${formatCashInput(cardNum)}</p>` : ""}
-            ${momoNum > 0 ? `<p><b>MoMo:</b> £${formatCashInput(momoNum)}</p>` : ""}
-            <p style="font-size: 1.2rem; color: green;"><b>Change:</b> £${change.toFixed(2)}</p>
+            ${cashNum > 0 ? `<p><b>Cash:</b> ${currencySymbol}${formatCashInput(cashNum)}</p>` : ""}
+            ${cardNum > 0 ? `<p><b>Card:</b> ${currencySymbol}${formatCashInput(cardNum)}</p>` : ""}
+            ${momoNum > 0 ? `<p><b>MoMo:</b> ${currencySymbol}${formatCashInput(momoNum)}</p>` : ""}
+            <p style="font-size: 1.2rem; color: green;"><b>Change:</b> ${currencySymbol}${change.toFixed(2)}</p>
           </div>
         `,
         icon: "question",
@@ -273,7 +264,7 @@ const CashierDashboard: React.FC = () => {
           <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: "primary.main", mr: 2 }}><PriceCheckTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.total)}</Typography>
+              <Typography variant="h5" fontWeight={800}>{currencySymbol}{formatCashInput(sessionStats.total)}</Typography>
               <Typography variant="body2" color="text.secondary" fontWeight={600}>Total Sales</Typography>
             </Box>
           </Paper>
@@ -282,7 +273,7 @@ const CashierDashboard: React.FC = () => {
           <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: "success.main", mr: 2 }}><MoneyTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.cash)}</Typography>
+              <Typography variant="h5" fontWeight={800}>{currencySymbol}{formatCashInput(sessionStats.cash)}</Typography>
               <Typography variant="body2" color="text.secondary" fontWeight={600}>Cash Revenue</Typography>
             </Box>
           </Paper>
@@ -291,7 +282,7 @@ const CashierDashboard: React.FC = () => {
           <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Avatar sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), color: "error.main", mr: 2 }}><CreditCardTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.card)}</Typography>
+              <Typography variant="h5" fontWeight={800}>{currencySymbol}{formatCashInput(sessionStats.card)}</Typography>
               <Typography variant="body2" color="text.secondary" fontWeight={600}>Card Revenue</Typography>
             </Box>
           </Paper>
@@ -300,7 +291,7 @@ const CashierDashboard: React.FC = () => {
           <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: "warning.main", mr: 2 }}><SecurityUpdateGoodTwoToneIcon /></Avatar>
             <Box>
-              <Typography variant="h5" fontWeight={800}>£{formatCashInput(sessionStats.momo)}</Typography>
+              <Typography variant="h5" fontWeight={800}>{currencySymbol}{formatCashInput(sessionStats.momo)}</Typography>
               <Typography variant="body2" color="text.secondary" fontWeight={600}>MoMo Revenue</Typography>
             </Box>
           </Paper>
@@ -353,7 +344,7 @@ const CashierDashboard: React.FC = () => {
                       </Stack>
                       <Stack direction="row" spacing={2} mb={1}>
                         <Box display="flex" alignItems="center" gap={0.5} color="primary.main" fontWeight={700}>
-                          £{formatCashInput(session.order_total || session.total)}
+                          {currencySymbol}{formatCashInput(session.order_total || session.total)}
                         </Box>
                         <Box display="flex" alignItems="center" gap={0.5} sx={{ opacity: 0.7 }}>
                           <TableRestaurant fontSize="small" />T-{session.table_number || "OTC"}
@@ -387,7 +378,7 @@ const CashierDashboard: React.FC = () => {
                         <TableRow key={session.id}>
                           <TableCell>T-{session.table_number || "OTC"}</TableCell>
                           <TableCell>ORD-{session.order_id}</TableCell>
-                          <TableCell>£{formatCashInput(session.order_total || session.total)}</TableCell>
+                          <TableCell>{currencySymbol}{formatCashInput(session.order_total || session.total)}</TableCell>
                           <TableCell>
                             <Chip label={session.payment_method} size="small" variant="outlined" />
                           </TableCell>
@@ -433,9 +424,9 @@ const CashierDashboard: React.FC = () => {
                              </Avatar>
                              <ListItemText 
                                primary={<Typography variant="body2" fontWeight={600}>{item.item_name}</Typography>}
-                               secondary={`${item.quantity} x £${formatCashInput(item.unit_price)}`}
+                               secondary={`${item.quantity} x ${currencySymbol}${formatCashInput(item.unit_price)}`}
                              />
-                             <Typography variant="body2" fontWeight={700}>£{formatCashInput(item.sum_price)}</Typography>
+                             <Typography variant="body2" fontWeight={700}>{currencySymbol}{formatCashInput(item.sum_price)}</Typography>
                            </ListItem>
                          )) : (
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4, opacity: 0.5 }}>
@@ -452,7 +443,7 @@ const CashierDashboard: React.FC = () => {
                         <Box display="flex" justifyContent="space-between" sx={{ opacity: 0.7 }}>
                           <Typography variant="body1">Subtotal</Typography>
                           <Typography variant="body1">
-                            £{formatCashInput(
+                            {currencySymbol}{formatCashInput(
                               selectedOrderItems.length > 0 
                                 ? selectedOrderItems.reduce((acc, item) => acc + (parseFloat(item.sum_price) || 0), 0)
                                 : (selectedSession?.order_total || selectedSession?.total || 0)
@@ -462,7 +453,7 @@ const CashierDashboard: React.FC = () => {
                         <Box display="flex" justifyContent="space-between" sx={{ color: 'error.main', opacity: 0.8 }}>
                           <Typography variant="body1">Discount ({discount || 0}%)</Typography>
                           <Typography variant="body1">
-                            -£{formatCashInput(
+                             -{currencySymbol}{formatCashInput(
                               ((selectedOrderItems.length > 0 
                                 ? selectedOrderItems.reduce((acc, item) => acc + (parseFloat(item.sum_price) || 0), 0)
                                 : (selectedSession?.order_total || selectedSession?.total || 0)) * (parseFloat(discount) || 0)) / 100
@@ -472,7 +463,7 @@ const CashierDashboard: React.FC = () => {
                         <Box display="flex" justifyContent="space-between">
                           <Typography variant="h6" fontWeight={800}>Total Due</Typography>
                           <Typography variant="h6" color="primary" fontWeight={900}>
-                            £{formatCashInput(
+                            {currencySymbol}{formatCashInput(
                               Math.max(0, (selectedOrderItems.length > 0 
                                 ? selectedOrderItems.reduce((acc, item) => acc + (parseFloat(item.sum_price) || 0), 0)
                                 : (selectedSession?.order_total || selectedSession?.total || 0)) * (1 - (parseFloat(discount) || 0) / 100))
@@ -506,7 +497,7 @@ const CashierDashboard: React.FC = () => {
                             value={cashAmount} 
                             onChange={handleCashChange}
                             sx={{ mb: 2 }}
-                            InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                            InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                           />
                        )}
                        {(paymentMethod === "card" || paymentMethod === "card+cash") && (
@@ -517,7 +508,7 @@ const CashierDashboard: React.FC = () => {
                             value={cardAmount} 
                             onChange={handleCardChange}
                             sx={{ mb: 2 }}
-                            InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                            InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                           />
                        )}
                        {paymentMethod === "momo" && (
@@ -527,7 +518,7 @@ const CashierDashboard: React.FC = () => {
                             value={momoAmount}
                             onChange={(e) => setMomoAmount(e.target.value)}
                             sx={{ mb: 2 }}
-                            InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                            InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }}
                           />
                        )}
                        <ToggleButtonGroup

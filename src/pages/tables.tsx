@@ -21,7 +21,6 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  TableFooter,
   CircularProgress,
   Divider,
 } from "@mui/material";
@@ -35,12 +34,18 @@ import {
   LockClock,
   EventSeat,
   LocalDining,
+  Map as MapIcon,
+  GridView as GridViewIcon,
 } from "@mui/icons-material";
+import FloorPlan from "../components/FloorPlan";
 import useMenuStore from "../lib/menuStore";
 import TransitionsModal from "../components/modal";
 import TableSectionSkeleton from "../components/skeletons/table-section-skeleton";
 import useTablesStore from "../lib/tablesStore";
 import EnhancedSnackbar from "../components/snackbar";
+import TransferTableDialog from "../components/TransferTableDialog";
+import useAuthStore from "../lib/authStore";
+import useRestaurantStore from "../lib/restaurantStore";
 
 const statusColors: Record<string, any> = {
   available: { color: "success", icon: CheckCircle, main: "success.main" },
@@ -52,6 +57,7 @@ const statusColors: Record<string, any> = {
 const TableManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
   const {
     tables,
     handleStatusChange,
@@ -63,9 +69,20 @@ const TableManagement: React.FC = () => {
     getTables,
     getSessionsOverview,
     selectedSession,
+    getSession, 
+    updateTablePosition,
+    cancelReservation,
+    transferTable
   } = useTablesStore();
 
-  const { currentOrderItems, loadingCurrentOrderItems, totalOrdersPrice } = useMenuStore();
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [tableToTransfer, setTableToTransfer] = useState<any>(null);
+  const [transferSessionId, setTransferSessionId] = useState<string | null>(null);
+
+  const { user } = useAuthStore();
+  const { selectedRestaurant } = useRestaurantStore();
+
+  const { currentOrderItems, loadingCurrentOrderItems, totalOrdersPrice, startCourse, currentOrder } = useMenuStore();
   const navigate = useNavigate();
 
   const filteredTables = useMemo(() => {
@@ -102,6 +119,23 @@ const TableManagement: React.FC = () => {
     getSessionsOverview();
   }, [getTables, getSessionsOverview]);
 
+  const handleTransferClick = async (table: any) => {
+    if (!user?.id || !selectedRestaurant?.id) return;
+    const session = await getSession(table.id, user.id, selectedRestaurant.id);
+    if (session) {
+      setTransferSessionId(session.id);
+      setTableToTransfer(table);
+      setTransferDialogOpen(true);
+    } else {
+      setSnackbar({
+        open: true,
+        message: "No active session found for this table.",
+        severity: "warning",
+        id: Date.now()
+      });
+    }
+  };
+
 
   const handleTableActionButtonClick = async (table: any) => {
     const result = await handleStatusChange(table);
@@ -113,6 +147,8 @@ const TableManagement: React.FC = () => {
       setSnackbar({ id: 2, open: true, message: "Table cancelled successfully", severity: "success" });
     } else if (result.message === "occupied") {
       setSnackbar({ id: 3, open: true, message: "Table occupied now", severity: "success" });
+      navigate("/app/menu");
+    } else if (result.message === "viewing") {
       navigate("/app/menu");
     }
   };
@@ -143,6 +179,21 @@ const TableManagement: React.FC = () => {
                 <ToggleButton value="reserved">Reserved</ToggleButton>
               </ToggleButtonGroup>
             </Grid>
+            <Grid item xs={12} md="auto">
+              <ToggleButtonGroup
+                exclusive
+                size="large"
+                value={viewMode}
+                onChange={(_, value) => value && setViewMode(value)}
+              >
+                <ToggleButton value="grid" aria-label="grid view">
+                  <GridViewIcon sx={{ mr: 1 }} /> Grid
+                </ToggleButton>
+                <ToggleButton value="floor" aria-label="floor plan">
+                  <MapIcon sx={{ mr: 1 }} /> Floor Plan
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Grid>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth size="small"
@@ -154,8 +205,9 @@ const TableManagement: React.FC = () => {
             </Grid>
           </Grid>
 
-          <Grid container spacing={3}>
-            {filteredTables.map((table: any) => {
+          {viewMode === "grid" ? (
+            <Grid container spacing={3}>
+              {filteredTables.map((table: any) => {
               const status = table?.status || "unavailable";
               const StatusIcon = statusColors[status]?.icon;
               return (
@@ -170,18 +222,72 @@ const TableManagement: React.FC = () => {
                        {table.location && <Typography variant="body2">📍 {table.location}</Typography>}
                     </CardContent>
                     <Box p={2}>
-                       <Button fullWidth onClick={() => handleTableActionButtonClick(table)} color={status === "available" ? "success" : status === "occupied" ? "error" : "warning"}>
-                          {status === "available" ? "Reserve" : status === "occupied" ? "View Order" : "Start Order"}
-                       </Button>
-                    </Box>
+                        <Stack direction="row" spacing={1} sx={{ '& > *': { flex: 1 } }}>
+                          <Button 
+                            fullWidth 
+                            onClick={() => handleTableActionButtonClick(table)} 
+                            color={status === "available" ? "success" : status === "occupied" ? "error" : "warning"}
+                            variant={status === "reserved" ? "contained" : "text"}
+                          >
+                             {status === "available" ? "Reserve" : status === "occupied" ? "View Order" : "Start Order"}
+                          </Button>
+                          {status === "occupied" && (
+                            <Button 
+                              fullWidth 
+                              onClick={() => handleTransferClick(table)} 
+                              color="primary" 
+                              variant="outlined"
+                              sx={{ px: 1 }}
+                            >
+                               Transfer
+                            </Button>
+                          )}
+                          {status === "reserved" && (
+                            <Button 
+                              fullWidth 
+                              onClick={() => cancelReservation(table, 'cancelled')} 
+                              color="error" 
+                              variant="outlined"
+                              sx={{ px: 1 }}
+                            >
+                               Cancel
+                            </Button>
+                          )}
+                        </Stack>
+                     </Box>
                   </Card>
                 </Grid>
               );
             })}
           </Grid>
+          ) : (
+            <FloorPlan 
+              tables={filteredTables} 
+              onTableClick={handleTableActionButtonClick}
+              onUpdatePosition={updateTablePosition}
+              onCancelReservation={(table) => cancelReservation(table, 'cancelled')}
+            />
+          )}
         </Box>
       )}
       {loadingTables && <TableSectionSkeleton />}
+
+      <TransferTableDialog
+        open={transferDialogOpen}
+        onClose={() => {
+          setTransferDialogOpen(false);
+          setTableToTransfer(null);
+          setTransferSessionId(null);
+        }}
+        onTransfer={async (destId) => {
+          if (transferSessionId && tableToTransfer) {
+            await transferTable(transferSessionId, tableToTransfer.id, destId);
+          }
+        }}
+        availableTables={tables.filter(t => t.status === 'available')}
+        sourceTableNumber={tableToTransfer?.table_number || ''}
+      />
+
       <EnhancedSnackbar />
       <TransitionsModal open={open} handleClose={handleClose}>
           {loadingCurrentOrderItems ? (
@@ -200,40 +306,60 @@ const TableManagement: React.FC = () => {
                   <Typography align="center" sx={{ py: 4 }}>No items found in this order.</Typography>
                 ) : (
                   <>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell><Typography variant="subtitle2" fontWeight="bold">Item</Typography></TableCell>
-                            <TableCell align="center"><Typography variant="subtitle2" fontWeight="bold">Qty</Typography></TableCell>
-                            <TableCell align="right"><Typography variant="subtitle2" fontWeight="bold">Price</Typography></TableCell>
-                            <TableCell align="right"><Typography variant="subtitle2" fontWeight="bold">Subtotal</Typography></TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {currentOrderItems.map((item: any, idx: number) => (
-                            <TableRow key={item?.order_item_id || item?.id || idx}>
-                              <TableCell>{item?.item_name}</TableCell>
-                              <TableCell align="center">{item?.quantity}</TableCell>
-                              <TableCell align="right">${item?.unit_price?.toFixed(2)}</TableCell>
-                              <TableCell align="right">${item?.sum_price?.toFixed(2)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                        <TableFooter>
-                          <TableRow>
-                            <TableCell colSpan={3} align="right">
-                              <Typography variant="h6" fontWeight="bold">Total Amount:</Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="h6" fontWeight="bold" color="primary.main">
-                                ${totalOrdersPrice?.toFixed(2)}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        </TableFooter>
-                      </Table>
-                    </TableContainer>
+                     <Box sx={{maxHeight: '60vh', overflow: 'auto'}}>
+                        {Array.from(new Set(currentOrderItems.map((item: any) => item.course || 1))).sort((a: any, b: any) => a - b).map((course: any) => {
+                          const courseItems = currentOrderItems.filter((item: any) => (item.course || 1) === course);
+                          const isCourseStarted = courseItems.every((item: any) => item.is_started !== false);
+                          
+                          return (
+                            <Box key={course} sx={{ mb: 4, bgcolor: 'action.hover', p: 2, borderRadius: 2 }}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                                <Typography variant="subtitle1" fontWeight="bold" color="primary">
+                                  {course === 1 ? "STARTER" : course === 2 ? "MAIN" : course === 3 ? "DESSERT" : "CHEF'S SPECIAL"} {isCourseStarted ? "" : "(HELD)"}
+                                </Typography>
+                                {!isCourseStarted && (
+                                  <Button 
+                                    size="small" 
+                                    variant="contained" 
+                                    color="warning" 
+                                    onClick={() => currentOrder?.id && startCourse(currentOrder.id, course)}
+                                  >
+                                    Fire {course === 1 ? "STARTER" : course === 2 ? "MAIN" : course === 3 ? "DESSERT" : "COURSE"}
+                                  </Button>
+                                )}
+                              </Stack>
+                              <TableContainer>
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={{fontWeight: 'bold'}}>Item</TableCell>
+                                      <TableCell align="center" sx={{fontWeight: 'bold'}}>Qty</TableCell>
+                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Price</TableCell>
+                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Total</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {courseItems.map((item: any, idx: number) => (
+                                      <TableRow key={item?.order_item_id || item?.id || idx}>
+                                        <TableCell>{item?.item_name}</TableCell>
+                                        <TableCell align="center">{item?.quantity}</TableCell>
+                                        <TableCell align="right">${item?.unit_price?.toFixed(2)}</TableCell>
+                                        <TableCell align="right">${item?.sum_price?.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Box>
+                          );
+                        })}
+                     </Box>
+                     <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.main', borderRadius: 2, color: 'white' }}>
+                       <Stack direction="row" justifyContent="space-between" alignItems="center">
+                         <Typography variant="h6" fontWeight="bold">Grand Total</Typography>
+                         <Typography variant="h5" fontWeight="bold">${totalOrdersPrice?.toFixed(2)}</Typography>
+                       </Stack>
+                     </Box>
                     <Box mt={3} display="flex" justifyContent="flex-end">
                       <Button variant="contained" onClick={handleClose}>Close</Button>
                     </Box>

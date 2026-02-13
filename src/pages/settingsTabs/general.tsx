@@ -10,6 +10,7 @@ import {
   CardContent,
   Stack,
   SelectChangeEvent,
+  TextField,
 } from "@mui/material";
 import { useSettings } from "../../providers/settingsProvider";
 
@@ -61,6 +62,49 @@ const GeneralSettingsPanel: React.FC = () => {
                   label="Show light/night mode toggle"
                 />
             </Stack>
+          </CardContent>
+        </Card>
+
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              Localization
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Currency Symbol
+              </Typography>
+              <TextField
+                fullWidth
+                value={(settings as any)?.general?.currency_symbol || "₵"}
+                size="small"
+                sx={{ mt: 1 }}
+                onChange={(e) => {
+                  const current = (settings as any)?.general || {};
+                  const updated = { ...current, currency_symbol: e.target.value };
+                  updateSetting("general", updated);
+                }}
+                placeholder="e.g. ₵, $, £"
+              />
+            </Box>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Currency Code (ISO)
+              </Typography>
+              <Select
+                fullWidth
+                value={(settings as any)?.general?.currency_code || "GHS"}
+                size="small"
+                sx={{ mt: 1 }}
+                onChange={(e) => handleSelectChange(e, "currency_code")}
+              >
+                <MenuItem value="GHS">GHS (₵)</MenuItem>
+                <MenuItem value="GBP">GBP (£)</MenuItem>
+                <MenuItem value="USD">USD ($)</MenuItem>
+                <MenuItem value="EUR">EUR (€)</MenuItem>
+                <MenuItem value="NGN">NGN (₦)</MenuItem>
+              </Select>
+            </Box>
           </CardContent>
         </Card>
 

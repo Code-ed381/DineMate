@@ -140,6 +140,14 @@ const BartenderDineInPanel: React.FC = () => {
                             </Typography>
                           </Stack>
 
+                          {order.notes && (
+                            <Box sx={{ mb: 1, p: 1, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 152, 0, 0.05)', borderLeft: '3px solid', borderColor: 'warning.main' }}>
+                              <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, color: isDark ? 'warning.light' : 'warning.dark', display: 'block' }}>
+                                Note: {order.notes}
+                              </Typography>
+                            </Box>
+                          )}
+
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                             <Box sx={{ flex: 1 }}>
                                <LinearProgress 
@@ -203,6 +211,11 @@ const BartenderDineInPanel: React.FC = () => {
                           <Typography fontWeight={700}>{order.menu_item_name}</Typography>
                           <Typography variant="caption" display="block">Table {order.table_number} • {order.waiter_first_name}</Typography>
                           <Typography variant="caption" color="text.secondary">Ready {getTimeAgo(order.updated_at)}</Typography>
+                          {order.notes && (
+                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic', color: 'info.main', fontWeight: 600 }}>
+                              Note: {order.notes}
+                            </Typography>
+                          )}
                         </Box>
                      </ListItem>
                    ))}

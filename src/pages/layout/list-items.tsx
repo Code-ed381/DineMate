@@ -15,6 +15,7 @@ import AssessmentIcon from "@mui/icons-material/Assessment";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import LocalBarIcon from "@mui/icons-material/LocalBar";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
@@ -123,6 +124,13 @@ export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }
             icon={<TableRestaurantIcon />} 
             label="Tables" 
             onClick={() => setBreadcrumb("Tables")} 
+            drawerOpen={drawerOpen}
+          />
+          <NavItem 
+            to="/app/order-history" 
+            icon={<ReceiptLongIcon />} 
+            label="History" 
+            onClick={() => setBreadcrumb("Order History")} 
             drawerOpen={drawerOpen}
           />
         </>

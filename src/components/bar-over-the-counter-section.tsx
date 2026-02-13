@@ -38,6 +38,7 @@ import useBarStore from "../lib/barStore";
 import BarTakeAwaySkeleton from "./skeletons/bar-takeaway-skeleton";
 import { printReceipt } from "./PrintWindow";
 import Swal from "sweetalert2";
+import { getCurrencySymbol } from "../utils/currency";
 
 const OTCTabs: React.FC = () => {
   const theme = useTheme();
@@ -289,7 +290,7 @@ const OTCTabs: React.FC = () => {
                           </Box>
                           <CardContent sx={{ p: 1.5 }}>
                             <Typography variant="body2" noWrap fontWeight={600} sx={{ mb: 0.5 }}>{item.name}</Typography>
-                            <Typography variant="subtitle2" color="primary" fontWeight={800}>£{formatCashInput(item.price)}</Typography>
+                            <Typography variant="subtitle2" color="primary" fontWeight={800}>{getCurrencySymbol()}{formatCashInput(item.price)}</Typography>
                           </CardContent>
                         </CardActionArea>
                       </Card>
@@ -344,7 +345,7 @@ const OTCTabs: React.FC = () => {
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>{item.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">£{formatCashInput(item.price)} each</Typography>
+                        <Typography variant="caption" color="text.secondary">{getCurrencySymbol()}{formatCashInput(item.price)} each</Typography>
                       </Box>
                       <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                         <DeleteOutline fontSize="small" />
@@ -355,7 +356,7 @@ const OTCTabs: React.FC = () => {
                          <Typography variant="body2" color="text.secondary">Qty:</Typography>
                          <Typography variant="body2" fontWeight={800}>{item.qty}</Typography>
                       </Stack>
-                       <Typography fontWeight={800} color="primary">£{formatCashInput(item.price * item.qty)}</Typography>
+                       <Typography fontWeight={800} color="primary">{getCurrencySymbol()}{formatCashInput(item.price * item.qty)}</Typography>
                     </Box>
                   </Paper>
                 ))}
@@ -373,16 +374,16 @@ const OTCTabs: React.FC = () => {
                 <Stack spacing={1}>
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">Subtotal</Typography>
-                      <Typography variant="body1" fontWeight={600}>£{formatCashInput(total)}</Typography>
+                      <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}{formatCashInput(total)}</Typography>
                    </Box>
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">Tax (0%)</Typography>
-                      <Typography variant="body1" fontWeight={600}>£0.00</Typography>
+                      <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}0.00</Typography>
                    </Box>
                    <Divider sx={{ my: 1 }} />
                    <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="h6" fontWeight={800}>Total</Typography>
-                      <Typography variant="h5" color="primary" fontWeight={900}>£{formatCashInput(total)}</Typography>
+                      <Typography variant="h5" color="primary" fontWeight={900}>{getCurrencySymbol()}{formatCashInput(total)}</Typography>
                    </Box>
                 </Stack>
               </Paper>
@@ -395,7 +396,7 @@ const OTCTabs: React.FC = () => {
                     type="number" 
                     value={cash} 
                     onChange={(e) => setCash(e.target.value)}
-                    InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                    InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
                   />
                   <TextField 
                     fullWidth 
@@ -403,13 +404,13 @@ const OTCTabs: React.FC = () => {
                     type="number" 
                     value={card} 
                     onChange={(e) => setCard(e.target.value)}
-                    InputProps={{ startAdornment: <InputAdornment position="start">£</InputAdornment> }}
+                    InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
                   />
                   {(parseFloat(cash) || 0) + (parseFloat(card) || 0) > total && (
                     <Box sx={{ p: 1, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
                       <Typography variant="body2" fontWeight="bold">Change:</Typography>
                       <Typography variant="body2" fontWeight="bold" color="success.main">
-                        £{((parseFloat(cash) || 0) + (parseFloat(card) || 0) - total).toFixed(2)}
+                        {getCurrencySymbol()}{((parseFloat(cash) || 0) + (parseFloat(card) || 0) - total).toFixed(2)}
                       </Typography>
                     </Box>
                   )}

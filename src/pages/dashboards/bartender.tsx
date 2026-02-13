@@ -44,6 +44,7 @@ import {
 } from "recharts";
 import DashboardHeader from "./components/dashboard-header";
 import dayjs from "dayjs";
+import { getCurrencySymbol } from "../../utils/currency";
 
 const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336", "#607d8b"];
 
@@ -131,7 +132,7 @@ const BartenderDashboard: React.FC = () => {
   const kpis = [
     { label: "Active Queue", value: pendingOrders.length, icon: <LocalBar />, color: "#ff9800", detail: "Pending now" },
     { label: "Daily Volume", value: performanceStats.totalDrinks, icon: <TrendingUp />, color: "#2196f3", detail: "Total drinks today" },
-    { label: "Direct OTC", value: `£${performanceStats.otcTotal.toFixed(2)}`, icon: <Star />, color: "#9c27b0", detail: `${performanceStats.otcCount} drinks sold` },
+    { label: "Direct OTC", value: `${getCurrencySymbol()}${performanceStats.otcTotal.toFixed(2)}`, icon: <Star />, color: "#9c27b0", detail: `${performanceStats.otcCount} drinks sold` },
     { label: "Completion", value: `${performanceStats.efficiency}%`, icon: <DoneAll />, color: "#4caf50", detail: "On-time rate" },
   ];
 

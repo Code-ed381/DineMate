@@ -3,6 +3,8 @@ import { supabase } from './supabase';
 import Swal from 'sweetalert2';
 import dayjs from 'dayjs';
 
+import { formatCurrency } from '../utils/currency';
+
 interface Order {
   id: string;
   created_at: string;
@@ -63,12 +65,7 @@ const useReportStore = create<ReportState>((set, get) => ({
   isFiltered: false,
 
   formatNumber: (number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(number);
+    return formatCurrency(number);
   },
 
   handleError: (error) => {

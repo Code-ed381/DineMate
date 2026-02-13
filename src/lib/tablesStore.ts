@@ -15,6 +15,10 @@ export interface RestaurantTable {
   restaurant_id: string;
   capacity?: number;
   assign?: string | null;
+  x_position?: number;
+  y_position?: number;
+  rotation?: number;
+  shape?: 'square' | 'circle';
 }
 
 export interface TableSession {
@@ -74,7 +78,9 @@ export interface TableState {
   getSessionOverview: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<any>;
   startSession: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<void>;
   endSession: (table_id: string, waiter_id: string, restaurant_id: string) => Promise<void>;
+  updateTablePosition: (tableId: string, x: number, y: number, rotation?: number) => Promise<void>;
   handleRemoveItem: (itemId: any) => Promise<void>;
+  transferTable: (sessionId: string, sourceTableId: string, destTableId: string) => Promise<void>;
   getTablesOverview: () => void; // Internal helper
 }
 
@@ -570,6 +576,71 @@ const useTablesStore = create<TableState>()(
             .eq("id", itemId?.order_id);
 
           if (ordersError) handleError(ordersError);
+        } catch (error) {
+          handleError(error as Error);
+        }
+      },
+
+      updateTablePosition: async (tableId, x, y, rotation) => {
+        const { error } = await supabase
+          .from("restaurant_tables")
+          .update({ 
+            x_position: x, 
+            y_position: y, 
+            rotation: rotation ?? 0 
+          })
+          .eq("id", tableId);
+
+        if (error) throw error;
+
+        set((state) => ({
+          tables: state.tables.map((t) =>
+            t.id === tableId ? { ...t, x_position: x, y_position: y, rotation: rotation ?? t.rotation } : t
+          ),
+        }));
+      },
+
+      transferTable: async (sessionId, sourceTableId, destTableId) => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const restaurantId = selectedRestaurant?.id;
+
+        if (!restaurantId) return;
+
+        try {
+          // 1. Update session's table_id
+          const { error: sessionError } = await supabase
+            .from("table_sessions")
+            .update({ table_id: destTableId })
+            .eq("id", sessionId);
+
+          if (sessionError) throw sessionError;
+
+          // 2. Set source table to available
+          const { error: sourceError } = await supabase
+            .from("restaurant_tables")
+            .update({ status: "available" })
+            .eq("id", sourceTableId);
+
+          if (sourceError) throw sourceError;
+
+          // 3. Set destination table to occupied
+          const { error: destError } = await supabase
+            .from("restaurant_tables")
+            .update({ status: "occupied" })
+            .eq("id", destTableId);
+
+          if (destError) throw destError;
+
+          // 4. Refresh local state
+          get().getTablesOverview();
+          get().getSessionsOverview();
+          
+          get().setSnackbar({
+            open: true,
+            message: "Table transferred successfully",
+            severity: "success",
+            id: Date.now()
+          });
         } catch (error) {
           handleError(error as Error);
         }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Typography, Card, CardContent } from '@mui/material';
+import { formatCurrency } from '../utils/currency';
 
 interface CardsProps {
   title: string;
@@ -9,12 +10,7 @@ interface CardsProps {
 }
 
 const Cards: React.FC<CardsProps> = ({ title, value, icon, bgColor }) => {
-    const formattedValue = new Intl.NumberFormat('en-GB', {
-        style: 'currency',
-        currency: 'GBP',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
+    const formattedValue = formatCurrency(value);
 
     return (
         <Card sx={{ backgroundColor: bgColor, color: '#fff', mb: 3 }}>

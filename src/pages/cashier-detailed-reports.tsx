@@ -28,6 +28,7 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import useCashierStore from "../lib/cashierStore";
 import DashboardHeader from "./dashboards/components/dashboard-header";
 import { useTheme, alpha } from "@mui/material/styles";
+import { getCurrencySymbol } from "../utils/currency";
 
 const CashierDetailedReports: React.FC = () => {
   const theme = useTheme();
@@ -112,7 +113,7 @@ const CashierDetailedReports: React.FC = () => {
       headerAlign: "right",
       renderCell: (params) => (
         <Typography variant="body2" fontWeight={700}>
-          £{formatCashInput(params.value)}
+          {getCurrencySymbol()}{formatCashInput(params.value)}
         </Typography>
       ),
     },
@@ -226,7 +227,7 @@ const CashierDetailedReports: React.FC = () => {
           <Card sx={{ borderRadius: 3, bgcolor: alpha(theme.palette.success.main, 0.03) }}>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>Gross Transaction Value</Typography>
-              <Typography variant="h4" fontWeight={800} color="success.main">£{formatCashInput(stats.totalSales)}</Typography>
+              <Typography variant="h4" fontWeight={800} color="success.main">{getCurrencySymbol()}{formatCashInput(stats.totalSales)}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -234,7 +235,7 @@ const CashierDetailedReports: React.FC = () => {
           <Card sx={{ borderRadius: 3, bgcolor: alpha(theme.palette.info.main, 0.03) }}>
             <CardContent>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>Avg. Item Price</Typography>
-              <Typography variant="h4" fontWeight={800} color="info.main">£{formatCashInput(stats.avgOrderValue)}</Typography>
+              <Typography variant="h4" fontWeight={800} color="info.main">{getCurrencySymbol()}{formatCashInput(stats.avgOrderValue)}</Typography>
             </CardContent>
           </Card>
         </Grid>

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, Typography } from "@mui/material";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
+import { getCurrencySymbol } from "../../../utils/currency";
 
 interface SalesTrendChartProps {
   allSessions: any[];
@@ -35,8 +36,8 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ allSessions }) => {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={salesData}>
             <XAxis dataKey="day" />
-            <YAxis tickFormatter={(value) => `£${value}`} />
-            <RTooltip formatter={(value: number) => [`£${value.toFixed(2)}`, "Sales"]} />
+            <YAxis tickFormatter={(value) => `${getCurrencySymbol()}${value}`} />
+            <RTooltip formatter={(value: number) => [`${getCurrencySymbol()}${value.toFixed(2)}`, "Sales"]} />
             <Line type="monotone" dataKey="sales" stroke="#1976d2" strokeWidth={3} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
