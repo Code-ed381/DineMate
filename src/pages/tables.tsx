@@ -48,6 +48,7 @@ import TransferTableDialog from "../components/TransferTableDialog";
 import useAuthStore from "../lib/authStore";
 import useRestaurantStore from "../lib/restaurantStore";
 import TableTimer from "../components/TableTimer";
+import { formatCurrency, getCurrencySymbol } from "../utils/currency";
 
 const statusColors: Record<string, any> = {
   available: { color: "success", icon: CheckCircle, main: "success.main" },
@@ -393,8 +394,8 @@ const TableManagement: React.FC = () => {
                                     <TableRow>
                                       <TableCell sx={{fontWeight: 'bold'}}>Item</TableCell>
                                       <TableCell align="center" sx={{fontWeight: 'bold'}}>Qty</TableCell>
-                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Price</TableCell>
-                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Total</TableCell>
+                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Price ({getCurrencySymbol()})</TableCell>
+                                      <TableCell align="right" sx={{fontWeight: 'bold'}}>Total ({getCurrencySymbol()})</TableCell>
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
@@ -402,8 +403,8 @@ const TableManagement: React.FC = () => {
                                       <TableRow key={item?.order_item_id || item?.id || idx}>
                                         <TableCell>{item?.item_name}</TableCell>
                                         <TableCell align="center">{item?.quantity}</TableCell>
-                                        <TableCell align="right">${item?.unit_price?.toFixed(2)}</TableCell>
-                                        <TableCell align="right">${item?.sum_price?.toFixed(2)}</TableCell>
+                                        <TableCell align="right">{Number(item?.unit_price || 0).toFixed(2)}</TableCell>
+                                        <TableCell align="right">{Number(item?.sum_price || 0).toFixed(2)}</TableCell>
                                       </TableRow>
                                     ))}
                                   </TableBody>
@@ -416,7 +417,7 @@ const TableManagement: React.FC = () => {
                      <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.main', borderRadius: 2, color: 'white' }}>
                        <Stack direction="row" justifyContent="space-between" alignItems="center">
                          <Typography variant="h6" fontWeight="bold">Grand Total</Typography>
-                         <Typography variant="h5" fontWeight="bold">${totalOrdersPrice?.toFixed(2)}</Typography>
+                         <Typography variant="h5" fontWeight="bold">{formatCurrency(totalOrdersPrice)}</Typography>
                        </Stack>
                      </Box>
                     <Box mt={3} display="flex" justifyContent="flex-end">

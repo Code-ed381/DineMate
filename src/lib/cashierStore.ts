@@ -262,13 +262,64 @@ const useCashierStore = create<CashierState>()(
       handleFetchOrderItems: async (orderId: string) => {
         set({ loadingOrderItems: true });
         try {
-          const { data, error } = await supabase
-            .from("order_items_full")
+          // 1. Fetch order items
+          const { data: orderItems, error: itemsError } = await supabase
+            .from("order_items")
             .select("*")
             .eq("order_id", orderId);
 
-          if (error) throw error;
-          const items = data || [];
+          if (itemsError) throw itemsError;
+
+          // 2. Fetch menu items for names/images
+          const menuItemIds = Array.from(new Set((orderItems || []).map((i: any) => i.menu_item_id).filter(Boolean)));
+          let menuItemsMap: Record<string, any> = {};
+          
+          if (menuItemIds.length > 0) {
+            const { data: menuItems } = await supabase
+              .from("menu_items")
+              .select("id, name, image_url")
+              .in("id", menuItemIds);
+            
+            menuItems?.forEach(mi => {
+              menuItemsMap[mi.id] = mi;
+            });
+          }
+
+          // 3. Fetch waiter info gracefully (might fail due to permissions)
+          const waiterIds = Array.from(new Set((orderItems || []).map((i: any) => i.prepared_by).filter(Boolean)));
+          let waitersMap: Record<string, any> = {};
+          
+          if (waiterIds.length > 0) {
+            try {
+              const { data: waiters } = await supabase
+                .from("restaurant_members_with_users")
+                .select("user_id, first_name, last_name, avatar_url")
+                .in("user_id", waiterIds);
+              
+              waiters?.forEach(w => {
+                waitersMap[w.user_id] = w;
+              });
+            } catch (e) {
+              console.warn("Could not fetch waiter details due to permissions:", e);
+            }
+          }
+
+          // 4. Manual Join
+          const items = (orderItems || []).map((oi: any) => {
+            const menuItem = menuItemsMap[oi.menu_item_id];
+            const waiter = waitersMap[oi.prepared_by];
+            return {
+              ...oi,
+              order_item_id: oi.id, // Ensure compatibility with UI expecting order_item_id
+              menu_item_name: menuItem?.name || "Unknown Item",
+              menu_item_image_url: menuItem?.image_url,
+              item_name: menuItem?.name,
+              waiter_first_name: waiter?.first_name || "System",
+              waiter_last_name: waiter?.last_name || "",
+              waiter_avatar_url: waiter?.avatar_url
+            };
+          });
+
           set({ selectedOrderItems: items });
 
           // Synchronize total to the database orders table, accounting for any existing discount
@@ -475,40 +526,68 @@ const useCashierStore = create<CashierState>()(
           }
 
           // STEP 2: Fetch items for those specific orders
-          const { data, error } = await supabase
-            .from("order_items_full")
+          const { data: orderItems, error: itemsError } = await supabase
+            .from("order_items")
             .select(`*`)
             .in("order_id", orderIds)
-            .order("order_item_created_at", { ascending: false });
+            .order("created_at", { ascending: false });
           
-          if (error) {
-            console.error("❌ Detailed Report Fetch - Items Error:", error);
-            throw error;
+          if (itemsError) {
+            console.error("❌ Detailed Report Fetch - Items Error:", itemsError);
+            throw itemsError;
           }
 
-          console.log(`✅ Detailed Report Fetch - Data Received (${data?.length || 0} items)`);
+          // STEP 3: Fetch related menu items and waiter info
+          const menuItemIds = Array.from(new Set((orderItems || []).map((i: any) => i.menu_item_id).filter(Boolean)));
+          let menuItemsMap: Record<string, any> = {};
+          if (menuItemIds.length > 0) {
+            const { data: menuItems } = await supabase
+              .from("menu_items")
+              .select("id, name, image_url")
+              .in("id", menuItemIds);
+            menuItems?.forEach(mi => menuItemsMap[mi.id] = mi);
+          }
+
+          const waiterIds = Array.from(new Set((orderItems || []).map((i: any) => i.prepared_by).filter(Boolean)));
+          let waitersMap: Record<string, any> = {};
+          if (waiterIds.length > 0) {
+            try {
+              const { data: waiters } = await supabase
+                .from("restaurant_members_with_users")
+                .select("user_id, first_name, last_name, avatar_url")
+                .in("user_id", waiterIds);
+              waiters?.forEach(w => waitersMap[w.user_id] = w);
+            } catch (e) {
+              console.warn("Could not fetch waiter details for report:", e);
+            }
+          }
+
+          console.log(`✅ Detailed Report Fetch - Data Received (${orderItems?.length || 0} items)`);
 
           // Process data to flatten it and ensure all expected fields exist for DataGrid
-          const processedData = (data as any[]).map(item => ({
-            ...item,
-            item_name: item.menu_item_name || item.item_name || "Unknown Item", 
-            image_url: item.menu_item_image_url || item.image_url,
-            order_ref: item.order_ref || item.order_id || "N/A",
-            // Map created_at to the correct timestamp
-            created_at: item.order_item_created_at || item.created_at,
-            // Waiter info
-            waiter_first_name: item.waiter_first_name || "System",
-            waiter_last_name: item.waiter_last_name || "",
-            waiter_avatar_url: item.waiter_avatar_url || item.waiter_avatar,
-            // Preparer info
-            preparer_first_name: item.prepared_by_first_name || (item.order_item_status === 'served' ? "Ready" : "In Progress"),
-            preparer_last_name: item.prepared_by_last_name || "",
-            preparer_avatar_url: item.prepared_by_avatar || item.preparer_avatar,
-            // Status and Pricing
-            status: item.order_item_status || item.status || "ordered",
-            sum_price: parseFloat(item.sum_price) || 0,
-            discount: parseFloat(item.discount) || 0
-          }));
+          const processedData = (orderItems as any[]).map(item => {
+            const menuItem = menuItemsMap[item.menu_item_id];
+            const waiter = waitersMap[item.prepared_by];
+            return {
+              ...item,
+              order_item_id: item.id, // CRITICAL: Fix for DataGrid unique ID error
+              item_name: menuItem?.name || "Unknown Item", 
+              image_url: menuItem?.image_url,
+              order_ref: item.order_id || "N/A",
+              created_at: item.created_at,
+              // Status and Pricing
+              status: item.status || "ordered",
+              sum_price: parseFloat(item.sum_price) || 0,
+              // Waiter info
+              waiter_first_name: waiter?.first_name || "System",
+              waiter_last_name: waiter?.last_name || "",
+              waiter_avatar_url: waiter?.avatar_url,
+              // Preparer info (fallback to waiter for now if no separate preparer info)
+              preparer_first_name: waiter?.first_name || (item.status === 'served' ? "Ready" : "In Progress"),
+              preparer_last_name: waiter?.last_name || "",
+              preparer_avatar_url: waiter?.avatar_url,
+            };
+          });
 
           console.log("📊 Detailed Report Fetch - Processed Data:", processedData);
 

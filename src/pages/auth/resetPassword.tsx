@@ -3,14 +3,14 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
 import { Theme } from '@mui/material/styles';
 import AppTheme from './components/shared-theme/AppTheme';
-import ColorModeSelect from './components/shared-theme/ColorModeSelect';
+import ColorModeIconToggle from './components/shared-theme/ColorModeIconToggle';
 import ResetPasswordCard from './components/ResetPasswordCard';
 
 const ResetPassword: React.FC = (props) => {
   return (
     <AppTheme {...props}>
       <CssBaseline enableColorScheme />
-      <ColorModeSelect sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
+      <ColorModeIconToggle sx={{ position: 'fixed', top: '1rem', right: '1rem' }} />
       <Stack
         direction="column"
         component="main"

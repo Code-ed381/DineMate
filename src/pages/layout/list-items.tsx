@@ -136,13 +136,22 @@ export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }
         </>
       )}
       {role === "bartender" && (
-        <NavItem 
-          to="/app/bar" 
-          icon={<LocalBarIcon />} 
-          label="Bar" 
-          onClick={() => setBreadcrumb("Menu")} 
-          drawerOpen={drawerOpen}
-        />
+        <>
+          <NavItem 
+            to="/app/bar" 
+            icon={<LocalBarIcon />} 
+            label="Bar" 
+            onClick={() => setBreadcrumb("Bar")} 
+            drawerOpen={drawerOpen}
+          />
+          <NavItem 
+            to="/app/bar/history" 
+            icon={<ReceiptLongIcon />} 
+            label="History" 
+            onClick={() => setBreadcrumb("Order History")} 
+            drawerOpen={drawerOpen}
+          />
+        </>
       )}
       {role === "chef" && (
         <NavItem 

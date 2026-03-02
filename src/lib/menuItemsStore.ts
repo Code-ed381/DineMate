@@ -36,9 +36,17 @@ interface MenuItemsState {
   loadingMenuItems: boolean;
   selectedCategory: string;
 
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+
+  selectedTags: string[];
+  allTags: string[];
+  toggleTag: (tag: string) => void;
+  clearTags: () => void;
+
   setSelectedCategory: (category: string) => void;
   isSelectedCategory: (category: string) => boolean;
-  filterMenuItemsByCategory: () => void;
+  filterMenuItems: () => void;
   fetchCategories: () => Promise<void>;
   fetchMenuItems: () => Promise<void>;
   fetchMeals: () => Promise<void>;
@@ -52,6 +60,10 @@ interface MenuItemsState {
   handleSaveDrink: (id: string) => Promise<void>;
   handleDeleteMeal: (id: string) => Promise<void>;
   handleDeleteDrink: (id: string) => Promise<void>;
+
+  addMenuItem: (item: any, imageFile?: File) => Promise<void>;
+  updateMenuItem: (id: string, item: any, imageFile?: File) => Promise<void>;
+  deleteMenuItem: (id: string) => Promise<void>;
 }
 
 const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
@@ -75,18 +87,72 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   filteredMenuItems: [],
   loadingMenuItems: true,
   selectedCategory: "",
+  searchQuery: "",
+  selectedTags: [],
+  allTags: [],
+
+  setSearchQuery: (query) => {
+    set({ searchQuery: query });
+    get().filterMenuItems();
+  },
+
+  toggleTag: (tag) => {
+    const { selectedTags } = get();
+    if (selectedTags.includes(tag)) {
+      set({ selectedTags: selectedTags.filter((t) => t !== tag) });
+    } else {
+      set({ selectedTags: [...selectedTags, tag] });
+    }
+    get().filterMenuItems();
+  },
+
+  clearTags: () => {
+    set({ selectedTags: [] });
+    get().filterMenuItems();
+  },
 
   setSelectedCategory: (category) => {
     set({ selectedCategory: category });
-    get().filterMenuItemsByCategory();
+    get().filterMenuItems();
   },
 
-  isSelectedCategory: (category) => get().selectedCategory === category?.toLowerCase(),
+  isSelectedCategory: (category) => {
+    const { selectedCategory } = get();
+    return (selectedCategory || "").toLowerCase() === (category || "").toLowerCase();
+  },
 
-  filterMenuItemsByCategory: () => {
-    const { selectedCategory, menuItems } = get();
-    if (!selectedCategory) return;
-    set({ filteredMenuItems: menuItems.filter((item) => item.category_name?.toLowerCase() === selectedCategory.toLowerCase()) });
+  filterMenuItems: () => {
+    const { selectedCategory, searchQuery, menuItems, selectedTags } = get();
+    let filtered = menuItems;
+
+    // Filter by Category
+    if (selectedCategory) {
+      filtered = filtered.filter(
+        (item) => (item.category_name || "").toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+
+    // Filter by Tags
+    if (selectedTags.length > 0) {
+      filtered = filtered.filter((item) =>
+        (item.tags || []).some((tag: string) =>
+          selectedTags.some((st) => st.toLowerCase() === tag.toLowerCase())
+        )
+      );
+    }
+
+    // Filter by Search Query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((item) =>
+        (item.name || item.item_name || "").toLowerCase().includes(query) ||
+        (item.description || "").toLowerCase().includes(query) ||
+        (item.category_name || "").toLowerCase().includes(query) ||
+        (item.tags || []).some((tag: string) => tag.toLowerCase().includes(query))
+      );
+    }
+
+    set({ filteredMenuItems: filtered });
   },
 
   fetchCategories: async () => {
@@ -119,11 +185,19 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
       const { data, error } = await supabase
         .from("menu_items_with_category")
         .select("*")
-        .eq("restaurant_id", restaurantId);
+        .eq("restaurant_id", restaurantId)
+        .order('name', { ascending: true });
 
       if (error) throw error;
       const items = (data || []) as MenuItem[];
-      set({ menuItems: items, filteredMenuItems: items });
+
+      // Extract all unique tags
+      const allTags = Array.from(
+        new Set(items.flatMap((item: MenuItem) => item.tags || []))
+      ).sort();
+
+      set({ menuItems: items, allTags });
+      get().filterMenuItems(); // Apply existing filters to new data
     } catch (error) {
       console.error(error);
       Swal.fire("Error", "Failed to fetch menu items.", "error");
@@ -327,6 +401,130 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
           Swal.fire("Deleted!", "Drink has been deleted.", "success");
         } catch (error) {
           Swal.fire("Error", "Failed to delete drink.", "error");
+        }
+      }
+    });
+  },
+
+  addMenuItem: async (item, imageFile) => {
+    try {
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+      if (!restaurantId) throw new Error("No restaurant selected");
+
+      let finalImageUrl = item.image_url || "";
+
+      if (imageFile) {
+        const fileExt = imageFile.name.split(".").pop();
+        const fileName = `${restaurantId}-${Date.now()}.${fileExt}`;
+        const filePath = `items/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("menu")
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("menu")
+          .getPublicUrl(filePath);
+
+        finalImageUrl = publicUrlData.publicUrl;
+      }
+
+      const { error } = await supabase.from("menu_items").insert([{
+        restaurant_id: restaurantId,
+        name: item.name,
+        description: item.description,
+        price: parseFloat(item.price),
+        category_id: item.category_id,
+        available: item.available === "true" || item.available === true,
+        image_url: finalImageUrl,
+        tags: item.tags || []
+      }]);
+
+      if (error) throw error;
+
+      Swal.fire("Success", "Item added successfully!", "success");
+      await get().fetchMenuItems();
+
+    } catch (error) {
+      console.error(error);
+      Swal.fire("Error", "Failed to add menu item.", "error");
+    }
+  },
+
+  updateMenuItem: async (id, item, imageFile) => {
+    try {
+      let finalImageUrl = item.image_url;
+
+      if (imageFile) {
+        const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+        const fileExt = imageFile.name.split(".").pop();
+        const fileName = `${restaurantId}-${Date.now()}.${fileExt}`;
+        const filePath = `items/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("menu")
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("menu")
+          .getPublicUrl(filePath);
+
+        finalImageUrl = publicUrlData.publicUrl;
+      }
+
+      const updatePayload: any = {
+        name: item.name,
+        description: item.description,
+        price: parseFloat(item.price),
+        category_id: item.category_id,
+        available: item.available === "true" || item.available === true,
+        tags: item.tags || []
+      };
+
+      if (finalImageUrl) {
+        updatePayload.image_url = finalImageUrl;
+      }
+
+      const { error } = await supabase
+        .from("menu_items")
+        .update(updatePayload)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      Swal.fire("Success", "Item updated successfully!", "success");
+      await get().fetchMenuItems();
+
+    } catch (error) {
+        console.error(error);
+        Swal.fire("Error", "Failed to update menu item.", "error");
+    }
+  },
+
+  deleteMenuItem: async (id) => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { error } = await supabase.from("menu_items").delete().eq("id", id);
+          if (error) throw error;
+
+          Swal.fire("Deleted!", "Item has been deleted.", "success");
+          await get().fetchMenuItems();
+        } catch (error) {
+          console.error(error);
+          Swal.fire("Error", "Failed to delete item.", "error");
         }
       }
     });

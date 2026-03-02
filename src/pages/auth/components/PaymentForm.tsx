@@ -202,9 +202,9 @@ const PaymentForm: React.FC = () => {
                   <Typography variant="h4" fontWeight={800} gutterBottom>
                     {subscription.billing_cycle === "monthly"
                       ? plan.monthly === 0
-                        ? "$0"
-                        : `$${plan.monthly}`
-                      : `$${plan.yearly}`}
+                        ? "₵0"
+                        : `₵${plan.monthly}`
+                      : `₵${plan.yearly}`}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {subscription.billing_cycle === "monthly" ? "per month" : "per year"}

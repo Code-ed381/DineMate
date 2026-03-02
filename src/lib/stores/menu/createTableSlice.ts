@@ -91,6 +91,21 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
 
       if (error) throw error;
 
+      // Logic to auto-close if session is closed or missing
+      if (!data || data.session_status === 'close') {
+          set({
+            chosenTable: null,
+            chosenTableSession: null,
+            tableSelected: false,
+            proceedToCheckOut: false,
+            orderId: null,
+            table: null,
+            activeSeesionByTableNumberLoaded: true,
+          });
+          get().resetStepper();
+          return;
+      }
+
       set({
         chosenTableSession: data,
         chosenTableOrderItems: data?.order_items || [],
@@ -185,8 +200,16 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
 
     const channel = supabase
       .channel(`waiter-sessions-${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => get().getActiveSessionByRestaurant())
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => get().getActiveSessionByRestaurant())
+      .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => {
+          get().getActiveSessionByRestaurant();
+          const chosen = get().chosenTable;
+          if (chosen) get().filterActiveSessionByTableNumber(chosen);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => {
+          get().getActiveSessionByRestaurant();
+          const chosen = get().chosenTable;
+          if (chosen) get().filterActiveSessionByTableNumber(chosen);
+      })
       .subscribe();
 
     set({ sessionsChannel: channel });

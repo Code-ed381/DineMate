@@ -27,10 +27,11 @@ import AdminHeader from "../../components/admin-header";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
 import { useSettingsStore } from "../../lib/settingsStore";
+import { formatCurrency, getCurrencySymbol } from "../../utils/currency";
 
 import { GridColDef } from "@mui/x-data-grid";
 
-const columns: GridColDef[] = [
+const baseColumns: GridColDef[] = [
   {
     field: "image_url",
     headerName: "Image",
@@ -59,10 +60,10 @@ const columns: GridColDef[] = [
     field: "price",
     headerName: "Price",
     flex: 1,
-    maxWidth: 80,
+    maxWidth: 120,
     sortable: true,
     editable: true,
-    renderCell: (params: any) => `$${params.row.price}`,
+    renderCell: (params: any) => Number(params.row.price || 0).toFixed(2),
   },
   {
     field: "available",
@@ -119,12 +120,11 @@ const columns: GridColDef[] = [
     headerName: "Delete",
     sortable: false,
     editable: true,
-    maxWidth: 80,
+    maxWidth: 120,
     align: "right",
     renderCell: (params: any) => (
         <IconButton
           color="error"
-          onClick={() => console.log("Delete", params.row)}
         >
           <DeleteIcon />
         </IconButton>
@@ -133,7 +133,6 @@ const columns: GridColDef[] = [
 ];
 
 const MenuItemsManagement: React.FC = () => {
-  const [search, setSearch] = useState("");
   const {
     categories,
     fetchCategories,
@@ -142,6 +141,11 @@ const MenuItemsManagement: React.FC = () => {
     setSelectedCategory,
     selectedCategory,
     filteredMenuItems,
+    searchQuery,
+    setSearchQuery,
+    addMenuItem,
+    updateMenuItem,
+    deleteMenuItem,
   } = useMenuItemsStore();
   const { viewMode } = useSettingsStore();
 
@@ -165,7 +169,7 @@ const MenuItemsManagement: React.FC = () => {
             grid-template-columns: 1fr 1fr;
             gap: 16px;
           }
-          .swal2-popup .form-grid-full {
+           .swal2-popup .form-grid-full {
             grid-column: span 2;
           }
           .swal2-popup .swal2-input, 
@@ -186,11 +190,12 @@ const MenuItemsManagement: React.FC = () => {
           </div>
           <div>
             <label>Price</label>
-            <input id="swal-price" type="number" class="swal2-input" placeholder="E.g. 9.99" />
+            <input id="swal-price" type="number" step="0.01" class="swal2-input" placeholder="E.g. 9.99" />
           </div>
           <div>
             <label>Category</label>
             <select id="swal-category" class="swal2-select">
+              <option value="" disabled selected>Select Category</option>
               ${categoryOptions}
             </select>
           </div>
@@ -210,24 +215,171 @@ const MenuItemsManagement: React.FC = () => {
             <input id="swal-image" type="file" accept="image/*" class="swal2-file" />
           </div>
           <div class="form-grid-full">
-            <label>Tags (max 3)</label>
-            <div style="display: flex; gap: 8px;">
-               <input id="swal-tag1" class="swal2-input" placeholder="Tag 1" />
-               <input id="swal-tag2" class="swal2-input" placeholder="Tag 2" />
-               <input id="swal-tag3" class="swal2-input" placeholder="Tag 3" />
-            </div>
+            <label>Tags (comma separated)</label>
+            <input id="swal-tags" class="swal2-input" placeholder="spicy, vegan, gluten-free" />
           </div>
         </div>
       `,
+      focusConfirm: false,
       preConfirm: async () => {
         const name = (document.getElementById("swal-name") as HTMLInputElement).value.trim();
         const price = (document.getElementById("swal-price") as HTMLInputElement).value.trim();
         const category_id = (document.getElementById("swal-category") as HTMLSelectElement).value;
-        // Logic for upload and tags...
-        return { name, price, category_id };
+        const description = (document.getElementById("swal-description") as HTMLInputElement).value.trim();
+        const available = (document.getElementById("swal-available") as HTMLSelectElement).value;
+        const imageInput = document.getElementById("swal-image") as HTMLInputElement;
+        const tagsInput = (document.getElementById("swal-tags") as HTMLInputElement).value.trim();
+
+        if (!name || !price || !category_id) {
+          Swal.showValidationMessage("Please fill in Name, Price, and Category");
+          return false;
+        }
+
+        const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
+        const imageFile = imageInput.files ? imageInput.files[0] : undefined;
+
+        await addMenuItem({
+            name,
+            price,
+            category_id,
+            description,
+            available,
+            tags
+        }, imageFile);
       }
     });
   };
+
+  const handleEditItem = (item: any) => {
+    const categoryOptions = categories
+      .map((cat) => `<option value="${cat.id}" ${cat.id === item.category ? "selected" : ""}>${cat.name}</option>`)
+      .join("");
+
+    Swal.fire({
+      title: "✏️ Edit Menu Item",
+      width: "900px",
+      html: `
+        <style>
+          .swal2-popup .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+          }
+           .swal2-popup .form-grid-full {
+            grid-column: span 2;
+          }
+          .swal2-popup .swal2-input, 
+          .swal2-popup .swal2-select, 
+          .swal2-popup .swal2-file {
+            width: 100% !important;
+            margin: 6px 0;
+            padding: 10px 12px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+          }
+        </style>
+        <div class="form-grid">
+          <div class="form-grid-full">
+            <label>Name</label>
+            <input id="swal-name" class="swal2-input" value="${item.name || item.item_name}" />
+          </div>
+          <div>
+            <label>Price</label>
+            <input id="swal-price" type="number" step="0.01" class="swal2-input" value="${item.price}" />
+          </div>
+          <div>
+            <label>Category</label>
+            <select id="swal-category" class="swal2-select">
+              ${categoryOptions}
+            </select>
+          </div>
+          <div class="form-grid-full">
+            <label>Description</label>
+            <input id="swal-description" class="swal2-input" value="${item.description || ""}" />
+          </div>
+          <div>
+            <label>Availability</label>
+            <select id="swal-available" class="swal2-select">
+              <option value="true" ${item.available ? "selected" : ""}>Available</option>
+              <option value="false" ${!item.available ? "selected" : ""}>Unavailable</option>
+            </select>
+          </div>
+          <div>
+            <label>Change Image (Optional)</label>
+            <input id="swal-image" type="file" accept="image/*" class="swal2-file" />
+          </div>
+          <div class="form-grid-full">
+            <label>Tags (comma separated)</label>
+            <input id="swal-tags" class="swal2-input" value="${(item.tags || []).join(", ")}" />
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      preConfirm: async () => {
+        const name = (document.getElementById("swal-name") as HTMLInputElement).value.trim();
+        const price = (document.getElementById("swal-price") as HTMLInputElement).value.trim();
+        const category_id = (document.getElementById("swal-category") as HTMLSelectElement).value;
+        const description = (document.getElementById("swal-description") as HTMLInputElement).value.trim();
+        const available = (document.getElementById("swal-available") as HTMLSelectElement).value;
+        const imageInput = document.getElementById("swal-image") as HTMLInputElement;
+        const tagsInput = (document.getElementById("swal-tags") as HTMLInputElement).value.trim();
+
+        if (!name || !price || !category_id) {
+          Swal.showValidationMessage("Please fill in Name, Price, and Category");
+          return false;
+        }
+
+        const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
+        const imageFile = imageInput.files ? imageInput.files[0] : undefined;
+
+        await updateMenuItem(item.id, {
+            name,
+            price,
+            category_id,
+            description,
+            available,
+            tags,
+            image_url: item.image_url // Pass existing URL to preserve it if no new file
+        }, imageFile);
+      }
+    });
+  };
+
+  const handleDeleteItem = (id: string) => {
+      deleteMenuItem(id);
+  };
+  
+  // Update columns to use handleDeleteItem and dynamic currency header
+  const updatedColumns = baseColumns.map(col => {
+      if (col.field === 'price') {
+          return { ...col, headerName: `Price (${getCurrencySymbol()})` };
+      }
+      if (col.field === 'actions') {
+          return {
+              ...col,
+              headerName: "Actions",
+              width: 120, // Increased width for two buttons
+              renderCell: (params: any) => (
+                <Box>
+                  <IconButton
+                    color="primary"
+                    onClick={() => handleEditItem(params.row)}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    color="error"
+                    onClick={() => handleDeleteItem(params.row.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              ),
+          };
+      }
+      return col;
+  });
 
   const handleAddCategory = () => {
       // Add Category logic
@@ -274,8 +426,8 @@ const MenuItemsManagement: React.FC = () => {
                <TextField
                 size="small"
                 placeholder="Search items..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -286,6 +438,8 @@ const MenuItemsManagement: React.FC = () => {
               />
            </Box>
 
+
+
            {viewMode === "grid" && (
                <Grid container spacing={3}>
                    {filteredMenuItems.map((item) => (
@@ -294,12 +448,12 @@ const MenuItemsManagement: React.FC = () => {
                                <CardMedia component="img" height="140" image={item.image_url} alt={item.name} />
                                <CardContent sx={{ flexGrow: 1 }}>
                                    <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
-                                   <Typography variant="body2" color="text.secondary">${item.price}</Typography>
+                                   <Typography variant="body2" color="text.secondary">{formatCurrency(item.price)}</Typography>
                                </CardContent>
                                <Divider />
                                <Box sx={{ p: 1, display: "flex", justifyContent: "space-between" }}>
-                                   <Button size="small" startIcon={<EditIcon />}>Edit</Button>
-                                   <Button size="small" color="error" startIcon={<DeleteIcon />}>Delete</Button>
+                                   <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditItem(item)}>Edit</Button>
+                                   <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteItem(item.id)}>Delete</Button>
                                </Box>
                            </Card>
                        </Grid>
@@ -308,7 +462,7 @@ const MenuItemsManagement: React.FC = () => {
            )}
 
            {viewMode === "list" && (
-               <DataTable rows={menuItems} columns={columns} />
+               <DataTable rows={filteredMenuItems} columns={updatedColumns} />
            )}
         </Box>
       </Box>

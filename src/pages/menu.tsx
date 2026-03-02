@@ -98,6 +98,8 @@ const Menu: React.FC = () => {
     handleRemoveItem,
     getActiveSessionByRestaurant,
     setSelectedCategory,
+    subscribeToSessions,
+    unsubscribeFromSessions,
     selectedCategory,
     filterMenuItemsByCategory,
     menuItems,
@@ -127,6 +129,13 @@ const Menu: React.FC = () => {
     toggleFavorite,
     isFavorite,
   } = useMenuStore();
+
+  useEffect(() => {
+    subscribeToSessions();
+    return () => {
+      unsubscribeFromSessions();
+    };
+  }, [subscribeToSessions, unsubscribeFromSessions]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
@@ -423,9 +432,9 @@ const Menu: React.FC = () => {
                      <TableCell><CancelIcon fontSize="small" /></TableCell>
                      <TableCell>Product</TableCell>
                      <TableCell>Status</TableCell>
-                     <TableCell>Price</TableCell>
+                     <TableCell>Price ({currencySymbol})</TableCell>
                      <TableCell align="center">Qty</TableCell>
-                     <TableCell>Amount</TableCell>
+                     <TableCell>Amount ({currencySymbol})</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -506,7 +515,7 @@ const Menu: React.FC = () => {
                              <Chip label={(item.order_item_status || 'Pending').toUpperCase()} size="small" color={item.order_item_status === 'preparing' ? 'warning' : item.order_item_status === 'ready' ? 'info' : item.order_item_status === 'served' ? 'success' : 'default'} variant={item.order_item_status === 'pending' ? 'outlined' : 'filled'} />
                            )}
                          </TableCell>
-                         <TableCell>{currencySymbol}{item.unit_price}</TableCell>
+                         <TableCell>{Number(item.unit_price || 0).toFixed(2)}</TableCell>
                          <TableCell align="center">
                              <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
                                  <IconButton size="small" onClick={() => updateQuantity(item, 'decrease')} disabled={!lockState.canDecrease || item.quantity <= 0 || isCancelled}><RemoveIcon fontSize="small" /></IconButton>
@@ -514,7 +523,7 @@ const Menu: React.FC = () => {
                                  <IconButton size="small" onClick={() => updateQuantity(item, 'increase')} disabled={isCancelled}><AddIcon fontSize="small" /></IconButton>
                              </Stack>
                          </TableCell>
-                         <TableCell>{currencySymbol}{item.sum_price?.toFixed(2)}</TableCell>
+                         <TableCell>{Number(item.sum_price || 0).toFixed(2)}</TableCell>
                       </TableRow>
                       );
                     })

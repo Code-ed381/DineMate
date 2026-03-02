@@ -107,13 +107,13 @@ const CashierDetailedReports: React.FC = () => {
     },
     {
       field: "sum_price",
-      headerName: "Total Cost",
+      headerName: `Total Cost (${getCurrencySymbol()})`,
       flex: 0.8,
       align: "right",
       headerAlign: "right",
       renderCell: (params) => (
         <Typography variant="body2" fontWeight={700}>
-          {getCurrencySymbol()}{formatCashInput(params.value)}
+          {formatCashInput(params.value)}
         </Typography>
       ),
     },

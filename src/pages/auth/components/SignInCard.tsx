@@ -100,6 +100,11 @@ const SignInCard: React.FC = () => {
     }
   };
 
+  const handleSubmitRaw = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleSubmit();
+  };
+
   return (
     <Card variant="outlined">
       <Box sx={{ display: { xs: "flex", md: "none" } }}>
@@ -113,6 +118,8 @@ const SignInCard: React.FC = () => {
         Sign in
       </Typography>
       <Box
+        component="form"
+        onSubmit={handleSubmitRaw}
         sx={{ display: "flex", flexDirection: "column", width: "100%", gap: 2 }}
       >
         <FormControl>
@@ -128,6 +135,7 @@ const SignInCard: React.FC = () => {
             autoFocus
             required
             fullWidth
+            size="small"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             variant="outlined"
@@ -140,15 +148,6 @@ const SignInCard: React.FC = () => {
         <FormControl>
           <Box sx={{ display: "flex", justifyContent: "space-between" }}>
             <FormLabel htmlFor="password">Password</FormLabel>
-            <Link
-              component="button"
-              type="button"
-              onClick={handleClickOpen}
-              variant="body2"
-              sx={{ alignSelf: "baseline" }}
-            >
-              Forgot your password?
-            </Link>
           </Box>
           <TextField
             error={passwordError || !!passwordErrorMessage}
@@ -160,6 +159,7 @@ const SignInCard: React.FC = () => {
             autoComplete="current-password"
             required
             fullWidth
+            size="small"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             variant="outlined"
@@ -183,16 +183,25 @@ const SignInCard: React.FC = () => {
             <FormHelperText error>{passwordErrorMessage}</FormHelperText>
           )}
         </FormControl>
-        <FormControlLabel
-          control={<Checkbox value="remember" color="primary" />}
-          label="Remember me"
-        />
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <FormControlLabel
+            control={<Checkbox value="remember" color="primary" />}
+            label="Remember me"
+          />
+          <Link
+            component="button"
+            type="button"
+            onClick={handleClickOpen}
+            variant="body2"
+          >
+            Forgot your password?
+          </Link>
+        </Box>
         <ForgotPassword open={open} handleClose={handleClose} />
         <Button
           type="submit"
           fullWidth
           variant="contained"
-          onClick={handleSubmit}
         >
           {processing ? <CircularProgress size={20} /> : "Sign in"}
         </Button>

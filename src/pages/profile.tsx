@@ -18,9 +18,10 @@ import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import useProfileStore from "../lib/profileStore";
 import useAuthStore from "../lib/authStore";
 import useAppStore from "../lib/appstore";
+import Swal from "sweetalert2";
 
 const Profile: React.FC = () => {
-  const { profile, getProfile, loading } = useProfileStore();
+  const { profile, getProfile, updateProfile, loading } = useProfileStore();
   const { user } = useAuthStore();
   const { uploadFile } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
@@ -36,10 +37,20 @@ const Profile: React.FC = () => {
     }
   }, [profile]);
 
-  const handleEditToggle = () => {
+  const handleEditToggle = async () => {
     if (isEditing) {
-      // Save logic here
-      setIsEditing(false);
+      if (!editedProfile.first_name || !editedProfile.last_name) {
+          Swal.fire("Error", "First and last name are required", "error");
+          return;
+      }
+      
+      try {
+        await updateProfile(editedProfile);
+        Swal.fire("Success", "Profile updated successfully", "success");
+        setIsEditing(false);
+      } catch (error) {
+        Swal.fire("Error", "Failed to update profile", "error");
+      }
     } else {
       setIsEditing(true);
     }

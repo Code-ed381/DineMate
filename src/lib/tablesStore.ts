@@ -241,7 +241,7 @@ const useTablesStore = create<TableState>()(
         
         const { error: ordersError } = await supabase
           .from("orders")
-          .delete()
+          .update({ status: "served" })
           .eq("session_id", tableSession?.session_id)
           .eq("restaurant_id", selectedRestaurant?.id);
 
@@ -249,7 +249,7 @@ const useTablesStore = create<TableState>()(
 
         const { error: tableSessionError } = await supabase
           .from("table_sessions")
-          .delete()
+          .update({ status: "close", closed_at: new Date().toISOString() })
           .eq("id", tableSession.session_id)
           .eq("restaurant_id", selectedRestaurant?.id);
 
@@ -295,6 +295,9 @@ const useTablesStore = create<TableState>()(
           console.log("No restaurantId or waiterId");
           return;
         }
+
+        const { resetOrder } = useMenuStore.getState();
+        resetOrder();
 
         await get().getSessionOverview(
           table.id,
@@ -472,6 +475,14 @@ const useTablesStore = create<TableState>()(
 
           if (error) throw error;
 
+          const currentSelectedSession = get().selectedSession;
+          if (currentSelectedSession) {
+             const stillOpen = data?.find((s: any) => s.session_id === currentSelectedSession.session_id && s.session_status !== 'close');
+             if (!stillOpen) {
+                 set({ selectedSession: null });
+             }
+          }
+
           set({
             sessionsOverview: data || [],
             sessionsOverviewLoaded: true,
@@ -585,7 +596,7 @@ const useTablesStore = create<TableState>()(
 
         const { data: tableSession, error: tableSessionError } = await supabase
           .from("table_sessions")
-          .delete()
+          .update({ status: "close", closed_at: new Date().toISOString() })
           .eq("table_id", table_id)
           .eq("waiter_id", waiter_id)
           .eq("restaurant_id", restaurant_id)

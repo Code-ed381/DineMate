@@ -23,7 +23,14 @@ export default function AppTheme(props: AppThemeProps) {
         colorSchemeSelector: 'data-mui-color-scheme',
         cssVarPrefix: 'template',
       },
-      ...getDesignTokens('light'), // Base tokens
+      colorSchemes: {
+        light: {
+          ...getDesignTokens('light'),
+        },
+        dark: {
+          ...getDesignTokens('dark'),
+        },
+      },
       components: {
         ...inputsCustomizations,
         ...dataDisplayCustomizations,

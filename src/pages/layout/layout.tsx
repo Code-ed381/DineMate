@@ -158,6 +158,8 @@ const Layout: React.FC = () => {
 
   const first_name = user?.user_metadata?.firstName || "";
   const last_name = user?.user_metadata?.lastName || "";
+  const avatar = user?.user_metadata?.profileAvatar || "";
+  const displayRole = (role || "staff").toUpperCase();
 
 
   useEffect(() => {
@@ -320,7 +322,7 @@ const Layout: React.FC = () => {
         textAlign: collapsed ? 'center' : 'left'
       }}>
         <Avatar
-          src={user?.user_metadata?.profileAvatar}
+          src={avatar}
           alt={first_name}
           sx={{ width: 40, height: 40, border: `2px solid ${theme.palette.primary.main}` }}
         />
@@ -335,7 +337,7 @@ const Layout: React.FC = () => {
               </Typography>
             </Box>
             <Chip 
-              label={role?.toUpperCase()} 
+              label={displayRole} 
               size="small" 
               color="primary" 
               variant="filled"
@@ -400,7 +402,7 @@ const Layout: React.FC = () => {
                 {selectedRestaurant?.name}
                 {!isSmallMobile && (
                   <Chip 
-                    label={role} 
+                    label={displayRole} 
                     size="small" 
                     color="primary" 
                     variant="outlined" 
@@ -490,7 +492,7 @@ const Layout: React.FC = () => {
                   <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
                     <Avatar
                       alt="User Avatar"
-                      src={user?.user_metadata?.profileAvatar}
+                      src={avatar}
                     />
                   </IconButton>
                 </TooltipComponent>

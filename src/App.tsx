@@ -25,6 +25,7 @@ import CashierDetailedReports from "./pages/cashier-detailed-reports";
 import OrderHistory from "./pages/waiter/order-history";
 import WaiterPerformance from "./pages/waiter/performance";
 import GuestCall from "./pages/guest/GuestCall";
+import BartenderHistory from "./pages/dashboards/history";
 
 const App: React.FC = () => {
   return (
@@ -71,6 +72,7 @@ const App: React.FC = () => {
           <Route path="order-history" element={<OrderHistory />} />
           <Route path="performance" element={<WaiterPerformance />} />
           <Route path="bar" element={<Bar />} />
+          <Route path="bar/history" element={<BartenderHistory />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>

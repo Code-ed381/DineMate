@@ -6,6 +6,7 @@ import Swal from "sweetalert2";
 import { database_logs } from "./logActivities";
 import { Session, User } from "@supabase/supabase-js";
 import useRestaurantStore from "./restaurantStore";
+import useBarStore from "./barStore";
 
 export interface PersonalInfo {
   firstName: string;
@@ -603,6 +604,7 @@ const useAuthStore = create<AuthState>()(
           restaurants: [],
           selectedRestaurant: null,
         });
+        useBarStore.getState().resetBarState();
       },
 
       fetchEmployees: async () => {
@@ -616,6 +618,9 @@ const useAuthStore = create<AuthState>()(
       },
 
       login: async (navigate) => {
+        // Ensure no stale Supabase session exists
+        await get().signOut();
+        
         const { username, password } = get();
         if (!username || !password) {
           Swal.fire({
@@ -637,7 +642,6 @@ const useAuthStore = create<AuthState>()(
             employees?.[0]?.password === password &&
             employees?.[0]?.name === username
           ) {
-            localStorage.setItem("employee", JSON.stringify(employees));
             navigate("/app/dashboard", { replace: true });
             const details = { info: "User logged in successfully" };
             database_logs(username, "USER_LOGGED_IN", details);

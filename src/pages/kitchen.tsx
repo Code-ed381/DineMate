@@ -23,6 +23,7 @@ import PendingMealsList from "./dashboards/components/pending-meals-list";
 import ReadyMealsList from "./dashboards/components/ready-meals-list";
 import ServedMealsList from "./dashboards/components/served-meals-list";
 import { formatDateTimeWithSuffix } from "../utils/format-datetime";
+import useAppStore from "../lib/appstore";
 
 dayjs.extend(relativeTime);
 
@@ -38,6 +39,12 @@ const Kitchen: React.FC = () => {
     subscribeToOrderItems,
     unsubscribeFromOrderItems,
   } = useKitchenStore();
+
+  const { setBreadcrumb } = useAppStore();
+
+  useEffect(() => {
+    setBreadcrumb("Kitchen");
+  }, [setBreadcrumb]);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));

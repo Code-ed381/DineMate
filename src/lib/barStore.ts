@@ -6,9 +6,11 @@ import Swal from "sweetalert2";
 import useRestaurantStore from "./restaurantStore";
 import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import dayjs from "dayjs";
 
 interface BarTask {
   kitchen_task_id: string; // Changed from task_id
+  menu_item_id: string;
   menu_item_name: string;
   task_number: number;
   quantity: number; // Changed from order_item_quantity
@@ -26,6 +28,23 @@ interface BarTask {
   completed_at?: string;
   menu_item_image_url?: string;
   notes?: string;
+  modifier_names?: { name: string }[];
+  recipe?: string | null;
+}
+
+interface BarMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+  category_id: string;
+  category_name: string;
+  restaurant_id: string;
+  type: string;
+  description?: string;
+  preparation_time?: number;
+  stock_count?: number | null;
+  recipe?: string | null;
 }
 
 interface CartItem {
@@ -48,7 +67,7 @@ interface Category {
 
 interface BarState {
   loadingItems: boolean;
-  items: any[];
+  items: BarMenuItem[];
   barOptionSelected: string;
   orderItemsLoading: boolean;
   orderItems: BarTask[];
@@ -71,7 +90,7 @@ interface BarState {
   isProcessingPayment: boolean;
 
   setIsLoadingItems: (value: boolean) => void;
-  setItems: (value: any[]) => void;
+  setItems: (value: BarMenuItem[]) => void;
   setBarOptionSelected: (value: string) => void;
   setSelectedCategory: (value: string) => void;
   setSearchQuery: (value: string) => void;
@@ -86,9 +105,6 @@ interface BarState {
   removeFromCart: (id: string) => void;
   handleFetchItems: () => Promise<void>;
   handleFetchOrderItems: (options?: { silent?: boolean }) => Promise<void>;
-  handleFetchPendingOrders: () => Promise<void>;
-  handleFetchReadyOrders: () => Promise<void>;
-  handleFetchServedOrders: () => Promise<void>;
   handleFetchDailyDrinkTasks: (options?: { silent?: boolean }) => Promise<void>;
   handleFetchDailyOTCDrinks: (options?: { silent?: boolean }) => Promise<void>;
   handleUpdateOrderItemStatus: (drink: BarTask) => Promise<void>;
@@ -97,6 +113,13 @@ interface BarState {
   setCard: (value: string) => void;
   formatCashInput: (amount: string | number) => string;
   completeOTCPayment: () => Promise<boolean>;
+  resetBarState: () => void;
+  updateQuantity: (id: string, delta: number) => void;
+  recentOTCOrders: any[];
+  tip: string;
+  setTip: (value: string) => void;
+  handleVoidOTCOrder: (orderId: string) => Promise<void>;
+  taxAmount: string;
 }
 
 const useBarStore = create<BarState>()(
@@ -123,7 +146,10 @@ const useBarStore = create<BarState>()(
       activeStep: 0,
       cash: "",
       card: "",
+      tip: "",
+      taxAmount: "0",
       isProcessingPayment: false,
+      recentOTCOrders: [],
 
       setIsLoadingItems: (value) => set({ loadingItems: value }),
       setItems: (value) => set({ items: value }),
@@ -134,6 +160,7 @@ const useBarStore = create<BarState>()(
       setActiveStep: (step) => set({ activeStep: step }),
       setCash: (value) => set({ cash: value }),
       setCard: (value) => set({ card: value }),
+      setTip: (value) => set({ tip: value }),
 
       formatCashInput: (amount) => {
         const numericValue = String(amount).replace(/[^0-9.]/g, "");
@@ -184,13 +211,16 @@ const useBarStore = create<BarState>()(
 
           if (sessionError) throw sessionError;
 
+          const tipValue = parseFloat(get().tip) || 0;
+
           // 2. Create Order
           const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
               session_id: session.id,
               restaurant_id: restaurantId,
-              total: total,
+              total: total + (parseFloat(get().taxAmount) || 0), // Assuming tax is added
+              tip: tipValue,
               status: "served",
             })
             .select()
@@ -218,7 +248,12 @@ const useBarStore = create<BarState>()(
 
           if (itemsError) throw itemsError;
 
-          // 4. Success - Clear the tab and reset state
+          // 4. Update Stock (Task 4.1)
+          for (const item of activeTabObj.cart) {
+            await supabase.rpc('decrement_stock', { item_id: item.id, amount: item.qty });
+          }
+
+          // 5. Success - Clear the tab and reset state
           Swal.fire({
             title: "Payment Successful",
             text: "Order has been processed and completed.",
@@ -231,6 +266,8 @@ const useBarStore = create<BarState>()(
             activeStep: 0,
             cash: "",
             card: "",
+            tip: "",
+            recentOTCOrders: [{ ...order, items: orderItemsData }, ...state.recentOTCOrders].slice(0, 10),
           }));
 
           return true;
@@ -259,9 +296,6 @@ const useBarStore = create<BarState>()(
             { event: "*", schema: "public", table: "kitchen_tasks" },
             () => {
               get().handleFetchOrderItems({ silent: true }); // Refresh the main list
-              get().handleFetchPendingOrders();
-              get().handleFetchReadyOrders();
-              get().handleFetchServedOrders();
               get().handleFetchDailyDrinkTasks({ silent: true });
             }
           )
@@ -294,17 +328,20 @@ const useBarStore = create<BarState>()(
       },
 
       addNewTab: () =>
-        set((state) => ({
-          tabs: [
-            ...state.tabs,
-            {
-              id: state.tabs.length + 1,
-              name: `Customer ${state.tabs.length + 1}`,
-              cart: [],
-            },
-          ],
-          activeTab: state.tabs.length,
-        })),
+        set((state) => {
+          const newId = Date.now();
+          return {
+            tabs: [
+              ...state.tabs,
+              {
+                id: newId,
+                name: `Customer ${state.tabs.length + 1}`,
+                cart: [],
+              },
+            ],
+            activeTab: state.tabs.length,
+          };
+        }),
 
       addToCart: (drink) =>
         set((state) => ({
@@ -345,12 +382,14 @@ const useBarStore = create<BarState>()(
             .eq("restaurant_id", restaurantId);
 
           if (error) handleError(error);
+          
+          const itemsData = (data as BarMenuItem[]) || [];
 
           const categories: Category[] = Array.from(
-            new Map((data || []).map((item: any) => [item.category_id, item.category_name]))
+            new Map(itemsData.map((item) => [item.category_id, item.category_name]))
           ).map(([id, name]) => ({ id: id as string, name: name as string }));
 
-          set({ items: data || [], categories, loadingItems: false });
+          set({ items: itemsData, categories, loadingItems: false });
         } catch (error) {
           console.error("Error fetching order items:", error);
           set({ loadingItems: false });
@@ -362,11 +401,13 @@ const useBarStore = create<BarState>()(
         const { selectedRestaurant } = useRestaurantStore.getState();
         const restaurantId = selectedRestaurant?.id;
         try {
+          const fromTime = dayjs().subtract(24, "hour").toISOString();
           const { data, error } = await supabase
             .from("kitchen_tasks_full")
             .select("*")
             .ilike("item_type", "drink")
             .eq("menu_item_restaurant_id", restaurantId)
+            .gte("task_created_at", fromTime)
             .order("task_created_at", { ascending: true }); // Better for FIFO queue
 
           if (error) handleError(error);
@@ -404,6 +445,22 @@ const useBarStore = create<BarState>()(
             });
           }
 
+          // --- Modifier Fetching (Task 2.4) ---
+          const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
+          let modMap: Record<string, { name: string }[]> = {};
+          
+          if (orderItemIds.length > 0) {
+            const { data: modsData } = await supabase
+              .from("order_item_modifiers")
+              .select("order_item_id, name")
+              .in("order_item_id", orderItemIds);
+            
+            modsData?.forEach(m => {
+              if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
+              modMap[m.order_item_id].push({ name: m.name });
+            });
+          }
+
           const correctedTasks = tasks.map(task => {
             const finalWaiterId = task.waiter_id || resolvedWaitersByOrder[task.order_id];
             const waiter = waiterMap[finalWaiterId] || {};
@@ -412,7 +469,8 @@ const useBarStore = create<BarState>()(
               waiter_id: finalWaiterId,
               waiter_first_name: waiter.first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
               waiter_last_name: waiter.last_name || "",
-              waiter_avatar: waiter.avatar
+              waiter_avatar: waiter.avatar,
+              modifier_names: modMap[task.order_item_id] || []
             };
           });
 
@@ -439,17 +497,6 @@ const useBarStore = create<BarState>()(
         }
       },
 
-      handleFetchPendingOrders: async () => {
-        get().handleFetchOrderItems();
-      },
-
-      handleFetchReadyOrders: async () => {
-        get().handleFetchOrderItems();
-      },
-
-      handleFetchServedOrders: async () => {
-        get().handleFetchOrderItems();
-      },
 
       handleFetchDailyDrinkTasks: async (options = {}) => {
         const { selectedRestaurant } = useRestaurantStore.getState();
@@ -486,14 +533,31 @@ const useBarStore = create<BarState>()(
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
-          // Fetch order items that are direct OTC (session has no table)
+          // 1. Fetch OTC sessions (where table_id is null)
+          const { data: otcSessions, error: sessionError } = await supabase
+            .from("table_sessions")
+            .select("id")
+            .eq("restaurant_id", restaurantId)
+            .is("table_id", null)
+            .gte("created_at", today.toISOString());
+
+          if (sessionError) throw sessionError;
+
+          const sessionIds = otcSessions?.map((s: any) => s.id) || [];
+
+          if (sessionIds.length === 0) {
+            set({ dailyOTCDrinks: [], loadingDailyOTCDrinks: false });
+            return;
+          }
+
+          // 2. Fetch order items for these sessions
           const { data, error } = await supabase
             .from("order_items_full")
             .select("*")
             .eq("restaurant_id", restaurantId)
-            .eq("item_type", "drink")
-            .is("table_id", null) 
-            .gte("created_at", today.toISOString());
+            .eq("type", "drink")
+            .in("session_id", sessionIds)
+            .gte("order_item_created_at", today.toISOString());
 
           if (error) throw error;
           set({ dailyOTCDrinks: data || [], loadingDailyOTCDrinks: false });
@@ -513,6 +577,13 @@ const useBarStore = create<BarState>()(
               title: `Start preparing "${drink.menu_item_name}"?`,
               html: `Task ${drink.task_number} of ${drink.quantity}<br/>Automatically marking as preparing in <b>5</b>s...`,
               icon: "warning",
+              showCancelButton: true,
+              showDenyButton: true,
+              confirmButtonColor: "#3085d6",
+              cancelButtonColor: "#ccc9c8",
+              denyButtonColor: "#d33",
+              confirmButtonText: "Yes, start preparing!",
+              denyButtonText: "Remove task",
               timer: 5000,
               timerProgressBar: true,
             }).then(async (result) => {
@@ -526,7 +597,47 @@ const useBarStore = create<BarState>()(
                   })
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
+
+                // Also update the order_item status so waiters see current status (Task 2.2)
+                await supabase
+                  .from("order_items")
+                  .update({
+                    status: "preparing",
+                    updated_at: new Date().toISOString(),
+                    prepared_by: userId,
+                  })
+                  .eq("id", drink.order_item_id);
+
                 get().handleFetchOrderItems({ silent: true });
+              }
+
+              if (result.isDenied) {
+                Swal.fire({
+                  title: "Remove this task?",
+                  text: "You won't be able to revert this!",
+                  icon: "warning",
+                  showCancelButton: true,
+                  confirmButtonColor: "#3085d6",
+                  cancelButtonColor: "#d33",
+                  confirmButtonText: "Yes, remove it",
+                }).then(async (deleteConfirm) => {
+                  if (deleteConfirm.isConfirmed) {
+                    const { error } = await supabase
+                      .from("kitchen_tasks")
+                      .delete()
+                      .eq("id", drink.kitchen_task_id);
+
+                    if (error) handleError(error);
+
+                    Swal.fire({
+                      title: "Deleted!",
+                      text: "Task has been removed.",
+                      icon: "success",
+                    });
+
+                    get().handleFetchOrderItems({ silent: true });
+                  }
+                });
               }
             });
           } catch (error) {
@@ -551,7 +662,60 @@ const useBarStore = create<BarState>()(
                   })
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
+
+                // Update the order_item status (Task 2.4)
+                await supabase
+                  .from("order_items")
+                  .update({
+                    status: "ready",
+                    updated_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString(),
+                  })
+                  .eq("id", drink.order_item_id);
+
                 get().handleFetchOrderItems({ silent: true });
+
+                // Send notification to the waiter (Task 2.1)
+                const { selectedRestaurant } = useRestaurantStore.getState();
+                const { user: currentUser } = useAuthStore.getState();
+
+                import("../services/notificationService").then(async ({ notificationService }) => {
+                  let targetWaiterId = drink.waiter_id;
+
+                  // Fallback: Fetch waiter_id via orders -> table_sessions if missing
+                  if (!targetWaiterId) {
+                    const { data: orderData } = await supabase
+                      .from("orders")
+                      .select("session_id")
+                      .eq("id", drink.order_id)
+                      .maybeSingle();
+
+                    if (orderData?.session_id) {
+                      const { data: sessionData } = await supabase
+                        .from("table_sessions")
+                        .select("waiter_id")
+                        .eq("id", orderData.session_id)
+                        .maybeSingle();
+
+                      if (sessionData?.waiter_id) {
+                        targetWaiterId = sessionData.waiter_id;
+                      }
+                    }
+                  }
+
+                  if (targetWaiterId && selectedRestaurant?.id) {
+                    await notificationService.sendUserNotification(
+                      selectedRestaurant.id,
+                      currentUser?.id || "",
+                      {
+                        title: "Drink Ready",
+                        message: `Table ${drink.table_number}: ${drink.menu_item_name} is ready for pickup`,
+                        priority: "high",
+                        userIds: [targetWaiterId],
+                      }
+                    );
+                  }
+                });
               }
             });
           } catch (error) {
@@ -572,12 +736,98 @@ const useBarStore = create<BarState>()(
                   .update({ status: "served", updated_at: new Date().toISOString() })
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
+                
+                // Update Stock (Task 4.1)
+                if (drink.menu_item_id) {
+                  await supabase.rpc('decrement_stock', { item_id: drink.menu_item_id, amount: 1 });
+                }
+
                 get().handleFetchOrderItems({ silent: true });
               } catch (error) {
                 console.error("Error updating task status:", error);
               }
             }
           });
+        }
+      },
+
+      resetBarState: () => {
+        const channel = get().orderItemsChannel;
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
+        set({
+          loadingItems: false,
+          items: [],
+          barOptionSelected: "dine_in",
+          orderItemsLoading: false,
+          orderItems: [],
+          pendingOrders: [],
+          readyOrders: [],
+          servedOrders: [],
+          categories: [],
+          selectedCategory: "all",
+          searchQuery: "",
+          tabs: [],
+          activeTab: 0,
+          orderItemsChannel: null,
+          dailyDrinkTasks: [],
+          loadingDailyTasks: false,
+          dailyOTCDrinks: [],
+          loadingDailyOTCDrinks: false,
+          activeStep: 0,
+          cash: "",
+          card: "",
+          isProcessingPayment: false,
+        });
+      },
+
+      updateQuantity: (id, delta) =>
+        set((state) => {
+          const newTabs = [...state.tabs];
+          const activeCart = newTabs[state.activeTab].cart;
+          const itemIndex = activeCart.findIndex((i: any) => i.id === id);
+
+          if (itemIndex > -1) {
+            const newQty = activeCart[itemIndex].qty + delta;
+            if (newQty > 0) {
+              activeCart[itemIndex].qty = newQty;
+            } else {
+              activeCart.splice(itemIndex, 1);
+            }
+          }
+
+          return { tabs: newTabs };
+        }),
+
+      handleVoidOTCOrder: async (orderId) => {
+        const result = await Swal.fire({
+          title: "Void this order?",
+          text: "This will mark the order as voided. This cannot be undone.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          confirmButtonText: "Yes, void it",
+          input: "password",
+          inputLabel: "Manager PIN",
+          inputPlaceholder: "Enter manager PIN to authorize",
+        });
+
+        if (result.isConfirmed) {
+          const { error } = await supabase
+            .from("orders")
+            .update({ status: "voided", updated_at: new Date().toISOString() })
+            .eq("id", orderId);
+
+          if (error) {
+            handleError(error);
+            return;
+          }
+
+          Swal.fire("Voided!", "The order has been voided.", "success");
+          set((state) => ({
+            recentOTCOrders: state.recentOTCOrders.filter((o) => o.id !== orderId),
+          }));
         }
       },
     }),

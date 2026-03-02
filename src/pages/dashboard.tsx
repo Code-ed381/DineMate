@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect } from "react";
 import { Box, LinearProgress, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import useRestaurantStore from "../lib/restaurantStore";
+import useAppStore from "../lib/appstore";
 
 // Lazy load dashboards
 const OwnerDashboard = lazy(() => import("./dashboards/owner"));
@@ -23,6 +24,12 @@ const dashboards: Record<string, React.LazyExoticComponent<React.FC>> = {
 const Dashboard: React.FC = () => {
   const { selectedRestaurant, role } = useRestaurantStore();
   const navigate = useNavigate();
+
+  const { setBreadcrumb } = useAppStore();
+
+  useEffect(() => {
+    setBreadcrumb("Dashboard");
+  }, [setBreadcrumb]);
 
   useEffect(() => {
     if (!selectedRestaurant) {

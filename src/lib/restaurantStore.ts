@@ -24,6 +24,7 @@ export interface Restaurant {
 
 export interface RestaurantMember {
     role: string;
+    status: string;
     restaurants: Restaurant;
 }
 
@@ -68,7 +69,7 @@ const useRestaurantStore = create<RestaurantState>()(
                     
                     const { data, error } = await supabase
                         .from('restaurant_members')
-                        .select('role, restaurants(*)')
+                        .select('role, status, restaurants(*)')
                         .eq('user_id', userId) as { data: RestaurantMember[] | null, error: any };
                     
                     if (error) throw error;
@@ -85,7 +86,7 @@ const useRestaurantStore = create<RestaurantState>()(
                 try {
                     const { data, error } = await supabase
                         .from('restaurant_members')
-                        .select('role, restaurants(*)')
+                        .select('role, status, restaurants(*)')
                         .eq('restaurant_id', id)
                         .single();
                     if (error) throw error;

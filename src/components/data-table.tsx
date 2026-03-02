@@ -12,6 +12,10 @@ interface DataTableProps {
   showToolbar?: boolean;
   autoHeight?: boolean;
   sx?: SxProps<Theme>;
+  slots?: any;
+  slotProps?: any;
+  loading?: boolean;
+  pagination?: boolean;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -24,12 +28,17 @@ const DataTable: React.FC<DataTableProps> = ({
   showToolbar = false,
   autoHeight = true,
   sx = {},
+  slots,
+  slotProps,
+  loading,
+  pagination,
 }) => {
   return (
     <DataGrid
       rows={rows}
       columns={columns}
       autoHeight={autoHeight}
+      loading={loading}
       getRowId={getRowId}
       onRowClick={onRowClick}
       disableRowSelectionOnClick
@@ -43,8 +52,11 @@ const DataTable: React.FC<DataTableProps> = ({
         "& .MuiDataGrid-columnHeaders": { fontWeight: "bold" },
         ...sx,
       }}
-      slots={showToolbar ? { toolbar: GridToolbar } : {}}
-      slotProps={showToolbar ? { toolbar: { showQuickFilter: true } } : {}}
+      slots={{ toolbar: showToolbar ? GridToolbar : undefined, ...slots }}
+      slotProps={{
+        toolbar: showToolbar ? { showQuickFilter: true } : undefined,
+        ...slotProps,
+      }}
     />
   );
 };

@@ -30,16 +30,16 @@ import {
   Print as PrintIcon,
   TableBar as TableIcon,
   CalendarMonth as CalendarIcon,
+  LocalBar,
 } from "@mui/icons-material";
 import useMenuStore from "../../lib/menuStore";
 import useAuthStore from "../../lib/authStore";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
 import useRestaurantStore from "../../lib/restaurantStore";
-
 import { printReceipt } from "../../components/PrintWindow";
 import { getCurrencySymbol } from "../../utils/currency";
 
-const OrderHistory: React.FC = () => {
+const BartenderHistory: React.FC = () => {
   const { user } = useAuthStore();
   const { myOrders, loadingMyOrders, fetchMyOrderHistory, getOrderItemsByOrderId } = useMenuStore();
   const { selectedRestaurant } = useRestaurantStore();
@@ -62,7 +62,7 @@ const OrderHistory: React.FC = () => {
 
   const filteredOrders = myOrders.filter((order: any) => 
     order.id.toString().includes(searchTerm) || 
-    order.table_number?.toString().includes(searchTerm)
+    (order.table_number?.toString() || "OTC").includes(searchTerm)
   );
 
   const handleViewOrder = async (order: any) => {
@@ -79,21 +79,19 @@ const OrderHistory: React.FC = () => {
   };
 
   const handleReprint = (order: any, items: any[]) => {
-    const waiterName = user?.user_metadata?.first_name || "Staff";
+    const bartenderName = user?.user_metadata?.first_name || "Bartender";
     const totalQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const totalPrice = order.total || items.reduce((sum, item) => sum + (item.sum_price || 0), 0);
     
-    // For history reprint, we might not have the original cash/card split easily from the joined view
-    // but we can pass the total.
     printReceipt(
       order.id,
-      waiterName,
-      order.table_number || "?",
+      bartenderName,
+      order.table_number ? `Table ${order.table_number}` : "OTC",
       totalQty,
       totalPrice,
       items,
       totalPrice.toFixed(2),
-      totalPrice.toFixed(2), // Mock cash if unknown
+      totalPrice.toFixed(2), // Assume full payment for history
       "0.00",
       "0.00",
       selectedRestaurant
@@ -101,9 +99,14 @@ const OrderHistory: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      {/* Header removed as requested */}
-
+    <Box sx={{ p: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 4 }}>
+        <LocalBar fontSize="large" color="primary" />
+        <Box>
+            <Typography variant="h4" fontWeight="800">Order History</Typography>
+            <Typography variant="body2" color="text.secondary">Review past sales and reprints</Typography>
+        </Box>
+      </Stack>
 
       {/* ---- Controls ---- */}
       <Stack
@@ -185,19 +188,23 @@ const OrderHistory: React.FC = () => {
                     avatar={
                       <Box 
                         sx={{ 
-                          bgcolor: 'primary.main', 
+                          bgcolor: order.table_number ? 'primary.main' : 'secondary.main', 
                           color: 'white', 
                           p: 1, 
                           borderRadius: '8px',
                           display: 'flex',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          minWidth: 40,
+                          justifyContent: 'center'
                         }}
                       >
-                        <TableIcon fontSize="small" />
-                        <Typography sx={{ ml: 0.5, fontWeight: 800 }}>{order.table_number}</Typography>
+                        {order.table_number ? <TableIcon fontSize="small" /> : <LocalBar fontSize="small" />}
+                        <Typography sx={{ ml: 0.5, fontWeight: 800, fontSize: '0.8rem' }}>
+                            {order.table_number || "OTC"}
+                        </Typography>
                       </Box>
                     }
-                    title={`#${order.id}`}
+                    title={`#${order.id.toString().slice(-6)}`}
                     titleTypographyProps={{ fontWeight: 700 }}
                     subheader={formatDateTimeWithSuffix(order.created_at)}
                     sx={{ pb: 1 }}
@@ -216,7 +223,7 @@ const OrderHistory: React.FC = () => {
                          <Chip 
                             label={order.status?.toUpperCase()} 
                             size="small" 
-                            color={order.status === 'served' ? 'success' : 'warning'} 
+                            color={order.status === 'served' || order.status === 'completed' ? 'success' : 'warning'} 
                             variant="outlined"
                             sx={{ fontWeight: 700, fontSize: '0.65rem' }}
                          />
@@ -265,7 +272,7 @@ const OrderHistory: React.FC = () => {
         <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>
           <ReceiptIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
           <Typography variant="h5" fontWeight={800}>Order Details</Typography>
-          <Typography variant="caption" color="text.secondary">#{selectedOrder?.id} • Table {selectedOrder?.table_number}</Typography>
+          <Typography variant="caption" color="text.secondary">#{selectedOrder?.id} • {selectedOrder?.table_number ? `Table ${selectedOrder?.table_number}` : "OTC"}</Typography>
         </DialogTitle>
         <DialogContent>
           {loadingDetails ? (
@@ -317,7 +324,7 @@ const OrderHistory: React.FC = () => {
                   <Typography variant="h6" fontWeight={800}>{currency}{selectedOrder?.total?.toFixed(2) || "0.00"}</Typography>
                 </Box>
                 <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  Served at: {selectedOrder && formatDateTimeWithSuffix(selectedOrder.created_at)}
+                  Processed at: {selectedOrder && formatDateTimeWithSuffix(selectedOrder.created_at)}
                 </Typography>
               </Box>
             </>
@@ -340,4 +347,4 @@ const OrderHistory: React.FC = () => {
   );
 };
 
-export default OrderHistory;
+export default BartenderHistory;

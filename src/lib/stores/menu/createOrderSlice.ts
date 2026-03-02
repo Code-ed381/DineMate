@@ -136,7 +136,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
 
   deleteOrderBySessionId: async (sessionId) => {
     if (!sessionId) return;
-    await supabase.from("orders").delete().eq("session_id", sessionId);
+    await supabase.from("orders").update({ status: 'served' }).eq("session_id", sessionId);
     set({ currentOrder: null });
   },
 

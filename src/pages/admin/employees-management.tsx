@@ -8,11 +8,22 @@ import {
   Card,
   Divider,
   Typography,
+  ToggleButton,
+  ToggleButtonGroup,
+  TextField,
+  InputAdornment,
+  CardMedia,
+  CardContent,
+  Button
 } from "@mui/material";
-import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import SearchIcon from "@mui/icons-material/Search";
 import AdminHeader from "../../components/admin-header";
 import DataTable from "../../components/data-table";
+import FAB from "../../components/fab";
+import { GridColDef } from "@mui/x-data-grid";
+import EmptyState from "../../components/empty-state";
 
 import Swal from "sweetalert2";
 import useRestaurantStore from "../../lib/restaurantStore";
@@ -26,7 +37,8 @@ import { useSubscription } from "../../providers/subscriptionProvider";
 interface EmployeeRow {
   member_id: string;
   user_id: string;
-  avatar: string;
+  avatar_url: string;
+  created_at: string;
   name: string;
   first_name: string;
   last_name: string;
@@ -44,10 +56,13 @@ const EmployeeManagement: React.FC = () => {
   const { updateUserAvatarAsAdmin, updateUserDetailsAsAdmin } = useAuthStore();
   const { settings } = useSettings();
   const { viewMode } = useSettingsStore();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [role, setRole] = useState<string | null>(null);
   const { subscriptionPlan } = useSubscription();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedEmpIdForUpload, setSelectedEmpIdForUpload] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEmployees();
@@ -55,6 +70,12 @@ const EmployeeManagement: React.FC = () => {
       setRole(storeRole);
     }
   }, [fetchEmployees, storeRole]);
+
+  const filteredEmployees = employees.filter((emp) => {
+      const matchesSearch = (emp.first_name + " " + emp.last_name + " " + emp.email + " " + (emp.phone || "")).toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = roleFilter === "all" || emp.role === roleFilter;
+      return matchesSearch && matchesRole;
+  });
 
   const handleRowClick = (params: any) => {
     let selectedAvatar: File | null = null;
@@ -115,7 +136,7 @@ const EmployeeManagement: React.FC = () => {
 
         <div class="edit-employee-container">
           <div class="avatar-wrapper">
-            <img id="avatar-img" src="${employee.avatar}" alt="${employee.name}" />
+            <img id="avatar-img" src="${employee.avatar_url}" alt="${employee.name}" />
             <div class="edit-avatar" id="edit-avatar-btn">
               ✏️
             </div>
@@ -211,9 +232,23 @@ const EmployeeManagement: React.FC = () => {
     }
   };
 
-  const columns = [
+  const handleTriggerUpload = (empUserId: string) => {
+      setSelectedEmpIdForUpload(empUserId);
+      fileInputRef.current?.click();
+  };
+
+  const handleDelete = async (employee: any) => {
+       const { handleDelete } = useEmployeesStore.getState();
+       
+       // Handle mismatch between data view and store expected type
+       // Store expects just 'id' which maps to 'member_id' in some contexts or user_id
+       // We should pass the object ensuring 'member_id' or 'id' is present
+       await handleDelete(employee);
+  };
+
+  const columns: GridColDef[] = [
     {
-      field: "avatar",
+      field: "avatar_url",
       headerName: "Avatar",
       width: 70,
       renderCell: (params: any) => (
@@ -244,6 +279,8 @@ const EmployeeManagement: React.FC = () => {
     {
       field: "status",
       headerName: "Status",
+      headerAlign: 'center',
+      align: 'center',
       flex: 1,
       maxWidth: 150,
       renderCell: (params: any) => (
@@ -264,11 +301,17 @@ const EmployeeManagement: React.FC = () => {
       ),
     },
     {
+      field: "created_at",
+      headerName: "Joined Date",
+      width: 150,
+      valueFormatter: (params: any) => new Date(params.value).toLocaleDateString(),
+    },
+    {
       field: "delete",
       headerName: "Delete",
       width: 70,
       renderCell: (params: any) => (
-        <IconButton onClick={() => console.log(params)}>
+        <IconButton onClick={() => handleDelete(params.row)}>
           <DeleteIcon color="error" />
         </IconButton>
       ),
@@ -281,107 +324,139 @@ const EmployeeManagement: React.FC = () => {
     <Box sx={{ p: 2 }}>
       <AdminHeader
         title="Employee Management"
-        description="Manage your restaurant employees, track availability, and update reservations"
+        description="Manage your restaurant staff, track roles, and update details"
       />
+
+       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+          <ToggleButtonGroup exclusive value={roleFilter} onChange={(_e, v) => v && setRoleFilter(v)} size="small">
+              <ToggleButton value="all">All</ToggleButton>
+              <ToggleButton value="admin">Admin</ToggleButton>
+              <ToggleButton value="waiter">Waiter</ToggleButton>
+              <ToggleButton value="chef">Chef</ToggleButton>
+              <ToggleButton value="kitchen">Kitchen</ToggleButton>
+              <ToggleButton value="cashier">Cashier</ToggleButton>
+          </ToggleButtonGroup>
+          <TextField
+            size="small"
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+            sx={{ width: 300 }}
+          />
+      </Box>
 
       {viewMode === "list" && (
         <DataTable
-          rows={employees}
+          rows={filteredEmployees}
           columns={columns}
           getRowId={(row: any) => row.member_id}
           onRowClick={handleRowClick}
+          slots={{
+            noRowsOverlay: () => (
+              <EmptyState
+                title="No Employees Found"
+                description="Try adjusting your search or filters, or add a new employee."
+                height={400}
+              />
+            ),
+          }}
+          sx={{ minHeight: 400 }}
         />
       )}
 
       {viewMode === "grid" && (
         <Grid container spacing={3}>
-          {employees.map((emp) => (
-            <Grid item xs={12} md={4} key={emp.member_id}>
-              <Card
-                sx={{
-                  borderRadius: 1,
-                  display: "flex",
-                  height: 250,
-                  overflow: "hidden",
-                }}
-              >
-                <Box
-                  sx={{
-                    width: "40%",
-                    bgcolor: "grey.100",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                    borderRadius: 1,
-                    overflow: "hidden",
-                  }}
-                >
-                  <img
-                    src={emp.avatar}
-                    alt={emp.first_name}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
+          {filteredEmployees.length === 0 ? (
+            <Grid item xs={12}>
+               <EmptyState
+                title="No Employees Found"
+                description="Try adjusting your search or filters, or add a new employee."
+              />
+            </Grid>
+          ) : (
+            filteredEmployees.map((emp: any) => (
+            <Grid item xs={12} sm={6} md={3} key={emp.member_id}>
+              <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                <CardMedia
+                  component="img"
+                  height="140"
+                  image={emp.avatar_url || "/default-user.png"}
+                  alt={emp.first_name}
+                />
+                <CardContent sx={{ flexGrow: 1, p: 2 }}>
+                  <Typography variant="h6" fontWeight="bold" gutterBottom>
+                    {emp.first_name} {emp.last_name}
+                  </Typography>
+                  <Chip 
+                    label={emp.role} 
+                    size="small" 
+                    variant="outlined" 
+                    sx={{ textTransform: "capitalize", mb: 2 }} 
                   />
 
-                  {((settings as any)?.employee_permissions?.admin_delete_edit_employee && role === "admin") || role === "owner" ? (
-                      <IconButton
-                        color="primary"
-                        sx={{
-                          position: "absolute",
-                          bottom: 8,
-                          right: 8,
-                          bgcolor: "white",
-                          boxShadow: 2,
-                          "&:hover": { bgcolor: "grey.200" },
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <CameraAltIcon />
-                      </IconButton>
-                  ) : null}
-
-                  <input
-                    type="file"
-                    hidden
-                    ref={fileInputRef}
-                    onChange={(e: any) => handleLogoUpload(emp.user_id, e.target.files[0])}
-                    accept="image/*"
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    flexGrow: 1,
-                    p: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                  }}
-                >
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                        <Typography variant="subtitle2" fontWeight="bold">Name</Typography>
-                        <Typography variant="subtitle2">{emp.first_name} {emp.last_name}</Typography>
-                    </Box>
-                    <Divider />
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, mt: 1 }}>
-                        <Typography variant="subtitle2" fontWeight="bold">Role</Typography>
-                        <Chip label={emp.role} size="small" variant="outlined" />
-                    </Box>
-                    <Divider />
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
-                        <Typography variant="subtitle2" fontWeight="bold">Status</Typography>
-                        <Chip label={emp.status} size="small" color={emp.status === "active" ? "success" : "default"} />
-                    </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Email</Typography>
+                    <Typography variant="caption" noWrap sx={{ maxWidth: "60%" }} title={emp.email}>{emp.email}</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Phone</Typography>
+                    <Typography variant="caption">{emp.phone}</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Joined</Typography>
+                    <Typography variant="caption">{new Date(emp.created_at).toLocaleDateString()}</Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2, alignItems: "center" }}>
+                    <Typography variant="subtitle2" fontWeight="bold">Status</Typography>
+                    <Chip 
+                        label={emp.status} 
+                        size="small" 
+                        color={emp.status === "active" ? "success" : "default"} 
+                        sx={{ textTransform: "capitalize" }} 
+                    />
+                  </Box>
+                </CardContent>
+                <Divider />
+                <Box sx={{ p: 1, display: "flex", justifyContent: "space-between" }}>
+                  <Button 
+                    size="small" 
+                    startIcon={<EditIcon />} 
+                    onClick={() => handleRowClick({ row: emp })}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    size="small" 
+                    color="error" 
+                    startIcon={<DeleteIcon />} 
+                    onClick={() => handleDelete(emp)}
+                  >
+                    Delete
+                  </Button>
                 </Box>
               </Card>
             </Grid>
-          ))}
+          )))}
         </Grid>
       )}
+
+      {/* Hidden file input controlled by ref */}
+      <input
+        type="file"
+        hidden
+        ref={fileInputRef}
+        onChange={(e: any) => {
+            if (selectedEmpIdForUpload && e.target.files[0]) {
+                handleLogoUpload(selectedEmpIdForUpload, e.target.files[0]);
+            }
+            setSelectedEmpIdForUpload(null);
+        }}
+        accept="image/*"
+      />
+
+       <FAB handleAdd={() => useEmployeesStore.getState().handleAddEmployee()} title="Add Employee" />
     </Box>
   );
 };

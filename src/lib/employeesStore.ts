@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import Swal from 'sweetalert2';
 import useRestaurantStore from './restaurantStore';
+import { useAuditStore } from './auditStore';
 
 interface Employee {
     member_id: string;
@@ -10,7 +11,8 @@ interface Employee {
     position: string;
     role: string;
     status: string;
-    image?: string;
+    avatar_url?: string;
+    created_at: string;
     user_id: string;
     [key: string]: any;
 }
@@ -94,14 +96,105 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleAddEmployee: async () => {
-        const { name, position } = get();
-        if (!name.trim() || !position.trim()) {
-            Swal.fire('Error', 'Name and Position cannot be empty.', 'error');
-            return;
-        }
+        const { value: formValues } = await Swal.fire({
+            title: 'Add New Employee',
+            html:
+                '<input id="swal-first-name" class="swal2-input" placeholder="First Name">' +
+                '<input id="swal-last-name" class="swal2-input" placeholder="Last Name">' +
+                '<input id="swal-email" class="swal2-input" placeholder="Email">' +
+                '<input id="swal-phone" class="swal2-input" placeholder="Phone">' +
+                '<input id="swal-password" class="swal2-input" placeholder="Password" type="password">' +
+                '<select id="swal-role" class="swal2-input">' +
+                '  <option value="waiter">Waiter</option>' +
+                '  <option value="chef">Chef</option>' +
+                '  <option value="bartender">Bartender</option>' +
+                '  <option value="cashier">Cashier</option>' +
+                '  <option value="admin">Admin</option>' +
+                '</select>',
+            focusConfirm: false,
+            showCancelButton: true,
+            preConfirm: () => {
+                return [
+                    (document.getElementById('swal-first-name') as HTMLInputElement).value,
+                    (document.getElementById('swal-last-name') as HTMLInputElement).value,
+                    (document.getElementById('swal-email') as HTMLInputElement).value,
+                    (document.getElementById('swal-phone') as HTMLInputElement).value,
+                    (document.getElementById('swal-password') as HTMLInputElement).value,
+                    (document.getElementById('swal-role') as HTMLSelectElement).value
+                ]
+            }
+        });
 
-        // Logic for adding employee seems incomplete in original file (user_id and restaurant_id from authStore/restaurantStore needed)
-        // I'll keep the logic consistent but with types.
+        if (formValues) {
+            const [firstName, lastName, email, phone, password, role] = formValues;
+            
+            if (!firstName || !lastName || !email || !password || !role) {
+                Swal.fire('Error', 'Please fill all required fields', 'error');
+                return;
+            }
+
+            try {
+                // 1. Create user in auth
+                // Dynamically import supabaseAdmin to avoid circular dependencies if any, 
+                // or just import at top. Let's assume it's imported.
+                const { supabaseAdmin } = await import('./supabaseAdmin');
+                
+                const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+                    email,
+                    password,
+                    email_confirm: true,
+                    user_metadata: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        phone_number: phone,
+                        role: 'employee' // default system role
+                    }
+                });
+
+                if (authError) throw authError;
+
+                if (!authData.user) throw new Error("Failed to create user");
+
+                // 2. Add to restaurant_members
+                const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
+                if (!selectedRestaurant?.id) throw new Error("No restaurant selected");
+
+                const { error: memberError } = await supabase
+                    .from('restaurant_members')
+                    .insert([{
+                        user_id: authData.user.id,
+                        restaurant_id: selectedRestaurant.id,
+                        role: role,
+                        status: 'pending',
+                        first_name: firstName,
+                        last_name: lastName,
+                        phone: phone,
+                        email: email
+                    }]);
+
+                if (memberError) {
+                    // unexpected error, maybe cleanup user? 
+                    console.error("Member creation failed:", memberError);
+                    throw memberError;    
+                }
+
+                await get().fetchEmployees();
+                
+                // Audit Log
+                await useAuditStore.getState().logAction({
+                    action: 'create_employee',
+                    entity_type: 'employee',
+                    entity_id: authData.user.id,
+                    details: { name: `${firstName} ${lastName}`, role, email }
+                });
+
+                Swal.fire('Success', 'Employee added successfully', 'success');
+
+            } catch (error: any) {
+                console.error(error);
+                Swal.fire('Error', error.message || 'Failed to add employee', 'error');
+            }
+        }
     },
 
     handleEditStart: (id, row) => {
@@ -113,7 +206,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
         if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-                set({ rowData: { ...get().rowData, image: event.target?.result as string } });
+                set({ rowData: { ...get().rowData, avatar_url: event.target?.result as string } });
             };
             reader.readAsDataURL(file);
         }
@@ -127,7 +220,8 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
                 admin: "Admin",
                 waiter: "Waiter",
                 bartender: "Bartender",
-                chef: "Chef"
+                chef: "Chef",
+                cashier: "Cashier"
             },
             showCancelButton: true,
             inputPlaceholder: `${employee.role}`,
@@ -142,13 +236,26 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
 
           if (role) {
             try {
+                // Use member_id if available, or fetch by user_id/restaurant_id combo if needed
+                // The employee object from view usually has member_id
+                const idToUpdate = employee.member_id || employee.id;
+
                 const { error } = await supabase
                     .from('restaurant_members')
                     .update({ role: role })
-                    .eq('id', employee.id);
+                    .eq('member_id', idToUpdate);
                 if (error) throw error;
 
                 await get().fetchEmployees();
+
+                // Audit Log
+                await useAuditStore.getState().logAction({
+                    action: 'update_employee_role',
+                    entity_type: 'employee',
+                    entity_id: idToUpdate,
+                    details: { old_role: employee.role, new_role: role, employee_name: employee.name }
+                });
+
                 Swal.fire('Success', 'Employee role updated successfully!', 'success');
             } catch (error) {
                 Swal.fire('Error', 'Failed to update employee role.', 'error');
@@ -157,9 +264,9 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleUpdateStatus: async (member) => {
-        const newStatus = member.status === 'active' ? 'inactive' : 'active';
+        const newStatus = member.status === 'active' ? 'suspended' : 'active';
         const title = member.status === 'active' 
-            ? `Are you sure you want to deactivate ${member.name}?`
+            ? `Are you sure you want to suspend ${member.name}?`
             : `Are you sure you want to activate ${member.name}?`;
 
         Swal.fire({
@@ -168,7 +275,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
             showCancelButton: true,
             confirmButtonColor: "#3085d6",
             cancelButtonColor: "#d33",
-            confirmButtonText: member.status === 'active' ? "Yes, deactivate!" : "Yes, activate!"
+            confirmButtonText: member.status === 'active' ? "Yes, suspend!" : "Yes, activate!"
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
@@ -180,8 +287,16 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
         
                     await get().fetchEmployees();
                     
+                    // Audit Log
+                    await useAuditStore.getState().logAction({
+                        action: 'update_employee_status',
+                        entity_type: 'employee',
+                        entity_id: member.member_id,
+                        details: { status: newStatus, employee_name: member.name }
+                    });
+                    
                     Swal.fire({
-                      title: newStatus === 'active' ? "Activated!" : "Deactivated!",
+                      title: newStatus === 'active' ? "Activated!" : "Suspended!",
                       text: `${member.name} has been ${newStatus}.`,
                       icon: "success",
                       showConfirmButton: false,
@@ -208,17 +323,17 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
             const { error } = await supabase
                 .from('restaurant_members')
                 .update({
-                    name: rowData.name,
+                    // name: rowData.name, // Name is usually computed/in auth, but if members table has it:
                     status: rowData.status,
-                    image: rowData.image || '',
-                    password: rowData.password || '',
+                    // image: rowData.image || '', // Image is usually in auth or a separate bucket url column
+                    // password removal
                 })
-                .eq('id', id);
+                .eq('member_id', id); // Use member_id
 
             if (error) throw error;
 
             set((state) => ({
-                employees: state.employees.map((row) => (row.id === id ? { ...row, ...rowData } as Employee : row)),
+                employees: state.employees.map((row) => (row.member_id === id ? { ...row, ...rowData } as Employee : row)),
                 editingRow: null,
                 rowData: {},
             }));
@@ -240,10 +355,25 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
         }).then(async (result) => {
             if (result.isConfirmed) {
                 try {
-                    const { error } = await supabase.from('restaurant_members').delete().eq('id', employee.id);
+                    // Delete from restaurant_members
+                    const idToDelete = employee.member_id || employee.id;
+                    const { error } = await supabase.from('restaurant_members').delete().eq('member_id', idToDelete);
                     if (error) throw error;
 
+                    // Optionally delete from auth users if we created it? 
+                    // Usually we might want to keep the user but remove access. 
+                    // The current requirement is just to make the delete button work.
+
                     await get().fetchEmployees();
+
+                    // Audit Log
+                    await useAuditStore.getState().logAction({
+                         action: 'delete_employee',
+                         entity_type: 'employee',
+                         entity_id: idToDelete,
+                         details: { employee_name: employee.name }
+                    });
+
                     Swal.fire({
                       title: "Deleted!",
                       text: "Employee has been deleted.",

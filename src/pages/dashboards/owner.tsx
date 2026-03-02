@@ -48,6 +48,11 @@ import {
   Bar,
 } from "recharts";
 
+import { useNavigate } from "react-router-dom";
+import { useAnalyticsStore } from "../../lib/analyticsStore";
+import useRestaurantStore from "../../lib/restaurantStore";
+import { formatCurrency } from "../../utils/currency";
+
 interface MetricCardProps {
   title: string;
   value: string | number;
@@ -73,11 +78,11 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const isPositive = inverseGood ? (change || 0) < 0 : (change || 0) > 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
-  const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[$,]/g, "")) : value;
+  const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
   const targetProgress = target ? (numericValue / target) * 100 : 0;
 
   return (
-    <Card>
+    <Card sx={{ height: '100%' }}>
       <CardContent>
         <Stack
           direction="row"
@@ -138,110 +143,39 @@ const MetricCard: React.FC<MetricCardProps> = ({
 
 const EnhancedOwnerDashboard: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [timeRange, setTimeRange] = useState("week");
-  const [selectedMetric, setSelectedMetric] = useState<"revenue" | "orders" | "customers">("revenue");
+  const [selectedMetric, setSelectedMetric] = useState<"revenue" | "orders">("revenue");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
+  const { selectedRestaurant } = useRestaurantStore();
+  const { 
+    kpis, 
+    revenueData, 
+    topItems, 
+    categoryData, 
+    staffPerformance, 
+    fetchDashboardData,
+    loading 
+  } = useAnalyticsStore();
+
   useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(() => {
+    if (selectedRestaurant?.id) {
+      fetchDashboardData(selectedRestaurant.id, timeRange);
       setLastUpdate(new Date());
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const kpis = useMemo(
-    () => ({
-      revenue: {
-        current: 12847.5,
-        previous: 11240.3,
-        change: 14.3,
-        target: 15000,
-      },
-      orders: {
-        current: 187,
-        previous: 165,
-        change: 13.3,
-        avgValue: 68.7,
-      },
-      customers: {
-        current: 342,
-        previous: 298,
-        change: 14.8,
-        returning: 62,
-      },
-      efficiency: {
-        avgPrepTime: 14.2,
-        previous: 16.8,
-        change: -15.5,
-        tableUtilization: 78,
-      },
-    }),
-    []
-  );
-
-  const revenueData = useMemo(() => {
-    if (timeRange === "today") {
-      return [
-        { time: "9AM", revenue: 420, orders: 12, customers: 18 },
-        { time: "11AM", revenue: 1240, orders: 28, customers: 42 },
-        { time: "1PM", revenue: 2540, orders: 52, customers: 78 },
-        { time: "3PM", revenue: 1120, orders: 24, customers: 32 },
-        { time: "5PM", revenue: 1380, orders: 32, customers: 48 },
-        { time: "7PM", revenue: 3240, orders: 64, customers: 96 },
-      ];
-    } else if (timeRange === "week") {
-      return [
-        { time: "Mon", revenue: 8420, orders: 142, customers: 218 },
-        { time: "Tue", revenue: 9240, orders: 156, customers: 245 },
-        { time: "Wed", revenue: 7890, orders: 128, customers: 198 },
-        { time: "Thu", revenue: 10530, orders: 178, customers: 276 },
-        { time: "Fri", revenue: 14840, orders: 234, customers: 362 },
-        { time: "Sat", revenue: 16210, orders: 268, customers: 412 },
-        { time: "Sun", revenue: 13670, orders: 218, customers: 334 },
-      ];
-    } else {
-      return [
-        { time: "Week 1", revenue: 58420, orders: 982, customers: 1542 },
-        { time: "Week 2", revenue: 62760, orders: 1056, customers: 1678 },
-        { time: "Week 3", revenue: 59540, orders: 1018, customers: 1598 },
-        { time: "Week 4", revenue: 64340, orders: 1092, customers: 1724 },
-      ];
     }
-  }, [timeRange]);
+  }, [selectedRestaurant?.id, timeRange, fetchDashboardData]);
 
-  const categoryData = [
-    { name: "Pizza", value: 38, revenue: 4880 },
-    { name: "Burgers", value: 22, revenue: 2826 },
-    { name: "Pasta", value: 18, revenue: 2312 },
-    { name: "Salads", value: 12, revenue: 1542 },
-    { name: "Beverages", value: 10, revenue: 1285 },
-  ];
-
-  const staffPerformance = [
-    { name: "Alice", orders: 42, revenue: 2890, rating: 4.8 },
-    { name: "John", orders: 38, revenue: 2610, rating: 4.6 },
-    { name: "Mei", orders: 35, revenue: 2405, rating: 4.9 },
-    { name: "Kwame", orders: 32, revenue: 2198, rating: 4.7 },
-    { name: "Sarah", orders: 29, revenue: 1995, rating: 4.5 },
-  ];
-
-  const topItems = [
-    { name: "Margherita Pizza", sold: 132, revenue: 1716 },
-    { name: "Classic Burger", sold: 118, revenue: 1534 },
-    { name: "Spaghetti", sold: 94, revenue: 1222 },
-    { name: "Caesar Salad", sold: 80, revenue: 1040 },
-    { name: "Lemonade", sold: 156, revenue: 624 },
-  ];
-
-  const peakHoursData = [
-    { hour: "Breakfast", orders: 45, capacity: 80 },
-    { hour: "Lunch", orders: 156, capacity: 180 },
-    { hour: "Afternoon", orders: 42, capacity: 100 },
-    { hour: "Dinner", orders: 178, capacity: 200 },
-  ];
+  useEffect(() => {
+    if (!autoRefresh || !selectedRestaurant?.id) return;
+    const interval = setInterval(() => {
+      fetchDashboardData(selectedRestaurant.id, timeRange);
+      setLastUpdate(new Date());
+    }, 30000); // 30 seconds for real data refresh
+    return () => clearInterval(interval);
+  }, [autoRefresh, selectedRestaurant?.id, timeRange, fetchDashboardData]);
 
   const COLORS = [
     theme.palette.primary.main,
@@ -250,6 +184,17 @@ const EnhancedOwnerDashboard: React.FC = () => {
     theme.palette.warning.main,
     theme.palette.success.main,
   ];
+
+  if (loading && revenueData.length === 0) {
+    return (
+       <Box sx={{ width: '100%', p: 3 }}>
+          <LinearProgress />
+          <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
+            Aggregating restaurant performance data...
+          </Typography>
+       </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -267,7 +212,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
               Owner Dashboard
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Real-time insights and performance analytics
+              Real-time insights and performance analytics for {selectedRestaurant?.name}
             </Typography>
           </Box>
           <Stack 
@@ -307,21 +252,13 @@ const EnhancedOwnerDashboard: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Alerts */}
-      <Stack spacing={1} mb={3}>
-        <Alert severity="warning" icon={<Warning />}>
-          Low stock: Mozzarella (6 units remaining)
-        </Alert>
-      </Stack>
-
       {/* KPI Cards */}
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             title="Total Revenue"
-            value={`$${kpis.revenue.current.toLocaleString()}`}
+            value={formatCurrency(kpis.revenue.current)}
             change={kpis.revenue.change}
-            target={kpis.revenue.target}
             icon={<AttachMoney />}
             color="primary"
           />
@@ -331,30 +268,26 @@ const EnhancedOwnerDashboard: React.FC = () => {
             title="Orders Completed"
             value={kpis.orders.current}
             change={kpis.orders.change}
-            subtitle={`Avg. $${kpis.orders.avgValue}`}
             icon={<ShoppingBag />}
             color="success"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
-            title="Total Customers"
-            value={kpis.customers.current}
-            change={kpis.customers.change}
-            subtitle={`${kpis.customers.returning}% returning`}
-            icon={<People />}
+            title="Avg Order Value"
+            value={formatCurrency(kpis.avgOrderValue.current)}
+            change={kpis.avgOrderValue.change}
+            icon={<TrendingUp />}
             color="secondary"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
-            title="Avg Prep Time"
-            value={`${kpis.efficiency.avgPrepTime}m`}
-            change={kpis.efficiency.change}
-            subtitle={`${kpis.efficiency.tableUtilization}% table util.`}
-            icon={<Schedule />}
+            title="Active Staff"
+            value={staffPerformance.length}
+            subtitle="Handling current orders"
+            icon={<People />}
             color="warning"
-            inverseGood
           />
         </Grid>
       </Grid>
@@ -381,10 +314,10 @@ const EnhancedOwnerDashboard: React.FC = () => {
               >
                 <Box>
                   <Typography variant="h6" fontWeight={700}>
-                    Revenue & Performance
+                    Order Trends
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Track performance over time
+                    Performance over the selected period
                   </Typography>
                 </Box>
                 <ToggleButtonGroup
@@ -395,51 +328,56 @@ const EnhancedOwnerDashboard: React.FC = () => {
                 >
                   <ToggleButton value="revenue">Revenue</ToggleButton>
                   <ToggleButton value="orders">Orders</ToggleButton>
-                  <ToggleButton value="customers">Customers</ToggleButton>
                 </ToggleButtonGroup>
               </Stack>
               <Box sx={{ flex: 1, minHeight: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueData}>
-                    <defs>
-                      <linearGradient
-                        id="colorMetric"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor={theme.palette.primary.main}
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={theme.palette.primary.main}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={theme.palette.divider}
-                    />
-                    <XAxis
-                      dataKey="time"
-                      stroke={theme.palette.text.secondary}
-                    />
-                    <YAxis stroke={theme.palette.text.secondary} />
-                    <Tooltip />
-                    <Area
-                      type="monotone"
-                      dataKey={selectedMetric}
-                      stroke={theme.palette.primary.main}
-                      strokeWidth={2}
-                      fill="url(#colorMetric)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {revenueData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={revenueData}>
+                      <defs>
+                        <linearGradient
+                          id="colorMetric"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={theme.palette.primary.main}
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={theme.palette.primary.main}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={theme.palette.divider}
+                      />
+                      <XAxis
+                        dataKey="time"
+                        stroke={theme.palette.text.secondary}
+                      />
+                      <YAxis stroke={theme.palette.text.secondary} />
+                      <Tooltip />
+                      <Area
+                        type="monotone"
+                        dataKey={selectedMetric}
+                        stroke={theme.palette.primary.main}
+                        strokeWidth={2}
+                        fill="url(#colorMetric)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <Typography color="text.secondary">No order data for this period</Typography>
+                  </Box>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -461,31 +399,37 @@ const EnhancedOwnerDashboard: React.FC = () => {
                   Category Mix
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Sales distribution
+                  Items distribution
                 </Typography>
               </Box>
               <Box sx={{ height: 240, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {categoryData.map((_entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                {categoryData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {categoryData.map((_entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                     <Typography color="text.secondary">No data</Typography>
+                  </Box>
+                )}
               </Box>
               <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", mt: 2 }}>
                 <Stack spacing={1}>
@@ -502,7 +446,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
                             width: 12,
                             height: 12,
                             borderRadius: "50%",
-                            bgcolor: COLORS[idx],
+                            bgcolor: COLORS[idx % COLORS.length],
                             flexShrink: 0,
                           }}
                         />
@@ -541,36 +485,42 @@ const EnhancedOwnerDashboard: React.FC = () => {
                 flexShrink={0}
               >
                 <Typography variant="h6" fontWeight={700}>
-                  Top Performers
+                  Top Items
                 </Typography>
-                <Button size="small" endIcon={<ChevronRight />}>
-                  View All
+                <Button size="small" endIcon={<ChevronRight />} onClick={() => navigate('/app/menu')}>
+                  Menu
                 </Button>
               </Stack>
               <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                <List>
-                  {topItems.map((item, idx) => (
-                    <ListItem key={idx} sx={{ px: 0 }}>
-                      <ListItemAvatar>
-                        <Avatar
-                          sx={{
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                            color: "primary.main",
-                          }}
-                        >
-                          #{idx + 1}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={item.name}
-                        secondary={`${item.sold} sold`}
-                      />
-                      <Typography variant="body2" fontWeight={700}>
-                        ${item.revenue}
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
+                {topItems.length > 0 ? (
+                  <List>
+                    {topItems.map((item, idx) => (
+                      <ListItem key={idx} sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar
+                            sx={{
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: "primary.main",
+                            }}
+                          >
+                            #{idx + 1}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={item.name}
+                          secondary={`${item.sold} items sold`}
+                        />
+                        <Typography variant="body2" fontWeight={700}>
+                          {formatCurrency(item.revenue)}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Box sx={{ p: 4, textAlign: 'center' }}>
+                     <Typography color="text.secondary">No item data yet</Typography>
+                  </Box>
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -588,92 +538,59 @@ const EnhancedOwnerDashboard: React.FC = () => {
               }}
             >
               <Typography variant="h6" fontWeight={700} mb={2} flexShrink={0}>
-                Team Performance
+                Staff Performance
               </Typography>
               <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                <List>
-                  {staffPerformance.map((staff, idx) => (
-                    <ListItem
-                      key={idx}
-                      sx={{
-                        px: 2,
-                        py: 1.5,
-                        mb: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.05),
-                        borderRadius: 2,
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Avatar
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${staff.name}`}
+                {staffPerformance.length > 0 ? (
+                  <List>
+                    {staffPerformance.map((staff, idx) => (
+                      <ListItem
+                        key={idx}
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          mb: 1,
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                          borderRadius: 2,
+                        }}
+                      >
+                        <ListItemAvatar>
+                          <Avatar
+                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${staff.name}`}
+                          />
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={staff.name}
+                          secondary={
+                            <Stack direction="row" spacing={1} component="span">
+                              <Typography variant="caption" component="span">
+                                {staff.orders} orders
+                              </Typography>
+                              <Typography variant="caption" component="span">
+                                •
+                              </Typography>
+                              <Typography variant="caption" component="span">
+                                ⭐ {staff.rating}
+                              </Typography>
+                            </Stack>
+                          }
                         />
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={staff.name}
-                        secondary={
-                          <Stack direction="row" spacing={1} component="span">
-                            <Typography variant="caption" component="span">
-                              {staff.orders} orders
-                            </Typography>
-                            <Typography variant="caption" component="span">
-                              •
-                            </Typography>
-                            <Typography variant="caption" component="span">
-                              ⭐ {staff.rating}
-                            </Typography>
-                          </Stack>
-                        }
-                      />
-                      <Typography variant="body2" fontWeight={700}>
-                        ${staff.revenue}
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
+                        <Typography variant="body2" fontWeight={700}>
+                          {formatCurrency(staff.revenue)}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                   <Box sx={{ p: 4, textAlign: 'center' }}>
+                      <Typography color="text.secondary">No staff activity recorded</Typography>
+                   </Box>
+                )}
               </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
-
-      {/* Peak Hours */}
-      <Card sx={{ height: 350, display: "flex", flexDirection: "column" }}>
-        <CardContent
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <Typography variant="h6" fontWeight={700} mb={2} flexShrink={0}>
-            Peak Hours Analysis
-          </Typography>
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={peakHoursData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={theme.palette.divider}
-                />
-                <XAxis dataKey="hour" stroke={theme.palette.text.secondary} />
-                <YAxis stroke={theme.palette.text.secondary} />
-                <Tooltip />
-                <Bar
-                  dataKey="orders"
-                  fill={theme.palette.primary.main}
-                  radius={[8, 8, 0, 0]}
-                />
-                <Bar
-                  dataKey="capacity"
-                  fill={alpha(theme.palette.primary.main, 0.2)}
-                  radius={[8, 8, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        </CardContent>
-      </Card>
     </Box>
   );
 };

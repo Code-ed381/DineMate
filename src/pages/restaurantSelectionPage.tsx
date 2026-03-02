@@ -17,10 +17,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import useRestaurantStore from "../lib/restaurantStore";
 import useAuthStore from "../lib/authStore";
 import { useSettingsStore } from "../lib/settingsStore";
+import useBarStore from "../lib/barStore";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
+import { getRoleRedirectPath } from "../utils/roleRedirects";
+import Swal from "sweetalert2";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -47,21 +50,21 @@ const RestaurantSelectionPage: React.FC = () => {
   }, [user]);
 
   const handleSelect = async (restaurant: any) => {
+    if (restaurant.status !== 'active') {
+      Swal.fire({
+        icon: 'error',
+        title: 'Access Denied',
+        text: 'Your account is not active for this restaurant. Please contact the administrator.',
+      });
+      return;
+    }
+
+    useBarStore.getState().resetBarState();
     setSelectedRestaurant(restaurant.restaurants);
     setRole(restaurant.role);
     await fetchSettings(restaurant.restaurants.id);
     
-    const roleMap: Record<string, string> = {
-        owner: "/app/dashboard",
-        admin: "/app/dashboard",
-        manager: "/app/dashboard",
-        waiter: "/app/dashboard",
-        chef: "/app/dashboard",
-        bartender: "/app/dashboard",
-        cashier: "/app/dashboard",
-    };
-
-    const target = roleMap[restaurant.role.toLowerCase()] || "/app/dashboard";
+    const target = getRoleRedirectPath(restaurant.role);
     navigate(target);
   };
 

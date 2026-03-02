@@ -45,12 +45,14 @@ import {
 import DashboardHeader from "./components/dashboard-header";
 import dayjs from "dayjs";
 import { getCurrencySymbol } from "../../utils/currency";
+import { useNavigate } from "react-router-dom"; // Added for navigation
 
 const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336", "#607d8b"];
 
 const BartenderDashboard: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const navigate = useNavigate(); // Added for navigation
   const {
     pendingOrders,
     readyOrders,
@@ -111,6 +113,24 @@ const BartenderDashboard: React.FC = () => {
       .slice(0, 5);
   }, [dailyDrinkTasks, dailyOTCDrinks]);
 
+  const prepTimeByDrink = useMemo(() => {
+    const times: Record<string, { total: number; count: number }> = {};
+    dailyDrinkTasks
+      .filter(t => t.order_item_status?.toLowerCase() === 'served' && t.completed_at && t.task_created_at)
+      .forEach(task => {
+        const diff = (new Date(task.completed_at!).getTime() - new Date(task.task_created_at).getTime()) / 60000;
+        if (diff > 0 && diff < 120) { // Filter out negative or excessively long times
+          if (!times[task.menu_item_name]) times[task.menu_item_name] = { total: 0, count: 0 };
+          times[task.menu_item_name].total += diff;
+          times[task.menu_item_name].count++;
+        }
+      });
+    return Object.entries(times)
+      .map(([name, { total, count }]) => ({ name, avgTime: Math.round((total / count) * 10) / 10 }))
+      .sort((a, b) => b.avgTime - a.avgTime)
+      .slice(0, 8);
+  }, [dailyDrinkTasks]);
+
   // 3. Prep Performance (Quick Report)
   const performanceStats = useMemo(() => {
     const served = dailyDrinkTasks.filter(t => t.order_item_status?.toLowerCase() === 'served');
@@ -118,11 +138,28 @@ const BartenderDashboard: React.FC = () => {
     const otcTotal = dailyOTCDrinks.reduce((sum, item) => sum + (parseFloat(item.sum_price) || 0), 0);
     const totalDrinks = dailyDrinkTasks.length + otcCount;
     
-    if (served.length === 0 && otcCount === 0) return { avgTime: 0, efficiency: 0, otcCount: 0, otcTotal: 0, totalDrinks: 0 };
+    // Average prep time for served drinks (in minutes)
+    const avgTime = served.length > 0 
+      ? served.reduce((sum, t) => {
+          const start = dayjs(t.task_created_at);
+          const end = dayjs(t.updated_at);
+          return sum + end.diff(start, 'minute', true);
+        }, 0) / served.length 
+      : 0;
+
+    // Efficiency: % of served drinks completed within preparation time
+    const onTime = served.filter(t => {
+      const start = dayjs(t.task_created_at);
+      const end = dayjs(t.updated_at);
+      const limit = t.menu_item_preparation_time || 5;
+      return end.diff(start, 'minute') <= limit;
+    }).length;
+
+    const efficiency = served.length > 0 ? Math.round((onTime / served.length) * 100) : 0;
 
     return {
-      avgTime: 5.5,
-      efficiency: 92,
+      avgTime: parseFloat(avgTime.toFixed(1)),
+      efficiency,
       otcCount,
       otcTotal,
       totalDrinks,
@@ -236,6 +273,52 @@ const BartenderDashboard: React.FC = () => {
           </Card>
         </Grid>
 
+        {/* Task 4.3: Speed-of-Service Analytics */}
+        <Grid item xs={12} md={6}>
+          <Card sx={{ borderRadius: 4, height: 400, border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight={700}>Avg Prep Time by Drink</Typography>
+              <Typography variant="caption" color="text.secondary">Minutes per drink today</Typography>
+            </Box>
+            <Box sx={{ height: 300, width: "100%", pr: 2 }}>
+              <ResponsiveContainer>
+                <BarChart data={prepTimeByDrink} layout="vertical">
+                  <XAxis type="number" unit=" min" />
+                  <YAxis type="category" dataKey="name" width={100} style={{ fontSize: '10px' }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '12px', 
+                      border: 'none', 
+                      boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.1)',
+                      background: theme.palette.background.paper,
+                      color: theme.palette.text.primary
+                    }}
+                  />
+                  <Bar dataKey="avgTime" fill="#ff9800" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </Card>
+        </Grid>
+
+        {/* Queue Management Button */}
+        <Grid item xs={12} md={6}>
+           <Box sx={{ mt: 2, textAlign: 'center' }}>
+             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Need to manage the live order queue?
+             </Typography>
+             <Button 
+                variant="contained" 
+                size="large" 
+                onClick={() => navigate("/app/bar")} // Changed to a more appropriate route
+                startIcon={<LocalBar />}
+                sx={{ borderRadius: 6, px: 6, py: 1.5, fontWeight: 800, textTransform: 'none' }}
+              >
+                Open Bar Interface
+             </Button>
+           </Box>
+        </Grid>
+
         {/* Live Queue Section */}
         <Grid item xs={12}>
           <Box sx={{ mt: 2, mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -244,7 +327,7 @@ const BartenderDashboard: React.FC = () => {
             </Typography>
             <Button startIcon={<Refresh />} onClick={() => handleFetchOrderItems()}>Refresh Queue</Button>
           </Box>
-          <BartenderDineInPanel />
+          <BartenderDineInPanel skipSubscription />
         </Grid>
       </Grid>
     </Box>

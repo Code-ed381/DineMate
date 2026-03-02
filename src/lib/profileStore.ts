@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import useAuthStore from './authStore';
+import { supabase } from './supabase';
+import useRestaurantStore from './restaurantStore';
 
 interface ProfileState {
     profile: any;
@@ -9,9 +11,10 @@ interface ProfileState {
     editingRow: any;
     rowData: any;
     getProfile: () => Promise<void>;
+    updateProfile: (updatedData: any) => Promise<void>;
 }
 
-const useProfileStore = create<ProfileState>((set) => ({
+const useProfileStore = create<ProfileState>((set, get) => ({
     profile: null,
     loading: true,
     name: '',
@@ -22,24 +25,54 @@ const useProfileStore = create<ProfileState>((set) => ({
     getProfile: async () => {
         set({ loading: true });
         
-        // Try to get employee data from localStorage first
-        const employeeData = localStorage.getItem('employee');
-        if (employeeData) {
-            const user = JSON.parse(employeeData);
-            const data = Array.isArray(user) ? user[0] : user;
-            set({ 
-                profile: {
-                    ...data,
-                    first_name: data.first_name || data.name, // Handle different employee field naming
-                }, 
-                loading: false 
-            });
+        const { user } = useAuthStore.getState();
+        if (!user) {
+            set({ profile: null, loading: false });
             return;
         }
 
-        // Fallback to Supabase auth user
-        const { user } = useAuthStore.getState();
-        if (user) {
+        try {
+            // Fetch role from restaurant_members
+            const { selectedRestaurant } = useRestaurantStore.getState();
+
+            // Fetch personal details from users view
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('restaurant_id', selectedRestaurant?.id)
+                .single();
+
+            const { data: memberData, error: memberError } = await supabase
+                .from('restaurant_members')
+                .select('role')
+                .eq('user_id', user.id)
+                .eq('restaurant_id', selectedRestaurant?.id)
+                .maybeSingle();
+
+            if (userError && userError.code !== 'PGRST116') { // Ignore "not found" if we have auth metadata
+                console.error("User view fetch error:", userError);
+            }
+
+            if (memberError && memberError.code !== 'PGRST116') { // Ignore "not found" if we have auth metadata
+                console.error("User view fetch error:", memberError);
+            }
+
+            set({
+                profile: {
+                    id: user.id,
+                    email: user.email,
+                    first_name: userData?.first_name || user.user_metadata?.firstName || "",
+                    last_name: userData?.last_name || user.user_metadata?.lastName || "",
+                    phone: userData?.phone || user.user_metadata?.phone || "",
+                    avatar_url: userData?.avatar_url || user.user_metadata?.profileAvatar || "",
+                    role: memberData?.role || "Staff",
+                },
+                loading: false
+            });
+        } catch (error) {
+            console.error("Error fetching profile from views:", error);
+            // Fallback to auth metadata
             set({
                 profile: {
                     id: user.id,
@@ -48,14 +81,41 @@ const useProfileStore = create<ProfileState>((set) => ({
                     last_name: user.user_metadata?.lastName || "",
                     phone: user.user_metadata?.phone || "",
                     avatar_url: user.user_metadata?.profileAvatar || "",
-                    role: "Owner", // Default role for authenticated users
+                    role: "Staff",
                 },
                 loading: false
             });
-            return;
         }
+    },
 
-        set({ profile: null, loading: false });
+    updateProfile: async (updatedData: any) => {
+        set({ loading: true });
+        
+        try {
+            const { error } = await supabase.auth.updateUser({
+                data: {
+                    firstName: updatedData.first_name,
+                    lastName: updatedData.last_name,
+                    phone: updatedData.phone,
+                    profileAvatar: updatedData.avatar_url
+                }
+            });
+
+            if (error) throw error;
+
+            // Update local store state
+            set({
+                profile: {
+                    ...get().profile,
+                    ...updatedData
+                },
+                loading: false
+            });
+        } catch (error) {
+            console.error("Failed to update profile via Supabase Auth", error);
+            set({ loading: false });
+            throw error;
+        }
     },
 }));
 

@@ -44,11 +44,20 @@ import MoneyTwoToneIcon from "@mui/icons-material/MoneyTwoTone";
 import PriceCheckTwoToneIcon from "@mui/icons-material/PriceCheckTwoTone";
 import SecurityUpdateGoodTwoToneIcon from "@mui/icons-material/SecurityUpdateGoodTwoTone";
 import useCashierStore from "../lib/cashierStore";
+import useRestaurantStore from "../lib/restaurantStore";
 import { printReceipt } from "../components/PrintWindow";
 import CashierDashboardSkeleton from "../components/skeletons/cashier-panel-skeleton";
 import { useCurrency } from "../utils/currency";
+import useAppStore from "../lib/appstore";
 
 const CashierDashboard: React.FC = () => {
+  const theme = useTheme();
+  const { setBreadcrumb } = useAppStore();
+
+  useEffect(() => {
+    setBreadcrumb("Cashier");
+  }, [setBreadcrumb]);
+
   const { currencySymbol } = useCurrency();
   const {
     activeSessions,
@@ -82,6 +91,7 @@ const CashierDashboard: React.FC = () => {
     discount,
     setDiscount,
   } = useCashierStore();
+  const { selectedRestaurant } = useRestaurantStore();
 
   const handlePrintReceipt = async (isFinal: boolean = false) => {
     if (!selectedSession) return;
@@ -104,7 +114,8 @@ const CashierDashboard: React.FC = () => {
       (cashValue + cardValue).toFixed(2),
       cashValue.toFixed(2),
       cardValue.toFixed(2),
-      change
+      change,
+      selectedRestaurant
     );
 
     if (!isFinal) {
@@ -119,7 +130,6 @@ const CashierDashboard: React.FC = () => {
     }
   };
 
-  const theme = useTheme();
 
   useEffect(() => {
     getActiveSessionByRestaurant();
@@ -330,7 +340,7 @@ const CashierDashboard: React.FC = () => {
                 <List>
                   {activeSessions.map((session: any) => (
                     <ListItem
-                      key={session.id}
+                      key={session.session_id}
                       onClick={() => setSelectedSession(session)}
                       sx={{
                         border: "1px solid divider", borderRadius: 2, mb: 1, mt: 2, p: 2, cursor: "pointer",
@@ -369,16 +379,16 @@ const CashierDashboard: React.FC = () => {
                       <TableRow>
                         <TableCell>Table</TableCell>
                         <TableCell>Order</TableCell>
-                        <TableCell>Amount</TableCell>
+                        <TableCell>Amount ({currencySymbol})</TableCell>
                         <TableCell>Method</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {closedSessions.map((session: any) => (
-                        <TableRow key={session.id}>
+                        <TableRow key={session.session_id}>
                           <TableCell>T-{session.table_number || "OTC"}</TableCell>
                           <TableCell>ORD-{session.order_id}</TableCell>
-                          <TableCell>{currencySymbol}{formatCashInput(session.order_total || session.total)}</TableCell>
+                          <TableCell>{formatCashInput(session.order_total || session.total)}</TableCell>
                           <TableCell>
                             <Chip label={session.payment_method} size="small" variant="outlined" />
                           </TableCell>

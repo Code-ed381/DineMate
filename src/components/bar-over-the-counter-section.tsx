@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import dayjs from "dayjs";
 import {
   Box,
   Card,
@@ -24,7 +25,6 @@ import {
   useTheme,
 } from "@mui/material";
 import {
-  Close,
   Search,
   Add,
   Remove,
@@ -35,10 +35,12 @@ import {
   KeyboardArrowRight,
 } from "@mui/icons-material";
 import useBarStore from "../lib/barStore";
+import useRestaurantStore from "../lib/restaurantStore";
 import BarTakeAwaySkeleton from "./skeletons/bar-takeaway-skeleton";
 import { printReceipt } from "./PrintWindow";
-import Swal from "sweetalert2";
 import { getCurrencySymbol } from "../utils/currency";
+import { useSettingsStore } from "../lib/settingsStore";
+import { History as HistoryIcon, RemoveCircleOutline } from "@mui/icons-material";
 
 const OTCTabs: React.FC = () => {
   const theme = useTheme();
@@ -70,7 +72,14 @@ const OTCTabs: React.FC = () => {
     completeOTCPayment,
     isProcessingPayment,
     formatCashInput,
+    updateQuantity,
+    tip,
+    setTip,
+    recentOTCOrders,
+    handleVoidOTCOrder,
   } = useBarStore();
+  const { selectedRestaurant } = useRestaurantStore();
+  const { settings } = useSettingsStore();
 
   useEffect(() => {
     handleFetchItems();
@@ -93,25 +102,37 @@ const OTCTabs: React.FC = () => {
 
     const cashValue = parseFloat(cash) || 0;
     const cardValue = parseFloat(card) || 0;
-    const change = (cashValue + cardValue - total).toFixed(2);
+    const { settings } = useSettingsStore.getState();
+    const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+    const taxAmount = total * taxRate;
+    const grandTotal = total + taxAmount;
+    const change = (cashValue + cardValue - grandTotal).toFixed(2);
 
     printReceipt(
       isFinal ? "OTC-" + Date.now().toString().slice(-6) : "PROFORMA",
       "Bartender",
       "OTC",
       activeCart.reduce((sum, item) => sum + item.qty, 0),
-      total,
+      grandTotal,
       activeCart.map(item => ({ ...item, item_name: item.name, quantity: item.qty, unit_price: item.price })),
       (cashValue + cardValue).toFixed(2),
       cashValue.toFixed(2),
       cardValue.toFixed(2),
-      change
+      change,
+      selectedRestaurant
     );
   };
 
   const handleNext = async () => {
     if (activeStep === 0) {
       if (activeCart.length === 0) return;
+      
+      // Update taxAmount in store before progressing
+      const { settings } = useSettingsStore.getState();
+      const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+      const taxAmount = (total * taxRate).toFixed(2);
+      useBarStore.setState({ taxAmount });
+      
       setActiveStep(1);
     } else {
       const success = await completeOTCPayment();
@@ -253,7 +274,8 @@ const OTCTabs: React.FC = () => {
               {/* Items Grid */}
               <Grid container spacing={2}>
                 {filteredItems.map((item: any) => {
-                  const inCart = activeCart.find(c => c.id === item.id);
+                  const inCart = activeCart.find(c => (c.id === item.id || (c as any).menu_item_id === item.id));
+                  const isOutOfStock = item.stock_count !== null && item.stock_count <= 0;
                   return (
                     <Grid item xs={6} sm={4} md={3} lg={2.4} key={item.id}>
                       <Card sx={{ 
@@ -262,12 +284,31 @@ const OTCTabs: React.FC = () => {
                         border: '1px solid',
                         borderColor: inCart ? 'primary.main' : 'divider',
                         transition: 'all 0.2s',
-                        '&:hover': { transform: 'translateY(-4px)', boxShadow: theme.shadows[4] }
+                        filter: isOutOfStock ? 'grayscale(0.8)' : 'none',
+                        opacity: isOutOfStock ? 0.7 : 1,
+                        position: 'relative',
+                        '&:hover': { transform: isOutOfStock ? 'none' : 'translateY(-4px)', boxShadow: isOutOfStock ? 'none' : theme.shadows[4] }
                       }}>
-                        <CardActionArea onClick={() => addToCart(item)}>
+                        <CardActionArea 
+                          onClick={() => !isOutOfStock && addToCart(item)}
+                          disabled={isOutOfStock}
+                        >
                           <Box sx={{ position: 'relative' }}>
                             <CardMedia component="img" height="120" image={item.image_url} />
-                            {inCart && (
+                            {isOutOfStock ? (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                top: 0, left: 0, right: 0, bottom: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                bgcolor: alpha(theme.palette.error.main, 0.4),
+                                color: 'white',
+                                backdropFilter: 'blur(2px)'
+                              }}>
+                                <Typography variant="h6" fontWeight={900} sx={{ textTransform: 'uppercase', letterSpacing: 2, transform: 'rotate(-15deg)' }}>
+                                  86'd
+                                </Typography>
+                              </Box>
+                            ) : inCart && (
                               <Box sx={{ 
                                 position: 'absolute', 
                                 top: 8, 
@@ -352,9 +393,16 @@ const OTCTabs: React.FC = () => {
                       </IconButton>
                     </Box>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Stack direction="row" spacing={1} alignItems="center">
-                         <Typography variant="body2" color="text.secondary">Qty:</Typography>
-                         <Typography variant="body2" fontWeight={800}>{item.qty}</Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <IconButton size="small" onClick={() => updateQuantity(item.id, -1)} sx={{ p: 0.5 }}>
+                          <Remove fontSize="small" />
+                        </IconButton>
+                        <Typography variant="body2" fontWeight={800} sx={{ minWidth: 20, textAlign: 'center' }}>
+                          {item.qty}
+                        </Typography>
+                        <IconButton size="small" onClick={() => updateQuantity(item.id, 1)} sx={{ p: 0.5 }}>
+                          <Add fontSize="small" />
+                        </IconButton>
                       </Stack>
                        <Typography fontWeight={800} color="primary">{getCurrencySymbol()}{formatCashInput(item.price * item.qty)}</Typography>
                     </Box>
@@ -370,23 +418,31 @@ const OTCTabs: React.FC = () => {
             </Box>
 
             <Box sx={{ mt: 3 }}>
-              <Paper sx={{ p: 2, borderRadius: 3, bgcolor: isDark ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.primary.main, 0.05), border: '1px dashed', borderColor: 'primary.main', mb: 2 }}>
-                <Stack spacing={1}>
-                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2" color="text.secondary">Subtotal</Typography>
-                      <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}{formatCashInput(total)}</Typography>
-                   </Box>
-                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2" color="text.secondary">Tax (0%)</Typography>
-                      <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}0.00</Typography>
-                   </Box>
-                   <Divider sx={{ my: 1 }} />
-                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Typography variant="h6" fontWeight={800}>Total</Typography>
-                      <Typography variant="h5" color="primary" fontWeight={900}>{getCurrencySymbol()}{formatCashInput(total)}</Typography>
-                   </Box>
-                </Stack>
-              </Paper>
+              {(() => {
+                const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+                const taxAmountValue = total * taxRate;
+                const grandTotal = total + taxAmountValue;
+
+                return (
+                  <Paper sx={{ p: 2, borderRadius: 3, bgcolor: isDark ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.primary.main, 0.05), border: '1px dashed', borderColor: 'primary.main', mb: 2 }}>
+                    <Stack spacing={1}>
+                       <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2" color="text.secondary">Subtotal</Typography>
+                          <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}{formatCashInput(total)}</Typography>
+                       </Box>
+                       <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2" color="text.secondary">Tax ({(taxRate * 100).toFixed(0)}%)</Typography>
+                          <Typography variant="body1" fontWeight={600}>{getCurrencySymbol()}{formatCashInput(taxAmountValue)}</Typography>
+                       </Box>
+                       <Divider sx={{ my: 1 }} />
+                       <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Typography variant="h6" fontWeight={800}>Total</Typography>
+                          <Typography variant="h5" color="primary" fontWeight={900}>{getCurrencySymbol()}{formatCashInput(grandTotal)}</Typography>
+                       </Box>
+                    </Stack>
+                  </Paper>
+                );
+              })()}
               
               {activeStep === 1 && (
                 <Stack spacing={2} sx={{ mb: 3 }}>
@@ -406,14 +462,30 @@ const OTCTabs: React.FC = () => {
                     onChange={(e) => setCard(e.target.value)}
                     InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
                   />
-                  {(parseFloat(cash) || 0) + (parseFloat(card) || 0) > total && (
-                    <Box sx={{ p: 1, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" fontWeight="bold">Change:</Typography>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        {getCurrencySymbol()}{((parseFloat(cash) || 0) + (parseFloat(card) || 0) - total).toFixed(2)}
-                      </Typography>
-                    </Box>
-                  )}
+                  <TextField 
+                    fullWidth 
+                    label="Tip Amount" 
+                    type="number" 
+                    value={tip} 
+                    onChange={(e) => setTip(e.target.value)}
+                    InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
+                  />
+                  {(() => {
+                    const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+                    const grandTotal = total * (1 + taxRate);
+                    const paid = (parseFloat(cash) || 0) + (parseFloat(card) || 0);
+                    if (paid > grandTotal) {
+                      return (
+                        <Box sx={{ p: 1, bgcolor: alpha(theme.palette.success.main, 0.1), borderRadius: 1, display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" fontWeight="bold">Change:</Typography>
+                          <Typography variant="body2" fontWeight="bold" color="success.main">
+                            {getCurrencySymbol()}{(paid - grandTotal).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      );
+                    }
+                    return null;
+                  })()}
                 </Stack>
               )}
 
@@ -461,6 +533,28 @@ const OTCTabs: React.FC = () => {
                 >
                   Print Proforma
                 </Button>
+              )}
+
+              {/* Task 3.4: Recent Orders Section */}
+              {recentOTCOrders.length > 0 && activeStep === 0 && (
+                <Box sx={{ mt: 4 }}>
+                  <Divider sx={{ mb: 2 }}>
+                    <Chip label="Recent Orders" size="small" icon={<HistoryIcon />} />
+                  </Divider>
+                  <Stack spacing={1}>
+                    {recentOTCOrders.map((prevOrder: any) => (
+                      <Paper key={prevOrder.id} sx={{ p: 1.5, borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid', borderColor: 'divider' }}>
+                        <Box>
+                          <Typography variant="caption" fontWeight="bold" display="block">Order #{prevOrder.id.toString().slice(-4)}</Typography>
+                          <Typography variant="caption" color="text.secondary">{getCurrencySymbol()}{formatCashInput(prevOrder.total)} • {dayjs(prevOrder.created_at).format('HH:mm')}</Typography>
+                        </Box>
+                        <IconButton size="small" color="error" onClick={() => handleVoidOTCOrder(prevOrder.id)}>
+                          <RemoveCircleOutline fontSize="small" />
+                        </IconButton>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
               )}
             </Box>
           </Grid>
