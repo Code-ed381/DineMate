@@ -11,6 +11,7 @@ import {
   Chip,
   IconButton,
   TextField,
+  CircularProgress,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
@@ -22,7 +23,7 @@ import Swal from "sweetalert2";
 
 const Profile: React.FC = () => {
   const { profile, getProfile, updateProfile, loading } = useProfileStore();
-  const { user } = useAuthStore();
+  const { refreshSession } = useAuthStore();
   const { uploadFile } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<any>(null);
@@ -46,6 +47,7 @@ const Profile: React.FC = () => {
       
       try {
         await updateProfile(editedProfile);
+        await refreshSession();
         Swal.fire("Success", "Profile updated successfully", "success");
         setIsEditing(false);
       } catch (error) {
@@ -56,15 +58,25 @@ const Profile: React.FC = () => {
     }
   };
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const url = await uploadFile(file);
-        setEditedProfile({ ...editedProfile, avatar_url: url });
-      } catch (err) {
-        console.error("Avatar upload failed", err);
-      }
+    if (!file) return;
+
+    setAvatarUploading(true);
+    try {
+      const url = await uploadFile(file, "avatars");
+      const updated = { ...editedProfile, avatar_url: url };
+      setEditedProfile(updated);
+      await updateProfile(updated);
+      await refreshSession();
+      Swal.fire({ title: "Avatar Updated", icon: "success", timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      console.error("Avatar upload failed", err);
+      Swal.fire("Error", "Failed to upload avatar", "error");
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -108,8 +120,14 @@ const Profile: React.FC = () => {
             <Box sx={{ position: "relative", display: "inline-block" }}>
               <Avatar
                 src={editedProfile.avatar_url || editedProfile.avatar}
-                sx={{ width: 150, height: 150, mx: "auto", mb: 2 }}
+                sx={{ width: 150, height: 150, mx: "auto", mb: 2, opacity: avatarUploading ? 0.4 : 1 }}
               />
+              {avatarUploading && (
+                <CircularProgress
+                  size={40}
+                  sx={{ position: "absolute", top: "35%", left: "35%" }}
+                />
+              )}
               <IconButton
                 component="label"
                 sx={{

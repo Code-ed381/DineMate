@@ -29,6 +29,8 @@ import useCashierStore from "../lib/cashierStore";
 import DashboardHeader from "./dashboards/components/dashboard-header";
 import { useTheme, alpha } from "@mui/material/styles";
 import { getCurrencySymbol } from "../utils/currency";
+import MetricCard from "../components/MetricCard";
+import { ShoppingBag, TrendingUp, PriceCheck } from "@mui/icons-material";
 
 const CashierDetailedReports: React.FC = () => {
   const theme = useTheme();
@@ -216,28 +218,28 @@ const CashierDetailedReports: React.FC = () => {
 
       <Grid container spacing={2} mb={3}>
         <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ borderRadius: 3, bgcolor: alpha(theme.palette.primary.main, 0.03) }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Total Quantity Sold</Typography>
-              <Typography variant="h4" fontWeight={800}>{stats.totalItems}</Typography>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Total Quantity Sold"
+            value={stats.totalItems}
+            icon={<ShoppingBag />}
+            color="primary"
+          />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ borderRadius: 3, bgcolor: alpha(theme.palette.success.main, 0.03) }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Gross Transaction Value</Typography>
-              <Typography variant="h4" fontWeight={800} color="success.main">{getCurrencySymbol()}{formatCashInput(stats.totalSales)}</Typography>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Gross Transaction Value"
+            value={`${getCurrencySymbol()}${formatCashInput(stats.totalSales)}`}
+            icon={<TrendingUp />}
+            color="success"
+          />
         </Grid>
         <Grid item xs={12} sm={12} md={4}>
-          <Card sx={{ borderRadius: 3, bgcolor: alpha(theme.palette.info.main, 0.03) }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Avg. Item Price</Typography>
-              <Typography variant="h4" fontWeight={800} color="info.main">{getCurrencySymbol()}{formatCashInput(stats.avgOrderValue)}</Typography>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Avg. Item Price"
+            value={`${getCurrencySymbol()}${formatCashInput(stats.avgOrderValue)}`}
+            icon={<PriceCheck />}
+            color="info"
+          />
         </Grid>
       </Grid>
 

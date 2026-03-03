@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, Fragment } from "react";
+import { Fragment } from "react";
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -21,6 +21,7 @@ import ColorModeIconToggle from './components/shared-theme/ColorModeIconToggle';
 import useAuthStore from '../../lib/authStore';
 import AuthStepperContent from './components/AuthStepperContent';
 import Swal from 'sweetalert2';
+import { usePaystackPayment } from 'react-paystack';
 
 const Checkout: React.FC = (props) => {
   const {
@@ -32,8 +33,17 @@ const Checkout: React.FC = (props) => {
     restaurantInfo,
     subscription,
     setProcessing,
-    processing,
   } = useAuthStore();
+
+  const config = {
+    reference: (new Date()).getTime().toString(),
+    email: personalInfo.email,
+    amount: (subscription.price || 0) * 100,
+    currency: "GHS",
+    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '',
+  };
+
+  const initializePayment = usePaystackPayment(config);
 
   const onNext = () => {
     const result = handleNextWithValidation();
@@ -42,7 +52,23 @@ const Checkout: React.FC = (props) => {
     }
 
     if (activeStep === steps.length - 1) {
-      onSubmit();
+      if (subscription.subscription_plan !== 'free') {
+        if (!config.publicKey) {
+          Swal.fire("Configuration Error", "Paystack public key is not set", "error");
+          return;
+        }
+        initializePayment({
+            onSuccess: (reference: any) => {
+              useAuthStore.getState().updateSubscription('paystack_reference', reference.reference);
+              onSubmit();
+            },
+            onClose: () => {
+              Swal.fire("Payment Cancelled", "You cancelled the payment.", "info");
+            }
+        });
+      } else {
+        onSubmit();
+      }
     }
   };
 

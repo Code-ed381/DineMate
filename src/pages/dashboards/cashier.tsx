@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Grid,
 } from "@mui/material";
-import DashboardHeader from "./components/dashboard-header";
+
 import useCashierStore from "../../lib/cashierStore";
 import TransactionHistory from "./components/transaction-histroy";
 import PaymentBreakdownChart from "./components/payment-breakdown";
@@ -11,14 +11,7 @@ import SalesTrendChart from "./components/sales-trend-chart";
 import KpiDashboard from "./components/kpi-dashboard";
 import CashierDashboardSkeleton from "./components/skeletons/cashier-dashboard-skeleton";
 
-interface Transaction {
-  id: string;
-  order: string;
-  amount: number;
-  method: string;
-  status: string;
-  date: string;
-}
+
 
 interface CashierReportsProps {
   salesData?: { day: string; sales: number }[];
@@ -41,12 +34,12 @@ const CashierReports: React.FC<CashierReportsProps> = () => {
         activeSeesionByRestaurantLoaded ? (
           <Box sx={{ p: { xs: 2, md: 3 } }}>
         {/* Header */}
-        <DashboardHeader
+        {/* <DashboardHeader
           title="Cashier Reports"
           description="Clean, consistent view — filters on the left, visual insights on the right."
           background="linear-gradient(135deg, rgb(25, 187, 31) 0%, rgb(199, 128, 102) 100%)"
           color="#fff"
-        />
+        /> */}
 
         {/* KPIs + Charts */}
         <KpiDashboard allSessions={allSessions}/>

@@ -61,6 +61,8 @@ const ThemeSwitch: React.FC = () => {
     setMode(mode === "dark" ? "light" : "dark");
   };
 
+
+
   return (
     <FormGroup>
       <FormControlLabel
@@ -74,7 +76,10 @@ const ThemeSwitch: React.FC = () => {
         }
         label=""
       />
-      <UpgradeModal open={openUpgradeModal} onClose={() => setOpenUpgradeModal(false)} onUpgrade={(pid) => console.log(pid)} />
+      <UpgradeModal 
+        open={openUpgradeModal} 
+        onClose={() => setOpenUpgradeModal(false)} 
+      />
     </FormGroup>
   );
 };

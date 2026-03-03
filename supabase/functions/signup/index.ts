@@ -22,6 +22,32 @@ Deno.serve(async (req) => {
   try {
     const { personalInfo, restaurantInfo, subscription } = await req.json();
 
+    // Verify Paystack payment for paid plans before proceeding
+    if (subscription.subscription_plan !== "free") {
+      const reference = subscription.paystack_reference;
+      if (!reference) {
+        throw new Error("Missing Paystack reference for paid plan");
+      }
+
+      const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
+      if (!paystackSecretKey) {
+        throw new Error("Paystack secret key not configured");
+      }
+
+      const paystackRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${paystackSecretKey}`,
+        },
+      });
+
+      const paystackResult = await paystackRes.json();
+
+      if (!paystackResult.status || paystackResult.data.status !== "success") {
+        throw new Error("Payment verification failed. Cannot complete signup.");
+      }
+    }
+
     // ✅ Create user
     const { data: { user }, error: signUpError } =
       await supabaseAdmin.auth.admin.createUser({
@@ -59,7 +85,13 @@ Deno.serve(async (req) => {
     // ✅ Insert subscription
     const { data: subscriptionData, error: subscriptionError } =
       await supabaseAdmin.from("subscriptions")
-        .insert({ ...subscription, user_id: user.id })
+        .insert({
+          restaurant_id: restaurant.id,
+          subscription_plan: subscription.subscription_plan,
+          billing_cycle: subscription.billing_cycle,
+          status: "active",
+          starts_at: new Date().toISOString(),
+        })
         .select()
         .single();
 
@@ -72,7 +104,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("Signup error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: (err as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

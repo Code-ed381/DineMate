@@ -62,10 +62,10 @@ const useProfileStore = create<ProfileState>((set, get) => ({
                 profile: {
                     id: user.id,
                     email: user.email,
-                    first_name: userData?.first_name || user.user_metadata?.firstName || "",
-                    last_name: userData?.last_name || user.user_metadata?.lastName || "",
-                    phone: userData?.phone || user.user_metadata?.phone || "",
-                    avatar_url: userData?.avatar_url || user.user_metadata?.profileAvatar || "",
+                    first_name: userData?.first_name || user.user_metadata?.firstName || user.user_metadata?.first_name || "",
+                    last_name: userData?.last_name || user.user_metadata?.lastName || user.user_metadata?.last_name || "",
+                    phone: userData?.phone || user.user_metadata?.phone || user.user_metadata?.phone_number || "",
+                    avatar_url: userData?.avatar_url || user.user_metadata?.profileAvatar || user.user_metadata?.avatar || "",
                     role: memberData?.role || "Staff",
                 },
                 loading: false

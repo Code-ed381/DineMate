@@ -120,12 +120,14 @@ const useRestaurantStore = create<RestaurantState>()(
                         .from('restaurants')
                         .update(restaurant)
                         .eq('id', id)
+                        .select()
                         .single();
                     if (error) throw error;
     
                     set({ selectedRestaurant: data as Restaurant });
                 } catch (error) {
                     Swal.fire('Error', 'Failed to update restaurant. Check your internet connection.', 'error');
+                    throw error;
                 }
             },
     

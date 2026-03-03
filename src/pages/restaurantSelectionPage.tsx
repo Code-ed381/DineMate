@@ -302,55 +302,57 @@ const RestaurantSelectionPage: React.FC = () => {
                   </Grid>
                 ))}
 
-                <Grid item xs={12} sm={6} md={4}>
-                  <MotionCard
-                    variants={itemVariants}
-                    whileHover={{ 
-                      y: -10, 
-                      scale: 1.02,
-                      borderColor: theme.palette.primary.main,
-                      background: alpha(theme.palette.primary.main, 0.02)
-                    }}
-                    onClick={() => navigate("/onboarding")}
-                    sx={{
-                      height: "100%",
-                      minHeight: 280,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      cursor: "pointer",
-                      borderRadius: 6,
-                      background: "transparent",
-                      border: `2px dashed ${alpha(theme.palette.divider, 0.2)}`,
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    <Box 
-                      sx={{ 
-                        width: 64, 
-                        height: 64, 
-                        borderRadius: "50%", 
-                        display: "flex", 
-                        alignItems: "center", 
+                {restaurants.some((r: any) => r.role === "owner") && (
+                  <Grid item xs={12} sm={6} md={4}>
+                    <MotionCard
+                      variants={itemVariants}
+                      whileHover={{ 
+                        y: -10, 
+                        scale: 1.02,
+                        borderColor: theme.palette.primary.main,
+                        background: alpha(theme.palette.primary.main, 0.02)
+                      }}
+                      onClick={() => navigate("/onboarding")}
+                      sx={{
+                        height: "100%",
+                        minHeight: 280,
+                        display: "flex",
+                        flexDirection: "column",
                         justifyContent: "center",
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        color: theme.palette.primary.main,
-                        mb: 2,
+                        alignItems: "center",
+                        cursor: "pointer",
+                        borderRadius: 6,
+                        background: "transparent",
+                        border: `2px dashed ${alpha(theme.palette.divider, 0.2)}`,
                         transition: "all 0.3s ease",
                       }}
-                      className="add-icon-container"
                     >
-                      <AddRoundedIcon sx={{ fontSize: 32 }} />
-                    </Box>
-                    <Typography variant="h6" fontWeight={700} color="text.primary">
-                      Add Restaurant
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Setup a new location
-                    </Typography>
-                  </MotionCard>
-                </Grid>
+                      <Box 
+                        sx={{ 
+                          width: 64, 
+                          height: 64, 
+                          borderRadius: "50%", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center",
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main,
+                          mb: 2,
+                          transition: "all 0.3s ease",
+                        }}
+                        className="add-icon-container"
+                      >
+                        <AddRoundedIcon sx={{ fontSize: 32 }} />
+                      </Box>
+                      <Typography variant="h6" fontWeight={700} color="text.primary">
+                        Add Restaurant
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Setup a new location
+                      </Typography>
+                    </MotionCard>
+                  </Grid>
+                )}
               </AnimatePresence>
             </Grid>
           </MotionBox>

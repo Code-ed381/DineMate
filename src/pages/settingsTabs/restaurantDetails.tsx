@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -8,52 +8,101 @@ import {
   Button,
   Avatar,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Close";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
-import useRestaurantStore from '../../lib/restaurantStore'
+import useRestaurantStore from '../../lib/restaurantStore';
+import useAppStore from '../../lib/appstore';
+import Swal from 'sweetalert2';
 
-interface RestaurantDetailsPanelProps {
-  restaurant: any;
-}
+const buildForm = (r: any) => ({
+  name: r?.name || "",
+  description: r?.description || "",
+  phone_number: r?.phone_number || "",
+  email: r?.email || "",
+  website: r?.website || "",
+  logo: r?.logo || "",
+  address_line_1: r?.address_line_1 || "",
+  address_line_2: r?.address_line_2 || "",
+  city: r?.city || "",
+  state: r?.state || "",
+  zip_code: r?.zip_code || "",
+  country: r?.country || "",
+});
 
-const RestaurantDetailsPanel: React.FC<RestaurantDetailsPanelProps> = ({ restaurant }) => {
+const RestaurantDetailsPanel: React.FC = () => {
+  // Read directly from the store — not from a stale prop
+  const { selectedRestaurant, updateRestaurant, role } = useRestaurantStore();
+  const { uploadFile } = useAppStore();
+
   const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState({
-    name: restaurant?.name || "",
-    description: restaurant?.description || "",
-    phone: restaurant?.phone || "",
-    email: restaurant?.email || "",
-    website: restaurant?.website || "",
-    logo: restaurant?.logo || "",
-    address_line_1: restaurant?.address_line_1 || "",
-    address_line_2: restaurant?.address_line_2 || "",
-    city: restaurant?.city || "",
-    state: restaurant?.state || "",
-    zip_code: restaurant?.zip_code || "",
-    country: restaurant?.country || "",
-  });
-  const { selectedRestaurant, role } = useRestaurantStore();
+  const [saving, setSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
-  const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setFormData({ ...formData, [field]: e.target.value });
+  const [formData, setFormData] = useState(buildForm(selectedRestaurant));
 
-  const handleSave = () => {
-    // TODO: call API
-    console.log("Saving details:", formData);
-    setEditMode(false);
+  // Keep formData in sync whenever selectedRestaurant updates in the store
+  useEffect(() => {
+    setFormData(buildForm(selectedRestaurant));
+  }, [selectedRestaurant]);
+
+  const handleChange =
+    (field: string) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setFormData({ ...formData, [field]: e.target.value });
+
+  const handleSave = async () => {
+    if (!selectedRestaurant?.id) return;
+    setSaving(true);
+    try {
+      let logoUrl = formData.logo;
+
+      // Only upload if a new file was selected
+      if (logoFile) {
+        logoUrl = await uploadFile(logoFile, "avatars");
+      }
+
+      // updateRestaurant calls .select().single() and sets selectedRestaurant in store
+      await updateRestaurant(selectedRestaurant.id, {
+        ...formData,
+        logo: logoUrl,
+      });
+
+      setLogoFile(null);
+      setEditMode(false);
+      Swal.fire("Success", "Restaurant details updated", "success");
+    } catch (error: any) {
+      console.error("Save failed:", error);
+      Swal.fire("Error", error.message || "Failed to save changes", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData({ ...formData, logo: URL.createObjectURL(file) });
+      setLogoFile(file);
+      // Show local preview immediately
+      setFormData((prev) => ({ ...prev, logo: URL.createObjectURL(file) }));
     }
   };
 
-  const renderField = (label: string, value: string, field: string, multiline = false) => (
+  const handleCancel = () => {
+    // Reset form back to what's in the store
+    setFormData(buildForm(selectedRestaurant));
+    setLogoFile(null);
+    setEditMode(false);
+  };
+
+  const renderField = (
+    label: string,
+    field: string,
+    multiline = false
+  ) => (
     <Grid item xs={12} sm={6}>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         {label}
@@ -68,31 +117,21 @@ const RestaurantDetailsPanel: React.FC<RestaurantDetailsPanelProps> = ({ restaur
           rows={multiline ? 3 : 1}
         />
       ) : (
-        <Typography variant="subtitle1">{value || "—"}</Typography>
+        <Typography variant="subtitle1">
+          {(formData as any)[field] || "—"}
+        </Typography>
       )}
     </Grid>
   );
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          mb: 3,
-          position: "relative",
-        }}
-      >
+      {/* Logo upload */}
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 3, position: "relative" }}>
         <Avatar
           src={formData.logo}
           alt="Restaurant Logo"
-          sx={{
-            width: 140,
-            height: 140,
-            borderRadius: 3,
-            bgcolor: "grey.200",
-            fontSize: 40,
-          }}
+          sx={{ width: 140, height: 140, borderRadius: 3, bgcolor: "grey.200", fontSize: 40 }}
         >
           {formData.name?.[0] || "R"}
         </Avatar>
@@ -110,46 +149,47 @@ const RestaurantDetailsPanel: React.FC<RestaurantDetailsPanelProps> = ({ restaur
           size="small"
         >
           <CameraAltIcon fontSize="small" />
-          <input type="file" hidden onChange={handleLogoUpload} />
+          <input
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={handleLogoUpload}
+          />
         </IconButton>
       </Box>
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
+      {/* Header row */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: "bold" }}>
           Restaurant Details
         </Typography>
-        {!editMode ? (role === "owner" && 
-          <IconButton onClick={() => setEditMode(true)} color="primary">
-            <EditIcon />
-          </IconButton>
-        ) : (
-          <Box>
-            <IconButton onClick={handleSave} color="success">
-              <SaveIcon />
-            </IconButton>
-            <IconButton onClick={() => setEditMode(false)} color="error">
-              <CancelIcon />
-            </IconButton>
-          </Box>
-        )}
+        {!editMode
+          ? role === "owner" && (
+              <IconButton onClick={() => setEditMode(true)} color="primary">
+                <EditIcon />
+              </IconButton>
+            )
+          : (
+            <Box>
+              <IconButton onClick={handleSave} color="success" disabled={saving}>
+                {saving ? <CircularProgress size={20} /> : <SaveIcon />}
+              </IconButton>
+              <IconButton onClick={handleCancel} color="error" disabled={saving}>
+                <CancelIcon />
+              </IconButton>
+            </Box>
+          )}
       </Box>
 
       <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
         Basic Information
       </Typography>
       <Grid container spacing={2} mb={3}>
-        {renderField("Restaurant Name", formData.name, "name")}
-        {renderField("Phone", formData.phone, "phone")}
-        {renderField("Email", formData.email, "email")}
-        {renderField("Website", formData.website, "website")}
-        {renderField("Description", formData.description, "description", true)}
+        {renderField("Restaurant Name", "name")}
+        {renderField("Phone", "phone_number")}
+        {renderField("Email", "email")}
+        {renderField("Website", "website")}
+        {renderField("Description", "description", true)}
       </Grid>
       <Divider sx={{ mb: 3 }} />
 
@@ -157,27 +197,20 @@ const RestaurantDetailsPanel: React.FC<RestaurantDetailsPanelProps> = ({ restaur
         Address
       </Typography>
       <Grid container spacing={2}>
-        {renderField("Address Line 1", formData.address_line_1, "address_line_1")}
-        {renderField("Address Line 2", formData.address_line_2, "address_line_2")}
-        {renderField("City", formData.city, "city")}
-        {renderField("State", formData.state, "state")}
-        {renderField("Zip Code", formData.zip_code, "zip_code")}
-        {renderField("Country", formData.country, "country")}
+        {renderField("Address Line 1", "address_line_1")}
+        {renderField("Address Line 2", "address_line_2")}
+        {renderField("City", "city")}
+        {renderField("State", "state")}
+        {renderField("Zip Code", "zip_code")}
+        {renderField("Country", "country")}
       </Grid>
 
       {editMode && (
-        <Box
-          sx={{
-            mt: 4,
-            display: "flex",
-            gap: 2,
-            justifyContent: { xs: "center", sm: "flex-end" },
-          }}
-        >
-          <Button variant="contained" color="primary" onClick={handleSave}>
-            Save Changes
+        <Box sx={{ mt: 4, display: "flex", gap: 2, justifyContent: { xs: "center", sm: "flex-end" } }}>
+          <Button variant="contained" color="primary" onClick={handleSave} disabled={saving}>
+            {saving ? <CircularProgress size={20} color="inherit" /> : "Save Changes"}
           </Button>
-          <Button variant="outlined" onClick={() => setEditMode(false)}>
+          <Button variant="outlined" onClick={handleCancel} disabled={saving}>
             Cancel
           </Button>
         </Box>

@@ -15,10 +15,11 @@ interface AnalyticsState {
   paymentAnalysis: { cash: number; card: number; online: number; total: number };
   peakHours: { hour: string; orders: number; revenue: number }[];
   loading: boolean;
+  hasFetched: boolean;
   fetchDashboardData: (restaurantId: string, timeRange: string) => Promise<void>;
 }
 
-export const useAnalyticsStore = create<AnalyticsState>((set) => ({
+export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   kpis: {
     revenue: { current: 0, previous: 0, change: 0 },
     orders: { current: 0, previous: 0, change: 0 },
@@ -31,9 +32,14 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   paymentAnalysis: { cash: 0, card: 0, online: 0, total: 0 },
   peakHours: [],
   loading: false,
+  hasFetched: false,
 
   fetchDashboardData: async (restaurantId, timeRange) => {
-    set({ loading: true });
+    const { hasFetched } = get();
+    // Only show loading spinner on the very first fetch
+    if (!hasFetched) {
+      set({ loading: true });
+    }
     try {
       const now = dayjs();
       let startOfCurrent: dayjs.Dayjs;
@@ -212,6 +218,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
             }, {})
         ).sort((a: any, b: any) => a.index - b.index) as any[],
         loading: false,
+        hasFetched: true,
       });
     } catch (error) {
       console.error("Error fetching analytics data:", error);

@@ -14,7 +14,10 @@ import {
   InputAdornment,
   CardMedia,
   CardContent,
-  Button
+  Button,
+  useTheme,
+  useMediaQuery,
+  Pagination
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -24,6 +27,8 @@ import DataTable from "../../components/data-table";
 import FAB from "../../components/fab";
 import { GridColDef } from "@mui/x-data-grid";
 import EmptyState from "../../components/empty-state";
+import AddEmployeeDialog from "../../components/AddEmployeeDialog";
+import EditEmployeeDialog from "../../components/EditEmployeeDialog";
 
 import Swal from "sweetalert2";
 import useRestaurantStore from "../../lib/restaurantStore";
@@ -32,6 +37,9 @@ import useAppStore from "../../lib/appstore";
 import useAuthStore from "../../lib/authStore";
 import { useSettings } from "../../providers/settingsProvider";
 import { useSettingsStore } from "../../lib/settingsStore";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
+import UpgradeModal from "../../components/UpgradeModal";
+import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
 
 interface EmployeeRow {
@@ -54,22 +62,23 @@ const EmployeeManagement: React.FC = () => {
   const { role: storeRole } = useRestaurantStore();
   const { uploadFile } = useAppStore();
   const { updateUserAvatarAsAdmin, updateUserDetailsAsAdmin } = useAuthStore();
-  const { settings } = useSettings();
-  const { viewMode } = useSettingsStore();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [page, setPage] = useState(1);
+  const cardsPerPage = 8;
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [role, setRole] = useState<string | null>(null);
-  const { subscriptionPlan } = useSubscription();
+  const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedEmpIdForUpload, setSelectedEmpIdForUpload] = useState<string | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<any>(null);
 
   useEffect(() => {
     fetchEmployees();
-    if (storeRole) {
-      setRole(storeRole);
-    }
-  }, [fetchEmployees, storeRole]);
+  }, [fetchEmployees]);
 
   const filteredEmployees = employees.filter((emp) => {
       const matchesSearch = (emp.first_name + " " + emp.last_name + " " + emp.email + " " + (emp.phone || "")).toLowerCase().includes(searchTerm.toLowerCase());
@@ -77,165 +86,54 @@ const EmployeeManagement: React.FC = () => {
       return matchesSearch && matchesRole;
   });
 
+  const pageCount = Math.ceil(filteredEmployees.length / cardsPerPage);
+  const paginatedEmployees = filteredEmployees.slice((page - 1) * cardsPerPage, page * cardsPerPage);
+
   const handleRowClick = (params: any) => {
-    let selectedAvatar: File | null = null;
     const employee = params.row as EmployeeRow;
 
-    if (subscriptionPlan === "free") {
+    if (!canUseFeature("Edit Employees")) {
         Swal.fire("Upgrade Required", "Please upgrade to a pro plan to edit employees.", "info");
         return;
     }
 
-    Swal.fire({
-      title: "Edit Employee",
-      html: `
-        <style>
-          .swal2-container .edit-employee-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-          }
-          .swal2-container .avatar-wrapper {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            margin-bottom: 15px;
-          }
-          .swal2-container .avatar-wrapper img {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #ddd;
-          }
-          .swal2-container .edit-avatar {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            background: #1976d2;
-            color: white;
-            border-radius: 50%;
-            padding: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .swal2-container .edit-avatar:hover {
-            background: #1565c0;
-          }
-          .swal2-container input, .swal2-container select {
-            width: 100%;
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            margin-bottom: 10px;
-            font-size: 14px;
-          }
-        </style>
-
-        <div class="edit-employee-container">
-          <div class="avatar-wrapper">
-            <img id="avatar-img" src="${employee.avatar_url}" alt="${employee.name}" />
-            <div class="edit-avatar" id="edit-avatar-btn">
-              ✏️
-            </div>
-          </div>
-          <input type="text" id="first_name" value="${employee.first_name}" placeholder="First Name" />
-          <input type="text" id="last_name" value="${employee.last_name}" placeholder="Last Name" />
-          <input type="email" disabled id="email" value="${employee.email}" placeholder="Email" />
-          <input type="text" id="phone" value="${employee.phone}" placeholder="Phone" />
-          <select id="role">
-            <option value="admin" ${employee.role === "admin" ? "selected" : ""}>Admin</option>
-            <option value="chef" ${employee.role === "chef" ? "selected" : ""}>Chef</option>
-            <option value="waiter" ${employee.role === "waiter" ? "selected" : ""}>Waiter</option>
-            <option value="bartender" ${employee.role === "bartender" ? "selected" : ""}>Bartender</option>
-            <option value="cashier" ${employee.role === "cashier" ? "selected" : ""}>Cashier</option>
-          </select>
-          <select id="status">
-            <option value="active" ${employee.status === "active" ? "selected" : ""}>Active</option>
-            <option value="pending" ${employee.status === "pending" ? "selected" : ""}>Pending</option>
-            <option value="suspended" ${employee.status === "suspended" ? "selected" : ""}>Suspended</option>
-          </select>
-          <input type="file" id="avatar-upload" accept="image/*" style="display:none;" />
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: "Save",
-      cancelButtonText: "Cancel",
-      showLoaderOnConfirm: true,
-      didOpen: () => {
-        const editBtn = document.getElementById("edit-avatar-btn");
-        const uploadInput = document.getElementById("avatar-upload") as HTMLInputElement;
-        const avatarImg = document.getElementById("avatar-img") as HTMLImageElement;
-
-        editBtn?.addEventListener("click", () => {
-          uploadInput?.click();
-        });
-
-        uploadInput?.addEventListener("change", (e: any) => {
-          const file = e.target.files[0];
-          if (file) {
-            selectedAvatar = file;
-            const reader = new FileReader();
-            reader.onload = (ev: any) => {
-              if (avatarImg) avatarImg.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-          }
-        });
-      },
-      preConfirm: () => {
-        const first_name = (document.getElementById("first_name") as HTMLInputElement).value;
-        const last_name = (document.getElementById("last_name") as HTMLInputElement).value;
-        const email = (document.getElementById("email") as HTMLInputElement).value;
-        const phone = (document.getElementById("phone") as HTMLInputElement).value;
-        const role = (document.getElementById("role") as HTMLSelectElement).value;
-        const status = (document.getElementById("status") as HTMLSelectElement).value;
-        const avatar = (document.getElementById("avatar-img") as HTMLImageElement).src;
-
-        return { first_name, last_name, email, phone, role, status, avatar };
-      },
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const { first_name, last_name, phone, role, status } = result.value;
-
-        const details = { first_name, last_name, phone_number: phone };
-        const other_details = { role, status };
-
-        if (selectedAvatar) {
-          await handleLogoUpload(employee.user_id, selectedAvatar);
-        }
-
-        const response = await updateUserDetailsAsAdmin(employee.user_id, details);
-        if (response) {
-            await updateEmployeeDetailsAsAdmin(employee.user_id, other_details);
-            await fetchEmployees();
-        }
-      }
-    });
+    setEditingEmployee(employee);
+    setEditDialogOpen(true);
   };
 
-  const handleLogoUpload = async (employeeId: string, file: File) => {
-    if (!file) return;
+  const handleEditSave = async (data: {
+    first_name: string;
+    last_name: string;
+    phone: string;
+    role: string;
+    status: string;
+    avatarFile?: File | null;
+  }) => {
+    if (!editingEmployee) return;
 
-    try {
-      const avatarUrl = await uploadFile(file);
-      if (avatarUrl) {
-        const response = await updateUserAvatarAsAdmin(employeeId, avatarUrl);
-        if (response) {
-            await fetchEmployees();
+    const { first_name, last_name, phone, role, status, avatarFile } = data;
+
+    if (avatarFile) {
+      try {
+        const avatarUrl = await uploadFile(avatarFile, "avatars");
+        if (avatarUrl) {
+          await updateUserAvatarAsAdmin(editingEmployee.user_id, avatarUrl);
         }
+      } catch (err: any) {
+        console.error("Upload failed:", err.message);
       }
-    } catch (err: any) {
-      console.error("Upload failed:", err.message);
+    }
+
+    const details = { first_name, last_name, phone_number: phone };
+    const other_details = { role, status };
+
+    const response = await updateUserDetailsAsAdmin(editingEmployee.user_id, details);
+    if (response) {
+      await updateEmployeeDetailsAsAdmin(editingEmployee.user_id, other_details);
+      await fetchEmployees();
     }
   };
 
-  const handleTriggerUpload = (empUserId: string) => {
-      setSelectedEmpIdForUpload(empUserId);
-      fileInputRef.current?.click();
-  };
 
   const handleDelete = async (employee: any) => {
        const { handleDelete } = useEmployeesStore.getState();
@@ -327,26 +225,40 @@ const EmployeeManagement: React.FC = () => {
         description="Manage your restaurant staff, track roles, and update details"
       />
 
-       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-          <ToggleButtonGroup exclusive value={roleFilter} onChange={(_e, v) => v && setRoleFilter(v)} size="small">
-              <ToggleButton value="all">All</ToggleButton>
-              <ToggleButton value="admin">Admin</ToggleButton>
-              <ToggleButton value="waiter">Waiter</ToggleButton>
-              <ToggleButton value="chef">Chef</ToggleButton>
-              <ToggleButton value="kitchen">Kitchen</ToggleButton>
-              <ToggleButton value="cashier">Cashier</ToggleButton>
-          </ToggleButtonGroup>
+       <Box sx={{ 
+          display: "flex", 
+          flexDirection: isMobile ? "column" : "row",
+          justifyContent: "space-between", 
+          gap: 2,
+          mb: 2 
+        }}>
           <TextField
             size="small"
             placeholder="Search employees..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-            sx={{ width: 300 }}
+            sx={{ width: isMobile ? "100%" : 300, order: isMobile ? 0 : 1 }}
           />
+          <Box sx={{ 
+            overflowX: "auto", 
+            order: isMobile ? 1 : 0,
+            '&::-webkit-scrollbar': { height: 4 },
+            '&::-webkit-scrollbar-thumb': { borderRadius: 2, bgcolor: 'divider' }
+          }}>
+            <ToggleButtonGroup exclusive value={roleFilter} onChange={(_e, v) => v && setRoleFilter(v)} size="small" sx={{ flexWrap: "nowrap" }}>
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="admin">Admin</ToggleButton>
+                <ToggleButton value="waiter">Waiter</ToggleButton>
+                <ToggleButton value="bartender">Bartender</ToggleButton>
+                <ToggleButton value="chef">Chef</ToggleButton>
+                <ToggleButton value="kitchen">Kitchen</ToggleButton>
+                <ToggleButton value="cashier">Cashier</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
       </Box>
 
-      {viewMode === "list" && (
+      {!isMobile && (
         <DataTable
           rows={filteredEmployees}
           columns={columns}
@@ -365,7 +277,7 @@ const EmployeeManagement: React.FC = () => {
         />
       )}
 
-      {viewMode === "grid" && (
+      {isMobile && (
         <Grid container spacing={3}>
           {filteredEmployees.length === 0 ? (
             <Grid item xs={12}>
@@ -375,7 +287,7 @@ const EmployeeManagement: React.FC = () => {
               />
             </Grid>
           ) : (
-            filteredEmployees.map((emp: any) => (
+            paginatedEmployees.map((emp: any) => (
             <Grid item xs={12} sm={6} md={3} key={emp.member_id}>
               <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
                 <CardMedia
@@ -442,21 +354,43 @@ const EmployeeManagement: React.FC = () => {
         </Grid>
       )}
 
-      {/* Hidden file input controlled by ref */}
-      <input
-        type="file"
-        hidden
-        ref={fileInputRef}
-        onChange={(e: any) => {
-            if (selectedEmpIdForUpload && e.target.files[0]) {
-                handleLogoUpload(selectedEmpIdForUpload, e.target.files[0]);
-            }
-            setSelectedEmpIdForUpload(null);
-        }}
-        accept="image/*"
-      />
+      {isMobile && pageCount > 1 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 3 }}>
+          <Pagination count={pageCount} page={page} onChange={(e, p) => setPage(p)} color="primary" />
+        </Box>
+      )}
 
-       <FAB handleAdd={() => useEmployeesStore.getState().handleAddEmployee()} title="Add Employee" />
+       <FAB 
+         handleAdd={() => {
+           if (isLimitReached("maxEmployees", employees.length)) {
+             Swal.fire({
+               title: "Staff Limit Reached",
+               text: `Your current plan allows up to ${plan.limits.maxEmployees} employees. Please upgrade to add more staff.`,
+               icon: "warning",
+               showCancelButton: true,
+               confirmButtonText: "Upgrade Now",
+               cancelButtonText: "Later"
+             }).then((res) => {
+               if (res.isConfirmed) setOpenUpgradeModal(true);
+             });
+             return;
+           }
+           setAddDialogOpen(true);
+         }} 
+         title="Add Employee" 
+       />
+       <AddEmployeeDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} onSuccess={fetchEmployees} />
+       <EditEmployeeDialog
+         open={editDialogOpen}
+         onClose={() => setEditDialogOpen(false)}
+         employee={editingEmployee}
+         onSave={handleEditSave}
+       />
+
+       <UpgradeModal 
+         open={openUpgradeModal} 
+         onClose={() => setOpenUpgradeModal(false)} 
+       />
     </Box>
   );
 };

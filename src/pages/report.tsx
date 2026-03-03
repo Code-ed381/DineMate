@@ -26,6 +26,7 @@ import DataTable from "../components/data-table";
 import EmptyState from "../components/empty-state";
 import { formatCurrency } from "../utils/currency";
 import { exportToCSV } from "../utils/exportUtils";
+import MetricCard from "../components/MetricCard";
 
 const ReportDashboard: React.FC = () => {
   const theme = useTheme();
@@ -139,14 +140,7 @@ const ReportDashboard: React.FC = () => {
     },
   ];
 
-  const getCardStyle = (lightColor: string) => ({
-    p: 2,
-    borderRadius: 3,
-    bgcolor: isDark ? theme.palette.background.paper : lightColor,
-    boxShadow: isDark
-      ? "0 0 8px rgba(255,255,255,0.08)"
-      : "0 2px 8px rgba(0,0,0,0.1)",
-  });
+
 
   return (
     <Box p={3} sx={{ width: "100%" }}>
@@ -241,57 +235,37 @@ const ReportDashboard: React.FC = () => {
 
       {/* KPI Cards */}
       <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} md={3}>
-          <Card sx={getCardStyle("#E3F2FD")}>
-            <CardHeader title="Cash Total" sx={{ p: 1, pb: 0 }} titleTypographyProps={{ variant: 'subtitle2', color: 'text.secondary' }} />
-            <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1, pt: 0.5 }}>
-              <Typography variant="h5" fontWeight={700}>{formatCurrency(cash)}</Typography>
-              <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Box bgcolor={theme.palette.primary.light} p={0.5} borderRadius={1} display="flex">
-                    <AttachMoney fontSize="small" color="primary" />
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            title="Cash Total"
+            value={formatCurrency(cash)}
+            icon={<AttachMoney />}
+            color="primary"
+          />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card sx={getCardStyle("#E8F5E9")}>
-            <CardHeader title="Card Total" sx={{ p: 1, pb: 0 }} titleTypographyProps={{ variant: 'subtitle2', color: 'text.secondary' }} />
-            <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1, pt: 0.5 }}>
-              <Typography variant="h5" fontWeight={700}>{formatCurrency(card)}</Typography>
-               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Box bgcolor={theme.palette.success.light} p={0.5} borderRadius={1} display="flex">
-                    <CreditCard fontSize="small" color="success" />
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            title="Card Total"
+            value={formatCurrency(card)}
+            icon={<CreditCard />}
+            color="success"
+          />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card sx={getCardStyle("#FFF3E0")}>
-            <CardHeader title="Total Orders" sx={{ p: 1, pb: 0 }} titleTypographyProps={{ variant: 'subtitle2', color: 'text.secondary' }} />
-            <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1, pt: 0.5 }}>
-              <Typography variant="h5" fontWeight={700}>{filteredOrders.length}</Typography>
-               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Box bgcolor={theme.palette.warning.light} p={0.5} borderRadius={1} display="flex">
-                    <ReceiptLong fontSize="small" color="warning" />
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            title="Total Orders"
+            value={filteredOrders.length}
+            icon={<ReceiptLong />}
+            color="warning"
+          />
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card sx={getCardStyle("#F3E5F5")}>
-            <CardHeader title="Total Sales" sx={{ p: 1, pb: 0 }} titleTypographyProps={{ variant: 'subtitle2', color: 'text.secondary' }} />
-            <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1, pt: 0.5 }}>
-              <Typography variant="h5" fontWeight={700}>{formatCurrency(total)}</Typography>
-               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Box bgcolor={theme.palette.secondary.light} p={0.5} borderRadius={1} display="flex">
-                    <TrendingUp fontSize="small" color="secondary" />
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard
+            title="Total Sales"
+            value={formatCurrency(total)}
+            icon={<TrendingUp />}
+            color="secondary"
+          />
         </Grid>
       </Grid>
 

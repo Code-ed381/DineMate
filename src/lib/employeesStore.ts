@@ -29,7 +29,7 @@ interface EmployeesState {
 
     fetchEmployees: () => Promise<void>;
     updateEmployeeDetailsAsAdmin: (userId: string, details: { role: string; status: string }) => Promise<void>;
-    handleAddEmployee: () => Promise<void>;
+    addEmployee: (data: { firstName: string, lastName: string, email: string, phone: string, role: string, avatarUrl: string }) => Promise<void>;
     handleEditStart: (id: string, row: Employee) => void;
     handleChangeEmployeeAvatar: (e: React.ChangeEvent<HTMLInputElement>) => void;
     handleEditRole: (employee: Employee) => Promise<void>;
@@ -95,105 +95,63 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
         }
     },
 
-    handleAddEmployee: async () => {
-        const { value: formValues } = await Swal.fire({
-            title: 'Add New Employee',
-            html:
-                '<input id="swal-first-name" class="swal2-input" placeholder="First Name">' +
-                '<input id="swal-last-name" class="swal2-input" placeholder="Last Name">' +
-                '<input id="swal-email" class="swal2-input" placeholder="Email">' +
-                '<input id="swal-phone" class="swal2-input" placeholder="Phone">' +
-                '<input id="swal-password" class="swal2-input" placeholder="Password" type="password">' +
-                '<select id="swal-role" class="swal2-input">' +
-                '  <option value="waiter">Waiter</option>' +
-                '  <option value="chef">Chef</option>' +
-                '  <option value="bartender">Bartender</option>' +
-                '  <option value="cashier">Cashier</option>' +
-                '  <option value="admin">Admin</option>' +
-                '</select>',
-            focusConfirm: false,
-            showCancelButton: true,
-            preConfirm: () => {
-                return [
-                    (document.getElementById('swal-first-name') as HTMLInputElement).value,
-                    (document.getElementById('swal-last-name') as HTMLInputElement).value,
-                    (document.getElementById('swal-email') as HTMLInputElement).value,
-                    (document.getElementById('swal-phone') as HTMLInputElement).value,
-                    (document.getElementById('swal-password') as HTMLInputElement).value,
-                    (document.getElementById('swal-role') as HTMLSelectElement).value
-                ]
-            }
-        });
-
-        if (formValues) {
-            const [firstName, lastName, email, phone, password, role] = formValues;
+    addEmployee: async ({ firstName, lastName, email, phone, role, avatarUrl }) => {
+        try {
+            // 1. Invite user via email (they set their own password)
+            const { supabaseAdmin } = await import('./supabaseAdmin');
             
-            if (!firstName || !lastName || !email || !password || !role) {
-                Swal.fire('Error', 'Please fill all required fields', 'error');
-                return;
+            const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+                data: {
+                    firstName: firstName,
+                    lastName: lastName,
+                    phone: phone,
+                    profileAvatar: avatarUrl,
+                    role: 'employee'
+                },
+                redirectTo: `${window.location.origin}/#/onboarding`
+            });
+
+            if (authError) throw authError;
+
+            if (!authData.user) throw new Error("Failed to invite user");
+
+            // 2. Add to restaurant_members
+            const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
+            if (!selectedRestaurant?.id) throw new Error("No restaurant selected");
+
+            const { error: memberError } = await supabase
+                .from('restaurant_members')
+                .insert([{
+                    user_id: authData.user.id,
+                    restaurant_id: selectedRestaurant.id,
+                    role: role,
+                    status: 'pending',
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone,
+                    email: email
+                }]);
+
+            if (memberError) {
+                console.error("Member creation failed:", memberError);
+                throw memberError;    
             }
 
-            try {
-                // 1. Create user in auth
-                // Dynamically import supabaseAdmin to avoid circular dependencies if any, 
-                // or just import at top. Let's assume it's imported.
-                const { supabaseAdmin } = await import('./supabaseAdmin');
-                
-                const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-                    email,
-                    password,
-                    email_confirm: true,
-                    user_metadata: {
-                        first_name: firstName,
-                        last_name: lastName,
-                        phone_number: phone,
-                        role: 'employee' // default system role
-                    }
-                });
+            await get().fetchEmployees();
+            
+            // Audit Log
+            await useAuditStore.getState().logAction({
+                action: 'create_employee',
+                entity_type: 'employee',
+                entity_id: authData.user.id,
+                details: { name: `${firstName} ${lastName}`, role, email }
+            });
 
-                if (authError) throw authError;
+            Swal.fire('Success', `Invite sent to ${email}`, 'success');
 
-                if (!authData.user) throw new Error("Failed to create user");
-
-                // 2. Add to restaurant_members
-                const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
-                if (!selectedRestaurant?.id) throw new Error("No restaurant selected");
-
-                const { error: memberError } = await supabase
-                    .from('restaurant_members')
-                    .insert([{
-                        user_id: authData.user.id,
-                        restaurant_id: selectedRestaurant.id,
-                        role: role,
-                        status: 'pending',
-                        first_name: firstName,
-                        last_name: lastName,
-                        phone: phone,
-                        email: email
-                    }]);
-
-                if (memberError) {
-                    // unexpected error, maybe cleanup user? 
-                    console.error("Member creation failed:", memberError);
-                    throw memberError;    
-                }
-
-                await get().fetchEmployees();
-                
-                // Audit Log
-                await useAuditStore.getState().logAction({
-                    action: 'create_employee',
-                    entity_type: 'employee',
-                    entity_id: authData.user.id,
-                    details: { name: `${firstName} ${lastName}`, role, email }
-                });
-
-                Swal.fire('Success', 'Employee added successfully', 'success');
-
-            } catch (error: any) {
-                console.error(error);
-                Swal.fire('Error', error.message || 'Failed to add employee', 'error');
-            }
+        } catch (error: any) {
+            console.error(error);
+            throw new Error(error.message || 'Failed to add employee');
         }
     },
 
@@ -357,7 +315,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
                 try {
                     // Delete from restaurant_members
                     const idToDelete = employee.member_id || employee.id;
-                    const { error } = await supabase.from('restaurant_members').delete().eq('member_id', idToDelete);
+                    const { error } = await supabase.from('restaurant_members').delete().eq('user_id', idToDelete);
                     if (error) throw error;
 
                     // Optionally delete from auth users if we created it? 

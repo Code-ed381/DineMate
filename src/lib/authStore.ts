@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { plans } from "../config/plans";
 import { supabase } from "./supabase";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { persist } from "zustand/middleware";
@@ -52,6 +53,7 @@ export interface Subscription {
   payment_method: string;
   card_details: CardDetails;
   momo_number: string;
+  paystack_reference?: string;
 }
 
 export interface AuthState {
@@ -104,7 +106,7 @@ export interface AuthState {
   updateConsent: (value: boolean) => void;
   updatePersonalInfo: (field: keyof PersonalInfo, value: string) => void;
   updateRestaurantInfo: (field: keyof RestaurantInfo, value: string) => void;
-  updateSubscription: (field: string, value: any, plans?: any[]) => void;
+  updateSubscription: (field: string, value: any) => void;
   validatePersonalInfo: () => Record<string, string>;
   validateRestaurantInfo: () => Record<string, string>;
   validateSubscriptionInfo: () => Record<string, string>;
@@ -191,6 +193,7 @@ const useAuthStore = create<AuthState>()(
           card_cvv: "",
         },
         momo_number: "",
+        paystack_reference: "",
       },
       defaultSubscription: {
         subscription_plan: "free",
@@ -204,6 +207,7 @@ const useAuthStore = create<AuthState>()(
           card_cvv: "",
         },
         momo_number: "",
+        paystack_reference: "",
       },
       validationErrors: {},
       email: "",
@@ -357,7 +361,7 @@ const useAuthStore = create<AuthState>()(
           restaurantInfo: { ...state.restaurantInfo, [field]: value },
         })),
 
-      updateSubscription: (field, value, plans = []) => {
+      updateSubscription: (field, value) => {
         set((state) => {
           if (value === "free") {
             return {
@@ -444,20 +448,29 @@ const useAuthStore = create<AuthState>()(
       validateSubscriptionInfo: () => {
         const { subscription } = get();
         const errors: Record<string, string> = {};
-        if (subscription.payment_method === "creditCard") {
-          if (!subscription.card_details.card_number.trim())
-            errors.card_number = "Card number is required";
-          if (!subscription.card_details.card_holder_name.trim())
-            errors.card_holder_name = "Card holder name is required";
-          if (!subscription.card_details.card_expiry_date.trim())
-            errors.card_expiry_date = "Card expiry date is required";
-          if (!subscription.card_details.card_cvv.trim())
-            errors.card_cvv = "Card CVV is required";
-        }
 
-        if (subscription.payment_method === "momo") {
-          if (!subscription.momo_number.trim())
-            errors.momo_number = "Momo number is required";
+        // If not free plan, we MUST have a payment method
+        if (subscription.subscription_plan !== "free") {
+          if (!subscription.payment_method) {
+            errors.payment_method = "Please select a payment method";
+            return errors; 
+          }
+
+          if (subscription.payment_method === "creditCard") {
+            if (!subscription.card_details.card_number.trim())
+              errors.card_number = "Card number is required";
+            if (!subscription.card_details.card_holder_name.trim())
+              errors.card_holder_name = "Card holder name is required";
+            if (!subscription.card_details.card_expiry_date.trim())
+              errors.card_expiry_date = "Card expiry date is required";
+            if (!subscription.card_details.card_cvv.trim())
+              errors.card_cvv = "Card CVV is required";
+          }
+
+          if (subscription.payment_method === "momo") {
+            if (!subscription.momo_number.trim())
+              errors.momo_number = "Momo number is required";
+          }
         }
 
         return errors;

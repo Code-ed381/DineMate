@@ -156,9 +156,9 @@ const Layout: React.FC = () => {
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
 
-  const first_name = user?.user_metadata?.firstName || "";
-  const last_name = user?.user_metadata?.lastName || "";
-  const avatar = user?.user_metadata?.profileAvatar || "";
+  const first_name = user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
+  const last_name = user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
+  const avatar = user?.user_metadata?.profileAvatar || user?.user_metadata?.avatar_url || user?.user_metadata?.profile_avatar || user?.user_metadata?.avatar || "";
   const displayRole = (role || "staff").toUpperCase();
 
 
@@ -392,6 +392,7 @@ const Layout: React.FC = () => {
                 {selectedRestaurant?.name?.charAt(0)}
               </Avatar>
 
+              {!isMobile && (
               <Typography
                 component="h1"
                 variant={isSmallMobile ? "h6" : "h5"}
@@ -417,6 +418,7 @@ const Layout: React.FC = () => {
                   />
                 )}
               </Typography>
+              )}
 
               {!isSmallMobile && (
                 <Box sx={{ mx: "auto", display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -451,7 +453,7 @@ const Layout: React.FC = () => {
 
               {settings?.general?.show_light_night_toggle && <ThemeToggle />}
 
-              {restaurants.length > 1 && (
+              {(role === "owner" || restaurants.length > 1) && (
                 <TooltipComponent title="Switch Restaurant">
                   <IconButton
                     size="large"

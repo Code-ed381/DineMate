@@ -14,21 +14,26 @@ import {
   List,
   Avatar,
   InputAdornment,
+  useTheme,
+  useMediaQuery,
+  Pagination,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
-import Swal from "sweetalert2";
 import useMenuItemsStore from "../../lib/menuItemsStore";
-import useRestaurantStore from "../../lib/restaurantStore";
 import CategoryItem from "../../components/category";
 import AdminHeader from "../../components/admin-header";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
 import { useSettingsStore } from "../../lib/settingsStore";
 import { formatCurrency, getCurrencySymbol } from "../../utils/currency";
-
+import MenuItemDialog from "../../components/MenuItemDialog";
+import CategoryDialog from "../../components/CategoryDialog";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
+import UpgradeModal from "../../components/UpgradeModal";
+import Swal from "sweetalert2";
 import { GridColDef } from "@mui/x-data-grid";
 
 const baseColumns: GridColDef[] = [
@@ -146,8 +151,24 @@ const MenuItemsManagement: React.FC = () => {
     addMenuItem,
     updateMenuItem,
     deleteMenuItem,
+    addCategory,
+    updateCategory,
+    deleteCategory,
   } = useMenuItemsStore();
-  const { viewMode } = useSettingsStore();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [page, setPage] = useState(1);
+  const cardsPerPage = 8;
+  const pageCount = Math.ceil(filteredMenuItems.length / cardsPerPage);
+  const paginatedMenuItems = filteredMenuItems.slice((page - 1) * cardsPerPage, page * cardsPerPage);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+
+  const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
 
   useEffect(() => {
     fetchMenuItems();
@@ -155,242 +176,99 @@ const MenuItemsManagement: React.FC = () => {
   }, [fetchCategories, fetchMenuItems]);
 
   const handleAddMenuItem = () => {
-    const categoryOptions = categories
-      .map((cat) => `<option value="${cat.id}">${cat.name}</option>`)
-      .join("");
-
-    Swal.fire({
-      title: "➕ Add New Menu Item",
-      width: "900px",
-      html: `
-        <style>
-          .swal2-popup .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-          }
-           .swal2-popup .form-grid-full {
-            grid-column: span 2;
-          }
-          .swal2-popup .swal2-input, 
-          .swal2-popup .swal2-select, 
-          .swal2-popup .swal2-file {
-            width: 100% !important;
-            margin: 6px 0;
-            padding: 10px 12px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-          }
-        </style>
-        <div class="form-grid">
-          <div class="form-grid-full">
-            <label>Name</label>
-            <input id="swal-name" class="swal2-input" placeholder="E.g. Cheeseburger" />
-          </div>
-          <div>
-            <label>Price</label>
-            <input id="swal-price" type="number" step="0.01" class="swal2-input" placeholder="E.g. 9.99" />
-          </div>
-          <div>
-            <label>Category</label>
-            <select id="swal-category" class="swal2-select">
-              <option value="" disabled selected>Select Category</option>
-              ${categoryOptions}
-            </select>
-          </div>
-          <div class="form-grid-full">
-            <label>Description</label>
-            <input id="swal-description" class="swal2-input" placeholder="Short description" />
-          </div>
-          <div>
-            <label>Availability</label>
-            <select id="swal-available" class="swal2-select">
-              <option value="true">Available</option>
-              <option value="false">Unavailable</option>
-            </select>
-          </div>
-          <div>
-            <label>Upload Image</label>
-            <input id="swal-image" type="file" accept="image/*" class="swal2-file" />
-          </div>
-          <div class="form-grid-full">
-            <label>Tags (comma separated)</label>
-            <input id="swal-tags" class="swal2-input" placeholder="spicy, vegan, gluten-free" />
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      preConfirm: async () => {
-        const name = (document.getElementById("swal-name") as HTMLInputElement).value.trim();
-        const price = (document.getElementById("swal-price") as HTMLInputElement).value.trim();
-        const category_id = (document.getElementById("swal-category") as HTMLSelectElement).value;
-        const description = (document.getElementById("swal-description") as HTMLInputElement).value.trim();
-        const available = (document.getElementById("swal-available") as HTMLSelectElement).value;
-        const imageInput = document.getElementById("swal-image") as HTMLInputElement;
-        const tagsInput = (document.getElementById("swal-tags") as HTMLInputElement).value.trim();
-
-        if (!name || !price || !category_id) {
-          Swal.showValidationMessage("Please fill in Name, Price, and Category");
-          return false;
-        }
-
-        const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
-        const imageFile = imageInput.files ? imageInput.files[0] : undefined;
-
-        await addMenuItem({
-            name,
-            price,
-            category_id,
-            description,
-            available,
-            tags
-        }, imageFile);
-      }
-    });
+    if (isLimitReached("maxMenuItems", menuItems.length)) {
+      Swal.fire({
+        title: "Menu Item Limit Reached",
+        text: `Your plan allows up to ${plan.limits.maxMenuItems} menu items. Please upgrade to add more.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Upgrade Now",
+        cancelButtonText: "Later"
+      }).then((res) => {
+        if (res.isConfirmed) setOpenUpgradeModal(true);
+      });
+      return;
+    }
+    setEditingItem(null);
+    setDialogOpen(true);
   };
 
   const handleEditItem = (item: any) => {
-    const categoryOptions = categories
-      .map((cat) => `<option value="${cat.id}" ${cat.id === item.category ? "selected" : ""}>${cat.name}</option>`)
-      .join("");
+    if (!canUseFeature("Add Menu Items")) {
+      Swal.fire("Upgrade Required", "Please upgrade your plan to edit menu items.", "info");
+      return;
+    }
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
 
-    Swal.fire({
-      title: "✏️ Edit Menu Item",
-      width: "900px",
-      html: `
-        <style>
-          .swal2-popup .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-          }
-           .swal2-popup .form-grid-full {
-            grid-column: span 2;
-          }
-          .swal2-popup .swal2-input, 
-          .swal2-popup .swal2-select, 
-          .swal2-popup .swal2-file {
-            width: 100% !important;
-            margin: 6px 0;
-            padding: 10px 12px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-          }
-        </style>
-        <div class="form-grid">
-          <div class="form-grid-full">
-            <label>Name</label>
-            <input id="swal-name" class="swal2-input" value="${item.name || item.item_name}" />
-          </div>
-          <div>
-            <label>Price</label>
-            <input id="swal-price" type="number" step="0.01" class="swal2-input" value="${item.price}" />
-          </div>
-          <div>
-            <label>Category</label>
-            <select id="swal-category" class="swal2-select">
-              ${categoryOptions}
-            </select>
-          </div>
-          <div class="form-grid-full">
-            <label>Description</label>
-            <input id="swal-description" class="swal2-input" value="${item.description || ""}" />
-          </div>
-          <div>
-            <label>Availability</label>
-            <select id="swal-available" class="swal2-select">
-              <option value="true" ${item.available ? "selected" : ""}>Available</option>
-              <option value="false" ${!item.available ? "selected" : ""}>Unavailable</option>
-            </select>
-          </div>
-          <div>
-            <label>Change Image (Optional)</label>
-            <input id="swal-image" type="file" accept="image/*" class="swal2-file" />
-          </div>
-          <div class="form-grid-full">
-            <label>Tags (comma separated)</label>
-            <input id="swal-tags" class="swal2-input" value="${(item.tags || []).join(", ")}" />
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      preConfirm: async () => {
-        const name = (document.getElementById("swal-name") as HTMLInputElement).value.trim();
-        const price = (document.getElementById("swal-price") as HTMLInputElement).value.trim();
-        const category_id = (document.getElementById("swal-category") as HTMLSelectElement).value;
-        const description = (document.getElementById("swal-description") as HTMLInputElement).value.trim();
-        const available = (document.getElementById("swal-available") as HTMLSelectElement).value;
-        const imageInput = document.getElementById("swal-image") as HTMLInputElement;
-        const tagsInput = (document.getElementById("swal-tags") as HTMLInputElement).value.trim();
 
-        if (!name || !price || !category_id) {
-          Swal.showValidationMessage("Please fill in Name, Price, and Category");
-          return false;
-        }
 
-        const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(Boolean) : [];
-        const imageFile = imageInput.files ? imageInput.files[0] : undefined;
-
-        await updateMenuItem(item.id, {
-            name,
-            price,
-            category_id,
-            description,
-            available,
-            tags,
-            image_url: item.image_url // Pass existing URL to preserve it if no new file
-        }, imageFile);
-      }
-    });
+  const handleDialogSubmit = async (data: any, imageFile?: File) => {
+    if (editingItem) {
+      await updateMenuItem(editingItem.id, data, imageFile);
+    } else {
+      await addMenuItem(data, imageFile);
+    }
   };
 
   const handleDeleteItem = (id: string) => {
-      deleteMenuItem(id);
+    deleteMenuItem(id);
   };
   
-  // Update columns to use handleDeleteItem and dynamic currency header
   const updatedColumns = baseColumns.map(col => {
-      if (col.field === 'price') {
-          return { ...col, headerName: `Price (${getCurrencySymbol()})` };
-      }
-      if (col.field === 'actions') {
-          return {
-              ...col,
-              headerName: "Actions",
-              width: 120, // Increased width for two buttons
-              renderCell: (params: any) => (
-                <Box>
-                  <IconButton
-                    color="primary"
-                    onClick={() => handleEditItem(params.row)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    color="error"
-                    onClick={() => handleDeleteItem(params.row.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              ),
-          };
-      }
-      return col;
+    if (col.field === 'price') {
+      return { ...col, headerName: `Price (${getCurrencySymbol()})` };
+    }
+    if (col.field === 'actions') {
+      return {
+        ...col,
+        headerName: "Actions",
+        width: 120,
+        renderCell: (params: any) => (
+          <Box>
+            <IconButton
+              color="primary"
+              onClick={() => handleEditItem(params.row)}
+            >
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              color="error"
+              onClick={() => handleDeleteItem(params.row.id)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        ),
+      };
+    }
+    return col;
   });
 
   const handleAddCategory = () => {
-      // Add Category logic
+    setEditingCategory(null);
+    setCategoryDialogOpen(true);
   };
 
   const handleEditCategory = (id: string) => {
-      console.log("Edit category", id);
+    const cat = categories.find((c: any) => c.id === id);
+    if (cat) {
+      setEditingCategory(cat);
+      setCategoryDialogOpen(true);
+    }
   };
 
   const handleDeleteCategory = (id: string) => {
-      console.log("Delete category", id);
+    deleteCategory(id);
+  };
+
+  const handleCategorySubmit = async (name: string) => {
+    if (editingCategory) {
+      await updateCategory(editingCategory.id, name);
+    } else {
+      await addCategory(name);
+    }
   };
 
   return (
@@ -400,30 +278,86 @@ const MenuItemsManagement: React.FC = () => {
         description="Manage your restaurant menu, track availability, and update reservations"
       />
 
+      {/* Mobile: horizontal category chips */}
+      {isMobile && (
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold">Categories</Typography>
+            <IconButton size="small" onClick={handleAddCategory}><AddIcon /></IconButton>
+          </Box>
+          <Box sx={{ 
+            display: "flex", 
+            gap: 1, 
+            overflowX: "auto", 
+            pb: 1,
+            '&::-webkit-scrollbar': { height: 4 },
+            '&::-webkit-scrollbar-thumb': { borderRadius: 2, bgcolor: 'divider' }
+          }}>
+            <Chip 
+              label="All" 
+              variant={!selectedCategory ? "filled" : "outlined"}
+              color={!selectedCategory ? "primary" : "default"}
+              onClick={() => setSelectedCategory("")}
+              sx={{ flexShrink: 0 }}
+            />
+            {categories.map((cat) => (
+              <Chip
+                key={cat.id}
+                label={cat.name}
+                variant={selectedCategory === cat.name ? "filled" : "outlined"}
+                color={selectedCategory === cat.name ? "primary" : "default"}
+                onClick={() => setSelectedCategory(cat.name)}
+                onDelete={() => handleDeleteCategory(cat.id)}
+                sx={{ flexShrink: 0 }}
+              />
+            ))}
+          </Box>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Search items..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mt: 1 }}
+          />
+        </Box>
+      )}
+
+      {/* Desktop: sidebar + content */}
       <Box sx={{ display: "flex", minHeight: "80vh" }}>
-        <Box sx={{ flex: "0 0 18%", borderRight: "1px solid #eee", p: 2 }}>
+        {!isMobile && (
+          <Box sx={{ flex: "0 0 18%", borderRight: "1px solid #eee", p: 2 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                <Typography variant="h6" fontWeight="bold">Categories</Typography>
-                <IconButton onClick={handleAddCategory}><AddIcon /></IconButton>
+              <Typography variant="h6" fontWeight="bold">Categories</Typography>
+              <IconButton onClick={handleAddCategory}><AddIcon /></IconButton>
             </Box>
             <List>
-                {categories.map((cat) => (
-                    <CategoryItem 
-                      key={cat.id} 
-                      category={cat} 
-                      handleEditCategory={handleEditCategory}
-                      handleDeleteCategory={handleDeleteCategory}
-                    />
-                ))}
+              {categories.map((cat) => (
+                <CategoryItem 
+                  key={cat.id} 
+                  category={cat} 
+                  handleEditCategory={handleEditCategory}
+                  handleDeleteCategory={handleDeleteCategory}
+                />
+              ))}
             </List>
-        </Box>
+          </Box>
+        )}
 
-        <Box sx={{ flexGrow: 1, p: 3 }}>
-           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-               {selectedCategory && (
-                   <Chip label={selectedCategory} onDelete={() => setSelectedCategory("")} />
-               )}
-               <TextField
+        <Box sx={{ flexGrow: 1, p: isMobile ? 0 : 3 }}>
+          {!isMobile && (
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+              {selectedCategory && (
+                <Chip label={selectedCategory} onDelete={() => setSelectedCategory("")} />
+              )}
+              <TextField
                 size="small"
                 placeholder="Search items..."
                 value={searchQuery}
@@ -436,37 +370,63 @@ const MenuItemsManagement: React.FC = () => {
                   ),
                 }}
               />
-           </Box>
+            </Box>
+          )}
 
+          {isMobile && (
+            <Grid container spacing={2}>
+              {paginatedMenuItems.map((item) => (
+                <Grid item xs={6} sm={6} key={item.id}>
+                  <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                    <CardMedia component="img" height="120" image={item.image_url} alt={item.name} />
+                    <CardContent sx={{ flexGrow: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="body2" fontWeight="bold" noWrap>{item.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)}</Typography>
+                    </CardContent>
+                    <Divider />
+                    <Box sx={{ px: 0.5, py: 0.5, display: "flex", justifyContent: "space-between" }}>
+                      <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditItem(item)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Edit</Button>
+                      <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteItem(item.id)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Del</Button>
+                    </Box>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
 
+          {!isMobile && (
+            <DataTable rows={filteredMenuItems} columns={updatedColumns} />
+          )}
 
-           {viewMode === "grid" && (
-               <Grid container spacing={3}>
-                   {filteredMenuItems.map((item) => (
-                       <Grid item xs={12} sm={6} md={3} key={item.id}>
-                           <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                               <CardMedia component="img" height="140" image={item.image_url} alt={item.name} />
-                               <CardContent sx={{ flexGrow: 1 }}>
-                                   <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
-                                   <Typography variant="body2" color="text.secondary">{formatCurrency(item.price)}</Typography>
-                               </CardContent>
-                               <Divider />
-                               <Box sx={{ p: 1, display: "flex", justifyContent: "space-between" }}>
-                                   <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditItem(item)}>Edit</Button>
-                                   <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteItem(item.id)}>Delete</Button>
-                               </Box>
-                           </Card>
-                       </Grid>
-                   ))}
-               </Grid>
-           )}
-
-           {viewMode === "list" && (
-               <DataTable rows={filteredMenuItems} columns={updatedColumns} />
-           )}
+          {isMobile && pageCount > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 3 }}>
+              <Pagination count={pageCount} page={page} onChange={(e, p) => setPage(p)} color="primary" />
+            </Box>
+          )}
         </Box>
       </Box>
+
       <FAB handleAdd={handleAddMenuItem} title="Add Item" />
+
+      <MenuItemDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSubmit={handleDialogSubmit}
+        categories={categories}
+        item={editingItem}
+      />
+
+      <CategoryDialog
+        open={categoryDialogOpen}
+        onClose={() => setCategoryDialogOpen(false)}
+        onSubmit={handleCategorySubmit}
+        category={editingCategory}
+      />
+
+      <UpgradeModal 
+        open={openUpgradeModal} 
+        onClose={() => setOpenUpgradeModal(false)} 
+      />
     </Box>
   );
 };

@@ -5,8 +5,6 @@ import useRestaurantStore from "./restaurantStore";
 interface SettingsState {
   settings: Record<string, any>;
   loading: boolean;
-  viewMode: string;
-  setViewMode: (viewMode: string) => void;
   fetchSettings: (restaurantId: string) => Promise<void>;
   updateSetting: (key: string, value: any) => Promise<void>;
   getSetting: (key: string) => any;
@@ -15,8 +13,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {},
   loading: false,
-  viewMode: "grid",
-  setViewMode: (viewMode) => set({ viewMode }),
+
 
   fetchSettings: async (restaurantId) => {
     set({ loading: true });
@@ -31,9 +28,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     } else {
       const map = Object.fromEntries((data || []).map((s) => [s.key, s.value]));
       set({ settings: map });
-      
-      const defaultView = map?.general?.default_view || "grid";
-      set({ viewMode: defaultView, loading: false });
+      set({ loading: false });
     }
   },
 

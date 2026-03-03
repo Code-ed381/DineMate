@@ -64,6 +64,10 @@ interface MenuItemsState {
   addMenuItem: (item: any, imageFile?: File) => Promise<void>;
   updateMenuItem: (id: string, item: any, imageFile?: File) => Promise<void>;
   deleteMenuItem: (id: string) => Promise<void>;
+
+  addCategory: (name: string) => Promise<void>;
+  updateCategory: (id: string, name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
 const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
@@ -525,6 +529,68 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
         } catch (error) {
           console.error(error);
           Swal.fire("Error", "Failed to delete item.", "error");
+        }
+      }
+    });
+  },
+
+  addCategory: async (name) => {
+    try {
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+      if (!restaurantId) throw new Error("No restaurant selected");
+
+      const { error } = await supabase.from("menu_categories").insert([{
+        name,
+        restaurant_id: restaurantId,
+      }]);
+      if (error) throw error;
+
+      Swal.fire("Success", "Category added successfully!", "success");
+      await get().fetchCategories();
+    } catch (error) {
+      console.error(error);
+      Swal.fire("Error", "Failed to add category.", "error");
+    }
+  },
+
+  updateCategory: async (id, name) => {
+    try {
+      const { error } = await supabase
+        .from("menu_categories")
+        .update({ name })
+        .eq("id", id);
+      if (error) throw error;
+
+      Swal.fire("Success", "Category updated!", "success");
+      await get().fetchCategories();
+      await get().fetchMenuItems();
+    } catch (error) {
+      console.error(error);
+      Swal.fire("Error", "Failed to update category.", "error");
+    }
+  },
+
+  deleteCategory: async (id) => {
+    Swal.fire({
+      title: "Are you sure?",
+      text: "All items in this category will become uncategorized.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const { error } = await supabase.from("menu_categories").delete().eq("id", id);
+          if (error) throw error;
+
+          Swal.fire("Deleted!", "Category has been deleted.", "success");
+          await get().fetchCategories();
+          await get().fetchMenuItems();
+        } catch (error) {
+          console.error(error);
+          Swal.fire("Error", "Failed to delete category.", "error");
         }
       }
     });
