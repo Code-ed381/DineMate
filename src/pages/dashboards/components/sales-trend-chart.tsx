@@ -37,7 +37,7 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ allSessions }) => {
           <LineChart data={salesData}>
             <XAxis dataKey="day" />
             <YAxis tickFormatter={(value) => `${getCurrencySymbol()}${value}`} />
-            <RTooltip formatter={(value: number) => [`${getCurrencySymbol()}${value.toFixed(2)}`, "Sales"]} />
+            <RTooltip formatter={(value: any) => [`${getCurrencySymbol()}${value.toFixed(2)}`, "Sales"]} />
             <Line type="monotone" dataKey="sales" stroke="#1976d2" strokeWidth={3} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>

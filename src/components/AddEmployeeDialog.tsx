@@ -18,7 +18,9 @@ import {
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import Swal from "sweetalert2";
 import useEmployeesStore from "../lib/employeesStore";
+import { useSettings } from "../providers/settingsProvider";
 import useAppStore from "../lib/appstore";
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE } from "../utils/phoneValidation";
 
 interface AddEmployeeDialogProps {
   open: boolean;
@@ -28,6 +30,10 @@ interface AddEmployeeDialogProps {
 
 const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, onSuccess }) => {
   const { addEmployee } = useEmployeesStore();
+  const { settings } = useSettings();
+  const ed = (settings as any)?.employee_defaults || {};
+  const requireAvatar = ed.require_avatar_on_invite !== false;
+  const requirePhone = !!ed.require_phone_on_invite;
   const { uploadFile } = useAppStore();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -36,7 +42,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState("waiter");
+  const [role, setRole] = useState((settings as any)?.employee_defaults?.default_role || "waiter");
   
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -74,15 +80,27 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
       return;
     }
 
-    if (!avatarFile) {
+    if (requireAvatar && !avatarFile) {
       Swal.fire("Error", "Please upload an avatar image", "error");
+      return;
+    }
+
+    if (requirePhone && !phone) {
+      Swal.fire("Error", "Phone number is required.", "error");
+      return;
+    }
+    if (phone && !isValidGhanaianPhone(phone)) {
+      Swal.fire("Invalid Phone", GHANA_PHONE_ERROR_MESSAGE, "error");
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Upload Avatar
-      const avatarUrl = await uploadFile(avatarFile, "avatars");
+      // 1. Upload Avatar (only if provided)
+      let avatarUrl = "";
+      if (avatarFile) {
+        avatarUrl = await uploadFile(avatarFile, "avatars");
+      }
 
       // 2. Submit to store (sends invite email)
       await addEmployee({
@@ -195,7 +213,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={loading || !firstName || !lastName || !email || !role || !avatarFile}
+          disabled={loading || !firstName || !lastName || !email || !role || (requireAvatar && !avatarFile)}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {loading ? "Sending Invite..." : "Invite Employee"}

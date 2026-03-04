@@ -17,6 +17,7 @@ import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import useRestaurantStore from '../../lib/restaurantStore';
 import useAppStore from '../../lib/appstore';
 import Swal from 'sweetalert2';
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE } from '../../utils/phoneValidation';
 
 const buildForm = (r: any) => ({
   name: r?.name || "",
@@ -56,6 +57,10 @@ const RestaurantDetailsPanel: React.FC = () => {
 
   const handleSave = async () => {
     if (!selectedRestaurant?.id) return;
+    if (formData.phone_number && !isValidGhanaianPhone(formData.phone_number)) {
+      Swal.fire("Invalid Phone", GHANA_PHONE_ERROR_MESSAGE, "error");
+      return;
+    }
     setSaving(true);
     try {
       let logoUrl = formData.logo;
@@ -82,12 +87,27 @@ const RestaurantDetailsPanel: React.FC = () => {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      // Show local preview immediately
-      setFormData((prev) => ({ ...prev, logo: URL.createObjectURL(file) }));
+    if (file && selectedRestaurant?.id) {
+      if (role !== "owner") {
+        Swal.fire("Error", "Only owners can change the restaurant logo", "error");
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const logoUrl = await uploadFile(file, "avatars");
+        await updateRestaurant(selectedRestaurant.id, { logo: logoUrl });
+        // Local state update happens via useEffect when store updates
+        setLogoFile(null);
+        Swal.fire("Success", "Restaurant logo updated", "success");
+      } catch (error: any) {
+        console.error("Logo upload failed:", error);
+        Swal.fire("Error", error.message || "Failed to upload logo", "error");
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -135,27 +155,30 @@ const RestaurantDetailsPanel: React.FC = () => {
         >
           {formData.name?.[0] || "R"}
         </Avatar>
-        <IconButton
-          component="label"
-          sx={{
-            position: "absolute",
-            bottom: 10,
-            right: "calc(50% - 70px)",
-            bgcolor: "background.paper",
-            border: "1px solid",
-            borderColor: "divider",
-            "&:hover": { bgcolor: "grey.100" },
-          }}
-          size="small"
-        >
-          <CameraAltIcon fontSize="small" />
-          <input
-            type="file"
-            hidden
-            accept="image/*"
-            onChange={handleLogoUpload}
-          />
-        </IconButton>
+        {role === "owner" && (
+          <IconButton
+            component="label"
+            sx={{
+              position: "absolute",
+              bottom: 10,
+              right: "calc(50% - 70px)",
+              bgcolor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
+              "&:hover": { bgcolor: "grey.100" },
+            }}
+            size="small"
+            disabled={saving}
+          >
+            {saving ? <CircularProgress size={16} /> : <CameraAltIcon fontSize="small" />}
+            <input
+              type="file"
+              hidden
+              accept="image/*"
+              onChange={handleLogoUpload}
+            />
+          </IconButton>
+        )}
       </Box>
 
       {/* Header row */}

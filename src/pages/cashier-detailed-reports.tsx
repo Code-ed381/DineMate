@@ -13,6 +13,7 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Button,
 } from "@mui/material";
 import {
   Assignment,
@@ -31,9 +32,17 @@ import { useTheme, alpha } from "@mui/material/styles";
 import { getCurrencySymbol } from "../utils/currency";
 import MetricCard from "../components/MetricCard";
 import { ShoppingBag, TrendingUp, PriceCheck } from "@mui/icons-material";
+import EmptyState from "../components/empty-state";
+import { exportToCSV } from "../utils/exportUtils";
+import { useSettings } from "../providers/settingsProvider";
+import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 
 const CashierDetailedReports: React.FC = () => {
   const theme = useTheme();
+  const { settings } = useSettings();
+  const cs = (settings as any).cashier_settings || {};
+  const rs = settings?.report_settings || {};
   const {
     detailedOrderItems,
     loadingDetailedOrderItems,
@@ -41,16 +50,34 @@ const CashierDetailedReports: React.FC = () => {
     formatCashInput,
   } = useCashierStore();
 
+  const navigate = useNavigate();
+
+  // Access guard: audit logs disabled or cashier not allowed
+  React.useEffect(() => {
+    if (rs.enable_audit_logs === false) {
+      Swal.fire({ title: "Disabled", text: "Audit Logs are disabled by settings.", icon: "info", timer: 2500, showConfirmButton: false });
+      navigate("/app/dashboard");
+    }
+  }, [rs.enable_audit_logs, navigate]);
+
   const [dateRange, setDateRange] = useState({
     startDate: "",
     endDate: "",
   });
-
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedPersonnel, setSelectedPersonnel] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchDetailedReportItems(dateRange);
   }, [fetchDetailedReportItems, dateRange]);
+
+  const handleExport = () => {
+    if (detailedOrderItems.length > 0) {
+      exportToCSV(detailedOrderItems, `audit_logs_${new Date().toISOString().split('T')[0]}`);
+    }
+  };
 
   const columns: GridColDef[] = [
     {
@@ -199,9 +226,21 @@ const CashierDetailedReports: React.FC = () => {
     const name = item.item_name || "";
     const ref = item.order_ref || "";
     const query = searchQuery.toLowerCase();
-    const matches = name.toLowerCase().includes(query) || ref.toString().toLowerCase().includes(query);
-    return matches;
+    const matchesSearch = name.toLowerCase().includes(query) || ref.toString().toLowerCase().includes(query);
+    
+    const matchesPersonnel = !selectedPersonnel || 
+      item.prepared_by === selectedPersonnel || 
+      item.waiter_id === selectedPersonnel; // Checking both if available
+      
+    const matchesStatus = !selectedStatus || item.status === selectedStatus;
+    
+    return matchesSearch && matchesPersonnel && matchesStatus;
   });
+
+  const uniquePersonnel = Array.from(new Set([
+    ...detailedOrderItems.map(i => ({ id: i.prepared_by, name: i.preparer_first_name })),
+    ...detailedOrderItems.map(i => ({ id: i.waiter_id, name: i.waiter_first_name }))
+  ].filter(p => p.id && p.name))).filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
 
   const stats = {
     totalItems: detailedOrderItems.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
@@ -216,39 +255,39 @@ const CashierDetailedReports: React.FC = () => {
       <Typography variant="h4" fontWeight={900} sx={{ mb: 1, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>Audit Logs</Typography>
       <Typography variant="body1" sx={{ mb: 4, opacity: 0.7 }}>Extensive overview of all transactions and personnel tracking.</Typography>
 
-      <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={4}>
-          <MetricCard
-            title="Total Quantity Sold"
-            value={stats.totalItems}
-            icon={<ShoppingBag />}
-            color="primary"
-          />
+      {cs.show_audit_stats !== false && (
+        <Grid container spacing={2} mb={3}>
+          <Grid item xs={12} sm={6} md={4}>
+            <MetricCard
+              title="Total Quantity Sold"
+              value={stats.totalItems}
+              icon={<ShoppingBag />}
+              color="primary"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <MetricCard
+              title="Gross Transaction Value"
+              value={`${getCurrencySymbol()}${formatCashInput(stats.totalSales)}`}
+              icon={<TrendingUp />}
+              color="success"
+            />
+          </Grid>
+          <Grid item xs={12} sm={12} md={4}>
+            <MetricCard
+              title="Avg. Item Price"
+              value={`${getCurrencySymbol()}${formatCashInput(stats.avgOrderValue)}`}
+              icon={<PriceCheck />}
+              color="info"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <MetricCard
-            title="Gross Transaction Value"
-            value={`${getCurrencySymbol()}${formatCashInput(stats.totalSales)}`}
-            icon={<TrendingUp />}
-            color="success"
-          />
-        </Grid>
-        <Grid item xs={12} sm={12} md={4}>
-          <MetricCard
-            title="Avg. Item Price"
-            value={`${getCurrencySymbol()}${formatCashInput(stats.avgOrderValue)}`}
-            icon={<PriceCheck />}
-            color="info"
-          />
-        </Grid>
-      </Grid>
+      )}
 
-      <Card sx={{ borderRadius: 3, overflow: "hidden" }}>
-        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ width: { xs: '100%', md: 'auto' }, flexGrow: 1 }}>
-            <TextField
+      <Card sx={{ borderRadius: 3, overflow: "visible" }}>
+        <Box sx={{ p: 2, borderBottom: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <TextField
               size="small"
-              fullWidth
               placeholder="Search item or order..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -259,40 +298,90 @@ const CashierDetailedReports: React.FC = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ minWidth: { md: 250 } }}
+              sx={{ minWidth: { md: 300 } }}
             />
-            <Stack direction="row" spacing={2} sx={{ width: '100%' }}>
-              <TextField
-                type="date"
-                size="small"
-                fullWidth
-                label="Start Date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                type="date"
-                size="small"
-                fullWidth
-                label="End Date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Stack>
-          </Stack>
           <Stack direction="row" spacing={1}>
-             <Tooltip title="Export CSV">
-                <IconButton onClick={() => {/* TODO: Implement export */}}>
-                  <Download />
-                </IconButton>
-             </Tooltip>
-             <IconButton>
-                <FilterList />
+             {cs.enable_csv_export !== false && (
+               <Tooltip title="Export CSV">
+                 <IconButton onClick={handleExport} disabled={detailedOrderItems.length === 0}>
+                   <Download />
+                 </IconButton>
+               </Tooltip>
+             )}
+             <IconButton onClick={() => setShowFilters(!showFilters)}>
+                <FilterList color={showFilters ? "primary" : "inherit"} />
              </IconButton>
           </Stack>
         </Box>
+
+        {showFilters && (
+          <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.02), borderBottom: `1px solid ${theme.palette.divider}` }}>
+             <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    label="From"
+                    value={dateRange.startDate}
+                    onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    label="To"
+                    value={dateRange.endDate}
+                    onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="By Personnel"
+                    value={selectedPersonnel}
+                    onChange={(e) => setSelectedPersonnel(e.target.value)}
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="">All Staff</option>
+                    {uniquePersonnel.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="By Status"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="served">Served</option>
+                    <option value="ready">Ready</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="cancelled">Cancelled</option>
+                  </TextField>
+                </Grid>
+             </Grid>
+             <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button size="small" onClick={() => {
+                  setDateRange({ startDate: "", endDate: "" });
+                  setSelectedPersonnel("");
+                  setSelectedStatus("");
+                }}>Clear Filters</Button>
+             </Box>
+          </Box>
+        )}
         <Box sx={{ height: { xs: '60vh', md: 600 }, width: "100%" }}>
           <DataGrid
             rows={filteredRows}
@@ -306,6 +395,16 @@ const CashierDetailedReports: React.FC = () => {
             }}
             pageSizeOptions={[10, 25, 50]}
             disableRowSelectionOnClick
+            slots={{
+              noRowsOverlay: () => (
+                <EmptyState
+                  title="No Records Found"
+                  description="Try adjusting your filters or date range."
+                  emoji="🕵️"
+                  height={400}
+                />
+              ),
+            }}
             sx={{
               border: 'none',
               "& .MuiDataGrid-columnHeaders": {

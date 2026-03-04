@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import useBarStore from "../lib/barStore";
 
-const options = [
+const allOptions = [
   {
     id: "dine_in",
     title: "Dine In",
@@ -25,8 +25,22 @@ const options = [
   },
 ];
 
-const BigOptionButtons: React.FC = () => {
+interface BigOptionButtonsProps {
+  enableDineIn?: boolean;
+  enableTakeaway?: boolean;
+}
+
+const BigOptionButtons: React.FC<BigOptionButtonsProps> = ({
+  enableDineIn = true,
+  enableTakeaway = true,
+}) => {
   const { setBarOptionSelected, barOptionSelected } = useBarStore();
+
+  const options = allOptions.filter((opt) => {
+    if (opt.id === "dine_in" && !enableDineIn) return false;
+    if (opt.id === "takeaway" && !enableTakeaway) return false;
+    return true;
+  });
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setBarOptionSelected(event.target.value);

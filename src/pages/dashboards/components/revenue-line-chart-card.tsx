@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Card, CardHeader, CardContent, Typography, Box } from "@mui/material";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import StackedLineChartTwoToneIcon from "@mui/icons-material/StackedLineChartTwoTone";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import EmptyState from "../../../components/empty-state";
 
 interface RevenueLineChartCardProps {
   orders: any[];
@@ -25,17 +25,19 @@ const RevenueLineChartCard: React.FC<RevenueLineChartCardProps> = ({ orders = []
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="time" />
                 <YAxis />
-                <Tooltip formatter={(val: number) => `₵${val.toFixed(2)}`} />
+                <Tooltip formatter={(val: any) => `₵${val.toFixed(2)}`} />
                 <Line type="monotone" dataKey="revenue" stroke="#1976d2" strokeWidth={3} dot={{ r: 5, stroke: "#1976d2", strokeWidth: 2, fill: "#fff" }} />
               </LineChart>
             </ResponsiveContainer>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Tracks order totals as they come in throughout the day</Typography>
           </>
         ) : (
-          <Box sx={{ p: 2, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" />
-            <Typography variant="body1" fontWeight={600}>No orders found</Typography>
-          </Box>
+          <EmptyState 
+            title="No Orders Found" 
+            description="No transaction data captured yet for today." 
+            emoji="💸"
+            height={200}
+          />
         )}
       </CardContent>
     </Card>

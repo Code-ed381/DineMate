@@ -41,6 +41,7 @@ import { useFeatureGate } from "../../hooks/useFeatureGate";
 import UpgradeModal from "../../components/UpgradeModal";
 import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
+import dayjs from "dayjs";
 
 interface EmployeeRow {
   member_id: string;
@@ -65,10 +66,15 @@ const EmployeeManagement: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [page, setPage] = useState(1);
-  const cardsPerPage = 8;
+  const { settings: _settingsForCards } = useSettings();
+  const _ed = (_settingsForCards as any)?.employee_defaults || {};
+  const cardsPerPage = Number(_ed.cards_per_page) || 8;
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const { settings } = useSettings();
+  const ep = (settings as any)?.employee_permissions || {};
+  const ed = (settings as any)?.employee_defaults || {};
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +97,8 @@ const EmployeeManagement: React.FC = () => {
 
   const handleRowClick = (params: any) => {
     const employee = params.row as EmployeeRow;
+
+    if (ep.admin_delete_edit_employee === false && storeRole !== 'owner') return;
 
     if (!canUseFeature("Edit Employees")) {
         Swal.fire("Upgrade Required", "Please upgrade to a pro plan to edit employees.", "info");
@@ -158,7 +166,7 @@ const EmployeeManagement: React.FC = () => {
     { field: "first_name", headerName: "First Name", maxWidth: 250, flex: 1 },
     { field: "last_name", headerName: "Last Name", maxWidth: 250, flex: 1 },
     { field: "email", headerName: "Email", maxWidth: 350, flex: 1 },
-    { field: "phone", headerName: "Phone", maxWidth: 250, flex: 1 },
+    ...(ed.show_phone_column !== false ? [{ field: "phone", headerName: "Phone", maxWidth: 250, flex: 1 }] : []),
     {
       field: "role",
       headerName: "Role",
@@ -198,13 +206,17 @@ const EmployeeManagement: React.FC = () => {
         />
       ),
     },
-    {
+    ...(ed.show_joined_date !== false ? [{
       field: "created_at",
       headerName: "Joined Date",
       width: 150,
-      valueFormatter: (params: any) => new Date(params.value).toLocaleDateString(),
-    },
-    {
+      renderCell: (params: any) => {
+        if (!params.value) return "N/A";
+        const date = dayjs(params.value);
+        return date.isValid() ? date.format("ddd DD MMM YYYY").toLowerCase() : "N/A";
+      },
+    }] : []),
+    ...(ep.admin_delete_edit_employee !== false ? [{
       field: "delete",
       headerName: "Delete",
       width: 70,
@@ -215,7 +227,7 @@ const EmployeeManagement: React.FC = () => {
       ),
       sortable: false,
       filterable: false,
-    },
+    }] : []),
   ];
 
   return (
@@ -232,6 +244,7 @@ const EmployeeManagement: React.FC = () => {
           gap: 2,
           mb: 2 
         }}>
+          {ed.show_employee_search !== false && (
           <TextField
             size="small"
             placeholder="Search employees..."
@@ -240,7 +253,8 @@ const EmployeeManagement: React.FC = () => {
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
             sx={{ width: isMobile ? "100%" : 300, order: isMobile ? 0 : 1 }}
           />
-          <Box sx={{ 
+          )}
+          {ed.show_role_filter !== false && <Box sx={{ 
             overflowX: "auto", 
             order: isMobile ? 1 : 0,
             '&::-webkit-scrollbar': { height: 4 },
@@ -255,26 +269,26 @@ const EmployeeManagement: React.FC = () => {
                 <ToggleButton value="kitchen">Kitchen</ToggleButton>
                 <ToggleButton value="cashier">Cashier</ToggleButton>
             </ToggleButtonGroup>
-          </Box>
+          </Box>}
       </Box>
 
       {!isMobile && (
-        <DataTable
-          rows={filteredEmployees}
-          columns={columns}
-          getRowId={(row: any) => row.member_id}
-          onRowClick={handleRowClick}
-          slots={{
-            noRowsOverlay: () => (
-              <EmptyState
-                title="No Employees Found"
-                description="Try adjusting your search or filters, or add a new employee."
-                height={400}
-              />
-            ),
-          }}
-          sx={{ minHeight: 400 }}
-        />
+        filteredEmployees.length === 0 ? (
+          <EmptyState
+            title="No Employees Found"
+            description="Try adjusting your search or filters, or add a new employee."
+            emoji="👥"
+            height={400}
+          />
+        ) : (
+          <DataTable
+            rows={filteredEmployees}
+            columns={columns}
+            getRowId={(row: any) => row.member_id}
+            onRowClick={handleRowClick}
+            sx={{ minHeight: 400 }}
+          />
+        )
       )}
 
       {isMobile && (
@@ -282,8 +296,10 @@ const EmployeeManagement: React.FC = () => {
           {filteredEmployees.length === 0 ? (
             <Grid item xs={12}>
                <EmptyState
-                title="No Employees Found"
-                description="Try adjusting your search or filters, or add a new employee."
+                 title="No Employees Found"
+                 description="Try adjusting your search or filters, or add a new employee."
+                 emoji="👥"
+                 height={300}
               />
             </Grid>
           ) : (
@@ -317,7 +333,11 @@ const EmployeeManagement: React.FC = () => {
                   </Box>
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                     <Typography variant="caption" color="text.secondary">Joined</Typography>
-                    <Typography variant="caption">{new Date(emp.created_at).toLocaleDateString()}</Typography>
+                    <Typography variant="caption" sx={{ textTransform: "lowercase" }}>
+                      {emp.created_at && dayjs(emp.created_at).isValid() 
+                        ? dayjs(emp.created_at).format("ddd DD MMM YYYY")
+                        : "N/A"}
+                    </Typography>
                   </Box>
                   
                   <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2, alignItems: "center" }}>
@@ -360,7 +380,7 @@ const EmployeeManagement: React.FC = () => {
         </Box>
       )}
 
-       <FAB 
+       {(storeRole === "owner" || ep.admin_invite_employee !== false) && <FAB 
          handleAdd={() => {
            if (isLimitReached("maxEmployees", employees.length)) {
              Swal.fire({
@@ -378,7 +398,7 @@ const EmployeeManagement: React.FC = () => {
            setAddDialogOpen(true);
          }} 
          title="Add Employee" 
-       />
+       />}
        <AddEmployeeDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} onSuccess={fetchEmployees} />
        <EditEmployeeDialog
          open={editDialogOpen}

@@ -49,6 +49,7 @@ import { printReceipt } from "../components/PrintWindow";
 import CashierDashboardSkeleton from "../components/skeletons/cashier-panel-skeleton";
 import { useCurrency } from "../utils/currency";
 import useAppStore from "../lib/appstore";
+import { useSettings } from "../providers/settingsProvider";
 
 const CashierDashboard: React.FC = () => {
   const theme = useTheme();
@@ -59,6 +60,8 @@ const CashierDashboard: React.FC = () => {
   }, [setBreadcrumb]);
 
   const { currencySymbol } = useCurrency();
+  const { settings } = useSettings();
+  const cs = (settings as any).cashier_settings || {};
   const {
     activeSessions,
     loadingActiveSessionByRestaurant,
@@ -103,6 +106,7 @@ const CashierDashboard: React.FC = () => {
       : (selectedSession.order_total || selectedSession.total || 0);
 
     const change = (cashValue + cardValue - calculatedTotal).toFixed(2);
+    const footerMessage = cs.receipt_footer_message || "THANK YOU FOR DINING WITH US!";
 
     printReceipt(
       isFinal ? "ORD-" + selectedSession.order_id : "PROFORMA",
@@ -115,7 +119,8 @@ const CashierDashboard: React.FC = () => {
       cashValue.toFixed(2),
       cardValue.toFixed(2),
       change,
-      selectedRestaurant
+      selectedRestaurant,
+      footerMessage,
     );
 
     if (!isFinal) {
@@ -209,6 +214,18 @@ const CashierDashboard: React.FC = () => {
       const totalPaid = cashNum + cardNum + momoNum;
       const change = Math.max(0, totalPaid - totalDue);
 
+      const doPayment = async () => {
+        await processPayment(selectedSession.session_id, selectedSession.order_id, selectedSession.table_id);
+        handlePrintReceipt(true);
+        setProceedToPayment(false);
+        if (cs.auto_print_receipt) handlePrintReceipt(true);
+      };
+
+      if (cs.require_payment_confirmation === false) {
+        doPayment();
+        return;
+      }
+
       Swal.fire({
         title: "Confirm Payment",
         html: `
@@ -230,9 +247,7 @@ const CashierDashboard: React.FC = () => {
         confirmButtonText: "Confirm & Print",
       }).then(async (result) => {
         if (result.isConfirmed) {
-          await processPayment(selectedSession.session_id, selectedSession.order_id, selectedSession.table_id);
-          handlePrintReceipt(true);
-          setProceedToPayment(false);
+          doPayment();
         }
       });
     }
@@ -269,7 +284,8 @@ const CashierDashboard: React.FC = () => {
           }} 
         />
       )}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      {cs.show_revenue_stats !== false && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Paper sx={{ p: 2, display: "flex", alignItems: "center", borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: "primary.main", mr: 2 }}><PriceCheckTwoToneIcon /></Avatar>
@@ -306,7 +322,8 @@ const CashierDashboard: React.FC = () => {
             </Box>
           </Paper>
         </Grid>
-      </Grid>
+        </Grid>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
@@ -484,16 +501,22 @@ const CashierDashboard: React.FC = () => {
 
                     <Divider sx={{ my: 2 }} />
 
-                    {!proceedToPayment && (selectedSession?.session_status === "open" || selectedSession?.session_status === "billed" || !selectedSession) && (
+                    {!proceedToPayment && (cs.allow_manual_discount !== false) && (selectedSession?.session_status === "open" || selectedSession?.session_status === "billed" || !selectedSession) && (
                       <TextField 
                         fullWidth 
                         label="Apply Discount (%)" 
                         type="number" 
                         value={discount} 
-                        onChange={handleDiscountChange}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          const max = cs.max_discount_percent;
+                          const capped = max != null && max < 100 ? Math.min(val, max) : val;
+                          setDiscount(String(capped));
+                        }}
                         disabled={!selectedSession}
                         sx={{ mb: 2 }}
                         InputProps={{ startAdornment: <InputAdornment position="start">%</InputAdornment> }}
+                        helperText={cs.max_discount_percent != null && cs.max_discount_percent < 100 ? `Max allowed: ${cs.max_discount_percent}%` : undefined}
                       />
                     )}
                    
@@ -539,17 +562,17 @@ const CashierDashboard: React.FC = () => {
                           sx={{ mb: 2 }}
                           size="small"
                        >
-                          <ToggleButton value="cash">Cash</ToggleButton>
-                          <ToggleButton value="card">Card</ToggleButton>
-                          <ToggleButton value="card+cash" sx={{ textTransform: 'none' }}>Card+Cash</ToggleButton>
-                          <ToggleButton value="momo">MoMo</ToggleButton>
-                          <ToggleButton value="online">Online</ToggleButton>
+                          {(cs.enable_cash ?? true) && <ToggleButton value="cash">Cash</ToggleButton>}
+                          {(cs.enable_card ?? true) && <ToggleButton value="card">Card</ToggleButton>}
+                          {(cs.enable_card_cash ?? true) && <ToggleButton value="card+cash" sx={{ textTransform: 'none' }}>Card+Cash</ToggleButton>}
+                          {(cs.enable_momo ?? true) && <ToggleButton value="momo">MoMo</ToggleButton>}
+                          {(cs.enable_online ?? true) && <ToggleButton value="online">Online</ToggleButton>}
                        </ToggleButtonGroup>
                      </Box>
                    ) : null}
 
                    <Stack direction="row" spacing={2} mt={2}>
-                      {!proceedToPayment && (
+                      {!proceedToPayment && (cs.show_proforma_bill !== false) && (
                         <Button fullWidth variant="outlined" startIcon={<ReceiptLong />} onClick={() => handlePrintReceipt(false)} disabled={!selectedSession}>Bill</Button>
                       )}
                       <Button 

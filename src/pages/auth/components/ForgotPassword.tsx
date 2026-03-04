@@ -19,37 +19,35 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ open, handleClose }) =>
     <Dialog
       open={open}
       onClose={handleClose}
-      slotProps={{
-        paper: {
-          component: 'form',
-          onSubmit: async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            const email = formData.get('email') as string;
+      PaperProps={{
+        component: 'form',
+        onSubmit: (async (event: React.FormEvent<HTMLFormElement>) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const email = formData.get('email') as string;
 
-            let { error } = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: "http://localhost:3000/#/reset-password",
-            });
+          let { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: "http://localhost:3000/#/reset-password",
+          });
 
-            if (error) {
-              Swal.fire({
-                title: 'Error',
-                text: error.message,
-                icon: 'error',
-              });
-              return;
-            }
-
-            handleClose();
-
+          if (error) {
             Swal.fire({
-              title: 'Success',
-              text: 'Check your email for a link to reset your password.',
-              icon: 'success',
+              title: 'Error',
+              text: error.message,
+              icon: 'error',
             });
-          },
-          sx: { backgroundImage: 'none' },
-        },
+            return;
+          }
+
+          handleClose();
+
+          Swal.fire({
+            title: 'Success',
+            text: 'Check your email for a link to reset your password.',
+            icon: 'success',
+          });
+        }) as any,
+        sx: { backgroundImage: 'none' },
       }}
     >
       <DialogTitle>Reset password</DialogTitle>

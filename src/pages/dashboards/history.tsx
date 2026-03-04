@@ -36,6 +36,7 @@ import useMenuStore from "../../lib/menuStore";
 import useAuthStore from "../../lib/authStore";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
 import useRestaurantStore from "../../lib/restaurantStore";
+import EmptyState from "../../components/empty-state";
 import { printReceipt } from "../../components/PrintWindow";
 import { getCurrencySymbol } from "../../utils/currency";
 
@@ -164,8 +165,12 @@ const BartenderHistory: React.FC = () => {
           {filteredOrders.length === 0 ? (
             <Grid item xs={12}>
               <Card sx={{ p: 10, textAlign: 'center', bgcolor: 'transparent', border: '1px dashed grey' }}>
-                <HistoryIcon sx={{ fontSize: 60, opacity: 0.2, mb: 2 }} />
-                <Typography variant="h6" color="text.secondary">No orders found for this date.</Typography>
+                <EmptyState 
+                title="No Orders" 
+                description="No orders found for this date." 
+                emoji="📜"
+                height={400}
+              />
               </Card>
             </Grid>
           ) : (

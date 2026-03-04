@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import useAuthStore from './authStore';
 import { supabase } from './supabase';
 import useRestaurantStore from './restaurantStore';
+import { toE164 } from '../utils/phoneValidation';
 
 interface ProfileState {
     profile: any;
@@ -96,7 +97,7 @@ const useProfileStore = create<ProfileState>((set, get) => ({
                 data: {
                     firstName: updatedData.first_name,
                     lastName: updatedData.last_name,
-                    phone: updatedData.phone,
+                    phone: updatedData.phone ? toE164(updatedData.phone) : updatedData.phone,
                     profileAvatar: updatedData.avatar_url
                 }
             });

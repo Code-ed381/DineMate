@@ -7,8 +7,9 @@ import {
   Typography,
   Avatar,
   Stack,
+  Button
 } from "@mui/material";
-import { Timer } from "@mui/icons-material";
+import { Timer, Block as BlockIcon } from "@mui/icons-material";
 import UpdateTwoToneIcon from "@mui/icons-material/UpdateTwoTone";
 import AlarmOnTwoToneIcon from "@mui/icons-material/AlarmOnTwoTone";
 import RoomServiceTwoToneIcon from "@mui/icons-material/RoomServiceTwoTone";
@@ -19,6 +20,8 @@ import OrdersBarChart from "./components/orders-bar-chart";
 import ChefDashboardProSkeleton from "./components/skeletons/chef-dashboard-skeleton";
 import LiveOrderQueueCard from "./components/live-order-status-panel";
 import { useReRender } from "../../utils/re-render";
+import { useSettings } from "../../providers/settingsProvider";
+import { useNavigate } from "react-router-dom";
 
 interface SmallStatProps {
   icon: React.ReactElement;
@@ -74,6 +77,14 @@ const ChefDashboard: React.FC = () => {
     unsubscribeFromOrderItems,
   } = useKitchenStore();
 
+  const { settings } = useSettings();
+  const dashSettings = settings?.dashboard_settings;
+  const kitchenSettings = settings?.kitchen_settings;
+  
+  const isCompact = dashSettings?.compact_layout;
+  const showStats = dashSettings?.show_order_stats !== false;
+  const navigate = useNavigate();
+
   const isLoading =
     !pendingMeals || !preparingMeals || !readyMeals || !servedMeals;
 
@@ -106,12 +117,23 @@ const ChefDashboard: React.FC = () => {
 
   useReRender(30000);
 
+  if (kitchenSettings?.enable_kds === false) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center', mt: 10 }}>
+        <BlockIcon sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
+        <Typography variant="h4" fontWeight="bold">KDS Disabled</Typography>
+        <Typography color="textSecondary" sx={{ mb: 3 }}>The Kitchen Display System is currently disabled.</Typography>
+        <Button variant="contained" onClick={() => navigate("/app/settings?tab=kitchen")}>Enable in Settings</Button>
+      </Box>
+    );
+  }
+
   return (
     <>
       {isLoading ? (
         <ChefDashboardProSkeleton />
       ) : (
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Box sx={{ p: isCompact ? 1.5 : { xs: 2, md: 3 } }}>
           <DashboardHeader
             title="Chef Dashboard"
             description="Here’s a quick summary of your restaurant’s performance today."
@@ -119,46 +141,50 @@ const ChefDashboard: React.FC = () => {
             color="#fff"
           />
 
-          {/* KPI strip */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={6} sm={6} md={3}>
-              <SmallStat
-                icon={<Timer />}
-                label="Pending"
-                value={pendingCount}
-                accent="#ffe6e6"
-              />
-            </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <SmallStat
-                icon={<UpdateTwoToneIcon />}
-                label="Preparing"
-                value={preparingCount}
-                accent="#fff3e0"
-              />
-            </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <SmallStat
-                icon={<AlarmOnTwoToneIcon />}
-                label="Ready"
-                value={readyCount}
-                accent="#e3f2fd"
-              />
-            </Grid>
-            <Grid item xs={6} sm={6} md={3}>
-              <SmallStat
-                icon={<RoomServiceTwoToneIcon />}
-                label="Served"
-                value={servedCount}
-                accent="#e8f5e9"
-              />
-            </Grid>
-          </Grid>
+          {showStats && (
+            <>
+              {/* KPI strip */}
+              <Grid container spacing={2} sx={{ mb: isCompact ? 1.5 : 3, mt: isCompact ? 1 : 0 }}>
+                <Grid item xs={6} sm={6} md={3}>
+                  <SmallStat
+                    icon={<Timer />}
+                    label="Pending"
+                    value={pendingCount}
+                    accent="#ffe6e6"
+                  />
+                </Grid>
+                <Grid item xs={6} sm={6} md={3}>
+                  <SmallStat
+                    icon={<UpdateTwoToneIcon />}
+                    label="Preparing"
+                    value={preparingCount}
+                    accent="#fff3e0"
+                  />
+                </Grid>
+                <Grid item xs={6} sm={6} md={3}>
+                  <SmallStat
+                    icon={<AlarmOnTwoToneIcon />}
+                    label="Ready"
+                    value={readyCount}
+                    accent="#e3f2fd"
+                  />
+                </Grid>
+                <Grid item xs={6} sm={6} md={3}>
+                  <SmallStat
+                    icon={<RoomServiceTwoToneIcon />}
+                    label="Served"
+                    value={servedCount}
+                    accent="#e8f5e9"
+                  />
+                </Grid>
+              </Grid>
 
-          {/* Orders Bar Chart */}
-          <OrdersBarChart />
+              {/* Orders Bar Chart */}
+              <OrdersBarChart />
+            </>
+          )}
 
-          <Grid container spacing={3} sx={{ my: 3 }}>
+          <Grid container spacing={isCompact ? 2 : 3} sx={{ my: isCompact ? 1.5 : 3 }}>
             {/* Left: Live Order Queue */}
             <Grid item xs={12} lg={6}>
               <LiveOrderQueueCard

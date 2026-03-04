@@ -57,6 +57,7 @@ interface KitchenState {
   handleFetchReadyMeals: () => Promise<void>;
   handleFetchServedMeals: () => Promise<void>;
   handleUpdateOrderItemStatus: (task: KitchenTask) => Promise<void>;
+  startCookingTask: (task: KitchenTask) => Promise<void>;
   resetKitchenState: () => void;
 }
 
@@ -658,6 +659,38 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         console.error("Error updating task:", error);
         handleError(error as Error);
       }
+    }
+  },
+
+  startCookingTask: async (task: KitchenTask) => {
+    const { user } = useAuthStore.getState();
+    const userId = user?.id;
+    const new_date = dayjs().toISOString();
+
+    try {
+      const { error } = await supabase
+        .from("kitchen_tasks")
+        .update({
+          status: "preparing",
+          updated_at: new_date,
+          prepared_by: userId,
+        })
+        .eq("id", task.kitchen_task_id);
+
+      if (error) handleError(error);
+
+      await supabase
+        .from("order_items")
+        .update({
+          status: "preparing",
+          updated_at: new_date,
+          prepared_by: userId,
+        })
+        .eq("id", task.order_item_id);
+
+      get().handleFetchPendingMeals();
+    } catch (error) {
+      console.error("Error auto-accepting task:", error);
     }
   },
 

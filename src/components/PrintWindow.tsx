@@ -1,5 +1,6 @@
 import { getCurrencySymbol } from '../utils/currency';
 import { Restaurant } from '../lib/restaurantStore';
+import { useSettingsStore } from '../lib/settingsStore';
 
 export const printReceipt = async (
   orderId: string,
@@ -12,10 +13,14 @@ export const printReceipt = async (
   cash: string,
   card: string,
   change: string,
-  restaurant?: Restaurant | null
+  restaurant?: Restaurant | null,
+  footerMessage?: string,
 ) => {
   const printWindow = window.open("", "", `width=400,height=600`) as unknown as Window;
   if (!printWindow) return;
+  // Fall back to global receipt footer from general settings if no per-section footer is given
+  const globalFooter = useSettingsStore.getState().settings?.general?.receipt_footer_message;
+  const resolvedFooter = footerMessage || globalFooter || 'THANK YOU FOR DINING WITH US!';
   const htmlContent = generatePrintHTML(
     orderId,
     waiterName,
@@ -27,7 +32,8 @@ export const printReceipt = async (
     cash,
     card,
     change,
-    restaurant
+    restaurant,
+    resolvedFooter,
   );
   printWindow.document.open();
   printWindow.document.writeln(htmlContent);
@@ -51,7 +57,8 @@ const generatePrintHTML = (
   cash: string,
   card: string,
   change: string,
-  restaurant?: Restaurant | null
+  restaurant?: Restaurant | null,
+  footerMessage?: string,
 ) => {
   const currency = getCurrencySymbol();
 
@@ -149,7 +156,7 @@ const generatePrintHTML = (
           <div class="divider"></div>
           
           <div class="footer">
-            <div>THANK YOU FOR DINING WITH US!</div>
+            <div>${footerMessage}</div>
             <div style="margin-top: 5px;">Powered by DineMate</div>
           </div>
         </div>

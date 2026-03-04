@@ -19,6 +19,7 @@ import SitemarkIcon from './components/SitemarkIcon';
 import AppTheme from "./components/shared-theme/AppTheme";
 import ColorModeIconToggle from './components/shared-theme/ColorModeIconToggle';
 import useAuthStore from '../../lib/authStore';
+import useAppStore from '../../lib/appstore';
 import AuthStepperContent from './components/AuthStepperContent';
 import Swal from 'sweetalert2';
 import { usePaystackPayment } from 'react-paystack';
@@ -75,6 +76,38 @@ const Checkout: React.FC = (props) => {
   const onSubmit = async () => {
     setProcessing(true);
     try {
+      const { tempFiles, updatePersonalInfo, updateRestaurantInfo } = useAuthStore.getState();
+      const { uploadFile } = useAppStore.getState();
+
+      // 1. Upload Persona Files
+      let avatarUrl = personalInfo.profileAvatar;
+      if (tempFiles.avatar) {
+        avatarUrl = await uploadFile(tempFiles.avatar, "avatars");
+        updatePersonalInfo("profileAvatar", avatarUrl);
+      }
+
+      let idUrl = personalInfo.idDocumentUrl;
+      if (tempFiles.idDocument) {
+        idUrl = await uploadFile(tempFiles.idDocument, "documents");
+        updatePersonalInfo("idDocumentUrl", idUrl);
+      }
+
+      // 2. Upload Restaurant Files
+      let logoUrl = restaurantInfo.logo;
+      if (tempFiles.logo) {
+        logoUrl = await uploadFile(tempFiles.logo, "avatars");
+        updateRestaurantInfo("logo", logoUrl);
+      }
+
+      let certUrl = restaurantInfo.business_certificate_url;
+      if (tempFiles.businessCertificate) {
+        certUrl = await uploadFile(tempFiles.businessCertificate, "documents");
+        updateRestaurantInfo("business_certificate_url", certUrl);
+      }
+
+      // Re-fetch state for final payload
+      const updatedState = useAuthStore.getState();
+
       const res = await fetch(
         `https://bvgukcijhcmsfhzywros.supabase.co/functions/v1/signup`,
         {
@@ -86,9 +119,9 @@ const Checkout: React.FC = (props) => {
             Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z3VrY2lqaGNtc2Zoenl3cm9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDE1NDksImV4cCI6MjA3MDkxNzU0OX0.EP068h4rdMhq_EgMrLbN50VXN6K_TEAQTfdiLJNNj70",
           },
           body: JSON.stringify({
-            personalInfo,
-            restaurantInfo,
-            subscription,
+            personalInfo: updatedState.personalInfo,
+            restaurantInfo: updatedState.restaurantInfo,
+            subscription: updatedState.subscription,
           }),
         }
       );
@@ -105,6 +138,7 @@ const Checkout: React.FC = (props) => {
         icon: "success",
       });
     } catch (error: any) {
+      console.error("Signup error:", error);
       Swal.fire({ title: "Error", text: error.message, icon: "error" });
     } finally {
       setProcessing(false);

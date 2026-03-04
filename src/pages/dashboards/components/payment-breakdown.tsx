@@ -45,7 +45,7 @@ const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ allSessio
               {paymentBreakdown.map((_, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
             </Pie>
             <Legend />
-            <RTooltip formatter={(value: number) => `${currencySymbol}${value.toFixed(2)}`} />
+            <RTooltip formatter={(value: any) => `${currencySymbol}${value.toFixed(2)}`} />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>

@@ -3,7 +3,7 @@ import {
   Card, CardHeader, CardContent, TextField, Stack, Button, Divider, MenuItem, Typography, Box, Paper
 } from "@mui/material";
 import TimerTwoToneIcon from "@mui/icons-material/TimerTwoTone";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import EmptyState from "../../../components/empty-state";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import useKitchenStore from "../../../lib/kitchenStore";
@@ -138,7 +138,12 @@ export default function OrdersServedPerformance() {
         </Stack>
         {selectedDate ? (
           dayItems.length === 0 ? (
-            <Paper sx={{ p: 3, textAlign: "center", borderRadius: 2 }}><Typography variant="h6">No items served on {selectedDate}</Typography></Paper>
+            <EmptyState 
+              title="No Items Served" 
+              description={`No items served on ${selectedDate}`} 
+              emoji="🍽️"
+              height={300}
+            />
           ) : (
             <Box sx={{ width: "100%", height: { xs: 250, md: 340 } }}>
               <DataGrid rows={dayItems.map((it: any) => ({ id: it.order_item_id, time: new Date(it.item_created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item: it.menu_item_name, qty: it.quantity || 1, price: (it.item_price || 0).toFixed(2), total: ((it.item_price || 0) * (it.quantity || 1)).toFixed(2), table: it.table_number ?? "—", waiter: `${it.waiter_first_name || ""} ${it.waiter_last_name || ""}`.trim(), preparer: `${it.preparer_first_name || ""} ${it.preparer_last_name || ""}`.trim() }))} columns={columns} initialState={{ pagination: { paginationModel: { pageSize: 8 } } }} disableRowSelectionOnClick />
@@ -147,7 +152,12 @@ export default function OrdersServedPerformance() {
         ) : (
           <Box sx={{ width: "100%", height: { xs: 250, md: 340 } }}>
             {chartData.length === 0 ? (
-              <Box sx={{ p: 3, textAlign: "center" }}><InfoOutlinedIcon sx={{ mb: 1 }} fontSize="large" /><Typography variant="body1" fontWeight={600}>No items to display</Typography></Box>
+              <EmptyState 
+                title="No Data" 
+                description="No items to display for the selected period." 
+                emoji="📉"
+                height={300}
+              />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>

@@ -14,6 +14,8 @@ import {
   InputLabel,
   TextField,
   CircularProgress,
+  Chip,
+  Stack,
 } from "@mui/material";
 import { GridColDef } from "@mui/x-data-grid";
 import { TrendingUp, FilterList, Download, CreditCard, AttachMoney, ReceiptLong } from "@mui/icons-material";
@@ -27,13 +29,19 @@ import EmptyState from "../components/empty-state";
 import { formatCurrency } from "../utils/currency";
 import { exportToCSV } from "../utils/exportUtils";
 import MetricCard from "../components/MetricCard";
+import { useSettings } from "../providers/settingsProvider";
+import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 
 const ReportDashboard: React.FC = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   // Stores
-  const { selectedRestaurant } = useRestaurantStore();
+  const { selectedRestaurant, role } = useRestaurantStore();
+  const { settings } = useSettings();
+  const rs = settings?.report_settings || {};
+  const navigate = useNavigate();
   const { 
     getOrdersNow, 
     getWaiters, 
@@ -49,10 +57,25 @@ const ReportDashboard: React.FC = () => {
 
   // Local State
   const [showFilters, setShowFilters] = useState(false);
-  const [filterType, setFilterType] = useState("today");
+  const [filterType, setFilterType] = useState(settings?.report_settings?.default_date_range || "today");
   const [startDate, setStartDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [selectedWaiter, setSelectedWaiter] = useState<string>("");
+  const [reportMode, setReportMode] = useState<"standard" | "X" | "Z">("standard");
+
+  // Security Check: Unauthorized Admin redirect
+  useEffect(() => {
+    if (role === "admin" && settings && !settings.employee_permissions?.admins_view_report) {
+       Swal.fire({
+          title: "Access Restricted",
+          text: "You do not have permission to view this page. Redirecting to dashboard...",
+          icon: "error",
+          timer: 3000,
+          showConfirmButton: false
+       });
+       navigate("/app/dashboard");
+    }
+  }, [role, settings, navigate]);
 
   // Initial Fetch & Date Range Logic
   useEffect(() => {
@@ -85,27 +108,29 @@ const ReportDashboard: React.FC = () => {
   };
 
   const handleApplyFilters = () => {
+    setReportMode("standard");
     handleFetchOrders();
-    // After fetching (which updates orders), we can optionally filter by waiter client-side
-    // or we could have passed waiterId to getOrdersNow if backend supported it.
-    // For now, we filter by waiter client-side using filterOrders
     if (selectedWaiter) {
         filterOrders(null, null, selectedWaiter);
     } else {
-        // If no waiter selected, we might need to ensure we show all fetched orders
-        // Currently filterOrders logic requires startDate/endDate to re-filter everything
-        // This is a bit disjointed due to hybrid approach.
-        // Simplified: The store's getOrdersNow updates 'filteredOrders' to all fetched.
-        // If we have a waiter selected, we refine that.
-        // We can call filterOrders with null dates (to ignore date check or use store's logic)
-        // usage: filterOrders(null, null, selectedWaiter)
         filterOrders(startDate, endDate, selectedWaiter || null);
     }
   };
 
+  const handleGenerateReport = (mode: "X" | "Z") => {
+    setReportMode(mode);
+    setFilterType("today");
+    const today = dayjs().format("YYYY-MM-DD");
+    setStartDate(today);
+    setEndDate(today);
+    setSelectedWaiter("");
+    handleFetchOrders();
+  };
+
   const handleExport = () => {
     if (filteredOrders.length > 0) {
-        exportToCSV(filteredOrders, `sales_report_${selectedRestaurant?.name || 'restaurant'}`);
+        const reportTitle = reportMode === "standard" ? "Sales" : `${reportMode} Report`;
+        exportToCSV(filteredOrders, `${reportTitle.toLowerCase().replace(" ", "_")}_${selectedRestaurant?.name || 'restaurant'}`);
     }
   };
 
@@ -114,24 +139,24 @@ const ReportDashboard: React.FC = () => {
     { field: "id", headerName: "Order ID", width: 120 },
     { field: "created_at", headerName: "Date", flex: 1, minWidth: 160 },
     { field: "waiter", headerName: "Waiter", flex: 1, minWidth: 140 },
-    { 
+    ...(rs.show_cash_column !== false ? [{ 
       field: "cash", 
       headerName: "Cash", 
       width: 100, 
-      renderCell: (params) => formatCurrency(params.value) 
-    },
-    { 
+      renderCell: (params: any) => formatCurrency(params.value) 
+    }] : []),
+    ...(rs.show_card_column !== false ? [{ 
       field: "card", 
       headerName: "Card", 
       width: 100,
-      renderCell: (params) => formatCurrency(params.value)
-    },
-    { 
+      renderCell: (params: any) => formatCurrency(params.value)
+    }] : []),
+    ...(rs.show_balance_column !== false ? [{ 
         field: "balance", 
         headerName: "Balance", 
         width: 100,
-        renderCell: (params) => formatCurrency(params.value)
-    },
+        renderCell: (params: any) => formatCurrency(params.value)
+    }] : []),
     { 
         field: "total", 
         headerName: "Total", 
@@ -146,37 +171,80 @@ const ReportDashboard: React.FC = () => {
     <Box p={3} sx={{ width: "100%" }}>
       <Grid container justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-            <Typography variant="h4" fontWeight={700}>Sales Report</Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Box display="flex" alignItems="center" gap={2}>
+              <Typography variant="h4" fontWeight={400} sx={{ opacity: 0.6 }}>Reports</Typography>
+              {reportMode !== "standard" && (
+                <Chip 
+                  label={`${reportMode} Report`} 
+                  color={reportMode === "X" ? "primary" : "secondary"} 
+                  sx={{ fontWeight: "bold" }}
+                  onDelete={() => setReportMode("standard")}
+                />
+              )}
+            </Box>
+            <Typography variant="h4" fontWeight={900} sx={{ mb: 1, letterSpacing: "-0.02em" }}>
+              {reportMode === "standard" ? "Sales Report" : `${reportMode} Report Overview`}
+            </Typography>
+            <Typography variant="body1" sx={{ opacity: 0.7 }}>
                 {selectedRestaurant?.name} • {dayjs(startDate).format("MMM DD")} - {dayjs(endDate).format("MMM DD")}
             </Typography>
         </Box>
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={1}>
+          {rs.enable_xz_reports !== false && (<>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            onClick={() => handleGenerateReport("X")}
+            sx={{ fontWeight: "bold" }}
+          >
+            X Report
+          </Button>
+          <Button 
+            variant="outlined" 
+            color="secondary" 
+            onClick={() => handleGenerateReport("Z")}
+            sx={{ fontWeight: "bold" }}
+          >
+            Z Report
+          </Button>
+          </>)}
+          {rs.allow_csv_export !== false && (
           <Button variant="contained" startIcon={<Download />} onClick={handleExport}>
             Export
           </Button>
+          )}
+          {rs.show_advanced_filters !== false && (
           <IconButton onClick={() => setShowFilters(!showFilters)}>
             <FilterList color={showFilters ? "primary" : "inherit"} />
           </IconButton>
+          )}
         </Box>
       </Grid>
 
       {/* Filter Panel */}
       {showFilters && (
-        <Card sx={{ mb: 3, p: 2 }}>
-          <Grid container spacing={2} alignItems="center">
+        <Card sx={{ mb: 3, p: 2, borderRadius: 3, border: `1px solid ${theme.palette.divider}` }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="subtitle1" fontWeight={700}>Advanced Filters</Typography>
+            <Button size="small" onClick={() => {
+              setFilterType("today");
+              setSelectedWaiter("");
+              setReportMode("standard");
+            }}>Reset All</Button>
+          </Stack>
+          <Grid container spacing={2} alignItems="flex-end">
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Period</InputLabel>
+                <InputLabel>Date Range</InputLabel>
                 <Select
                   value={filterType}
-                  label="Period"
+                  label="Date Range"
                   onChange={(e) => setFilterType(e.target.value)}
                 >
-                  <MenuItem value="today">Today</MenuItem>
+                  <MenuItem value="today">Today (X/Z Mode)</MenuItem>
                   <MenuItem value="week">This Week</MenuItem>
                   <MenuItem value="month">This Month</MenuItem>
-                  <MenuItem value="custom">Custom Range</MenuItem>
+                  <MenuItem value="custom">Custom Calendar</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -206,16 +274,15 @@ const ReportDashboard: React.FC = () => {
                     </Grid>
                 </>
             )}
-            <Grid item xs={12} md={3}>
+            {rs.show_waiter_filter !== false && <Grid item xs={12} md={2.5}>
                 <FormControl fullWidth size="small">
-                    <InputLabel>Waiter</InputLabel>
+                    <InputLabel>Attendant / Waiter</InputLabel>
                     <Select
                         value={selectedWaiter}
-                        label="Waiter"
+                        label="Attendant / Waiter"
                         onChange={(e) => setSelectedWaiter(e.target.value)}
-                        displayEmpty
                     >
-                        <MenuItem value="">All Waiters</MenuItem>
+                        <MenuItem value="">All Personnel</MenuItem>
                         {waiters.map((w: any) => (
                             <MenuItem key={w.user_id} value={w.user_id}>
                                 {w.first_name} {w.last_name || ''}
@@ -223,10 +290,15 @@ const ReportDashboard: React.FC = () => {
                         ))}
                     </Select>
                 </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button variant="contained" fullWidth onClick={handleApplyFilters}>
-                Apply
+            </Grid>}
+            <Grid item xs={12} md={2.5}>
+              <Button 
+                variant="contained" 
+                fullWidth 
+                onClick={handleApplyFilters}
+                sx={{ height: 40, borderRadius: 2, fontWeight: "bold" }}
+              >
+                Refine Search
               </Button>
             </Grid>
           </Grid>
@@ -234,7 +306,7 @@ const ReportDashboard: React.FC = () => {
       )}
 
       {/* KPI Cards */}
-      <Grid container spacing={2} mb={3}>
+      {rs.show_report_kpi_cards !== false && <Grid container spacing={2} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <MetricCard
             title="Cash Total"
@@ -267,10 +339,10 @@ const ReportDashboard: React.FC = () => {
             color="secondary"
           />
         </Grid>
-      </Grid>
+      </Grid>}
 
       {/* Data Table */}
-      <Card>
+      {rs.show_transaction_table !== false && <Card>
         <CardHeader title="Transaction History" />
         <CardContent>
           <DataTable
@@ -291,7 +363,7 @@ const ReportDashboard: React.FC = () => {
             sx={{ minHeight: 400 }}
           />
         </CardContent>
-      </Card>
+      </Card>}
     </Box>
   );
 };

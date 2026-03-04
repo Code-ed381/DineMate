@@ -431,7 +431,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
                 title: "New Order",
                 message: `Table ${tableNum}: ${orderItem.name} (x1)`,
                 priority: "high",
-                roles: itemType === 'drink' ? ["barman", "admin", "owner"] : ["chef", "admin", "owner"]
+                roles: itemType === 'drink' ? ["barman", "bartender"] : ["chef", "kitchen"]
               }).catch(e => console.error(e));
             }
           });

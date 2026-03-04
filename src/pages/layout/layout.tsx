@@ -48,6 +48,9 @@ import { ToastContainer } from "react-toastify";
 import NotificationList from "../../components/notifications";
 import useNotificationStore from "../../lib/notificationStore";
 import CommandPalette from "../../components/command-palette";
+import { ComplaintDialog } from "../../components/ComplaintDialog";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
@@ -129,8 +132,10 @@ const Layout: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const isSmallMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [open, setOpen] = React.useState(false);
+  const idleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [complaintOpen, setComplaintOpen] = React.useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const { breadcrumb, setBreadcrumb } = useAppStore();
   const {
@@ -142,6 +147,7 @@ const Layout: React.FC = () => {
     role,
   } = useRestaurantStore();
   const { settings } = useSettings() as any;
+  const gs = settings?.general || {};
   const { 
     notifications, 
     setNotifications, 
@@ -155,6 +161,15 @@ const Layout: React.FC = () => {
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
+
+  // Sync sidebar default open state once settings load
+  React.useEffect(() => {
+    if (settings?.general?.sidebar_default_open !== undefined) {
+      setOpen(!!settings.general.sidebar_default_open);
+    }
+  // Only run once after initial settings load
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.general?.sidebar_default_open === undefined ? 0 : 1]);
 
   const first_name = user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
   const last_name = user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
@@ -235,7 +250,19 @@ const Layout: React.FC = () => {
     }
   };
 
-  const logout = async () => { 
+  const logout = async () => {
+    if (gs.require_logout_confirmation) {
+      const { default: Swal } = await import('sweetalert2');
+      const result = await Swal.fire({
+        title: 'Logout?',
+        text: 'Are you sure you want to sign out?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, logout',
+        cancelButtonText: 'Cancel',
+      });
+      if (!result.isConfirmed) return;
+    }
     signOut();
     localStorage.clear();
     localStorage.removeItem("auth-store");
@@ -243,6 +270,25 @@ const Layout: React.FC = () => {
     setSelectedRestaurant(null);
     navigate("/");
   };
+
+  // Session idle timeout
+  React.useEffect(() => {
+    const timeout = Number(gs.session_idle_timeout) || 0;
+    if (!timeout) return;
+    const ms = timeout * 60 * 1000;
+    const reset = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => logout(), ms);
+    };
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, reset));
+    reset();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, reset));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs.session_idle_timeout]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -265,6 +311,7 @@ const Layout: React.FC = () => {
   };
 
   useEffect(() => {
+    if (gs.enable_keyboard_shortcuts === false) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if inside an input/textarea
       if (
@@ -422,6 +469,7 @@ const Layout: React.FC = () => {
 
               {!isSmallMobile && (
                 <Box sx={{ mx: "auto", display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {gs.show_online_status !== false && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: 0.8 }}>
                     <Box 
                       sx={{ 
@@ -436,6 +484,7 @@ const Layout: React.FC = () => {
                       {isOnline ? 'ONLINE' : 'OFFLINE'}
                     </Typography>
                   </Box>
+                  )}
                   <Divider orientation="vertical" flexItem sx={{ height: 20, my: 'auto' }} />
                   <Typography
                     variant="subtitle2"
@@ -541,7 +590,7 @@ const Layout: React.FC = () => {
                     <PersonIcon sx={{ mr: 1 }} />
                     <Typography textAlign="center">Profile</Typography>
                   </MenuItem>
-                    {role === "owner" && (
+                    {(role === "owner" || role === "admin") && (
                     <MenuItem
                       onClick={() => {
                         handleCloseUserMenu();
@@ -596,6 +645,21 @@ const Layout: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <SecondaryListItems drawerOpen={true} />
             </List>
+            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && (
+              <Box sx={{ px: 2, pb: 1 }}>
+                <Button
+                  fullWidth
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  startIcon={<ReportProblemIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => setComplaintOpen(true)}
+                  sx={{ fontWeight: 700, fontSize: '0.7rem', py: 0.8, borderRadius: 2, textTransform: 'none' }}
+                >
+                  Submit Complaint
+                </Button>
+              </Box>
+            )}
             <UserProfileCard />
           </MuiDrawer>
 
@@ -625,6 +689,27 @@ const Layout: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <SecondaryListItems drawerOpen={open} />
             </List>
+            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && (
+              <Box sx={{ px: open ? 2 : 0.5, pb: 1 }}>
+                {open ? (
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="contained"
+                    color="error"
+                    startIcon={<ReportProblemIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => setComplaintOpen(true)}
+                    sx={{ fontWeight: 700, fontSize: '0.7rem', py: 0.8, borderRadius: 2, textTransform: 'none' }}
+                  >
+                    Submit Complaint
+                  </Button>
+                ) : (
+                  <IconButton color="error" onClick={() => setComplaintOpen(true)} sx={{ mx: 'auto', display: 'flex' }}>
+                    <ReportProblemIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
+            )}
             <UserProfileCard collapsed={!open} />
           </Drawer>
           <Box
@@ -668,6 +753,7 @@ const Layout: React.FC = () => {
             )}
 
             <Box sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
+              {gs.enable_page_transitions !== false ? (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={breadcrumb}
@@ -679,9 +765,11 @@ const Layout: React.FC = () => {
                   <Outlet />
                 </motion.div>
               </AnimatePresence>
+              ) : <Outlet />}
               <ToastContainer />
             </Box>
-            <CommandPalette />
+            {gs.enable_command_palette !== false && <CommandPalette />}
+            <ComplaintDialog open={complaintOpen} onClose={() => setComplaintOpen(false)} />
             <Copyright sx={{ py: 4 }} />
           </Box>
         </Box>

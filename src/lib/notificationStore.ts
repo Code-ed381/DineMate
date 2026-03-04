@@ -335,8 +335,11 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
             }));
 
             if (combined.notification) {
+              const { role } = useRestaurantStore.getState();
+              if (shouldShowToast(combined.notification.type, role, combined.notification.metadata)) {
                 get().showToastNotification(combined.notification);
                 get().showBrowserNotification(combined.notification);
+              }
             }
           } catch (err) {
             console.error("Realtime handler error:", err);
@@ -434,6 +437,27 @@ function playNotificationSound(priority: string) {
     default: audio.src = "/sounds/normal-notification.mp3";
   }
   audio.play().catch(() => {});
+}
+
+// Notification type categories
+const PAYMENT_TYPES = ["payment"];
+const SYSTEM_TYPES = ["general", "system", "complaint", "user"];
+
+function shouldShowToast(notificationType: string, userRole: string | null, metadata?: any): boolean {
+  if (!userRole) return true;
+  const role = userRole.toLowerCase();
+  const isComplaint = metadata?.is_complaint === true;
+  
+  // Owners and admins: only system-level notifications + complaints
+  if (role === "owner" || role === "admin") {
+    return isComplaint || SYSTEM_TYPES.includes(notificationType);
+  }
+  // Cashier: only payment notifications + system
+  if (role === "cashier") {
+    return PAYMENT_TYPES.includes(notificationType) || SYSTEM_TYPES.includes(notificationType);
+  }
+  // Waiter, chef, bartender, kitchen: show order + system notifications
+  return true;
 }
 
 export default useNotificationStore;

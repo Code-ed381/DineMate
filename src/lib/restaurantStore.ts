@@ -7,7 +7,7 @@ import { persist } from "zustand/middleware";
 export interface Restaurant {
     id: string;
     name: string;
-    ownerId: string;
+    owner_id: string;
     description?: string;
     address_line_1: string;
     address_line_2?: string;
@@ -19,6 +19,7 @@ export interface Restaurant {
     email: string;
     website?: string;
     logo?: string;
+    business_certificate_url?: string;
     created_at?: string;
 }
 
@@ -38,7 +39,7 @@ export interface RestaurantState {
     setRole: (role: string | null) => void;
     getRestaurants: () => Promise<void>;
     getRestaurantById: (id: string) => Promise<void>;
-    createRestaurant: (restaurant: Partial<Restaurant>) => Promise<void>;
+    createRestaurant: (restaurant: Partial<Restaurant>) => Promise<string | null>;
     updateRestaurant: (id: string, restaurant: Partial<Restaurant>) => Promise<void>;
     deleteRestaurant: (id: string) => Promise<void>;
 }
@@ -102,15 +103,36 @@ const useRestaurantStore = create<RestaurantState>()(
     
             createRestaurant: async (restaurant) => {
                 try {
-                    const { data, error } = await supabase
+                    const { user } = useAuthStore.getState();
+                    if (!user) throw new Error("Authentication required");
+
+                    // 1. Insert Restaurant
+                    const { data: newRestaurant, error: resError } = await supabase
                         .from('restaurants')
-                        .insert([restaurant])
+                        .insert([{ ...restaurant, owner_id: user.id }])
+                        .select()
                         .single();
-                    if (error) throw error;
+                    if (resError) throw resError;
+
+                    // 2. Create Owner Membership
+                    const { error: memberError } = await supabase
+                        .from('restaurant_members')
+                        .insert([{
+                            restaurant_id: newRestaurant.id,
+                            user_id: user.id,
+                            role: 'owner',
+                            status: 'active'
+                        }]);
+                    if (memberError) throw memberError;
     
-                    set({ selectedRestaurant: data as Restaurant });
-                } catch (error) {
-                    Swal.fire('Error', 'Failed to create restaurant. Check your internet connection.', 'error');
+                    // Refresh restaurant list
+                    await get().getRestaurants();
+                    set({ selectedRestaurant: newRestaurant as Restaurant, role: 'owner' });
+                    return newRestaurant.id;
+                } catch (error: any) {
+                    console.error("Create restaurant failed:", error);
+                    Swal.fire('Error', error.message || 'Failed to create restaurant.', 'error');
+                    return null;
                 }
             },
     

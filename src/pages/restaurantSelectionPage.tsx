@@ -24,6 +24,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
 import { getRoleRedirectPath } from "../utils/roleRedirects";
 import Swal from "sweetalert2";
+import AddRestaurantModal from "../components/modals/AddRestaurantModal";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -36,6 +37,7 @@ const RestaurantSelectionPage: React.FC = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const [modalOpen, setModalOpen] = React.useState(false);
 
   useEffect(() => {
     getRestaurants();
@@ -312,7 +314,7 @@ const RestaurantSelectionPage: React.FC = () => {
                         borderColor: theme.palette.primary.main,
                         background: alpha(theme.palette.primary.main, 0.02)
                       }}
-                      onClick={() => navigate("/onboarding")}
+                      onClick={() => setModalOpen(true)}
                       sx={{
                         height: "100%",
                         minHeight: 280,
@@ -358,6 +360,7 @@ const RestaurantSelectionPage: React.FC = () => {
           </MotionBox>
         )}
       </Container>
+      <AddRestaurantModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </Box>
   );
 };

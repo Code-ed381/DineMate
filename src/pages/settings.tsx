@@ -3,8 +3,9 @@ import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 
 import Box from "@mui/material/Box";
-import { useTheme, useMediaQuery } from "@mui/material";
+import { useTheme, useMediaQuery, Backdrop, CircularProgress, Typography } from "@mui/material";
 import useRestaurantStore from "../lib/restaurantStore";
+import { useSettingsStore } from "../lib/settingsStore";
 import RestaurantDetailsPanel from "./settingsTabs/restaurantDetails";
 import EmployeesPanel from "./settingsTabs/employees";
 import TablesPanel from "./settingsTabs/tables";
@@ -15,6 +16,8 @@ import DashboardSettingsPanel from "./settingsTabs/dashboard";
 import SecuritySettingsPanel from "./settingsTabs/security";
 import GeneralSettingsPanel from "./settingsTabs/general";
 import SubscriptionSettingsPanel from "./settingsTabs/subscription";
+import CashierSettingsPanel from "./settingsTabs/cashier";
+import BarSettingsPanel from "./settingsTabs/bar";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -53,9 +56,12 @@ function a11yProps(index: number) {
 
 const Settings: React.FC = () => {
   const [value, setValue] = React.useState(0);
-  const { selectedRestaurant } = useRestaurantStore();
+  const { selectedRestaurant, role } = useRestaurantStore();
+  const { loading } = useSettingsStore();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  const isAllowed = role === "owner" || role === "admin";
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -63,9 +69,36 @@ const Settings: React.FC = () => {
 
   if (!selectedRestaurant) return null;
 
+  if (!isAllowed) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '70vh',
+        textAlign: 'center',
+        p: 3
+      }}>
+        <Box 
+          component="img" 
+          src="https://illustrations.popsy.co/amber/lock.svg" 
+          sx={{ width: 250, mb: 4 }} 
+        />
+        <Typography variant="h4" fontWeight={900} color="error.main" gutterBottom>
+          Access Denied
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
+          You don't have the necessary permissions to access the settings panel. 
+          Please contact the restaurant owner if you believe this is an error.
+        </Typography>
+      </Box>
+    );
+  }
+
   const tabLabels = [
     "Restaurant Info", "General", "Employees", "Tables", "Menu",
-    "Reports", "Kitchen", "Dashboard", "Security", "Subscription"
+    "Reports", "Kitchen", "Dashboard", "Cashier", "Bar", "Security", "Subscription"
   ];
 
   const tabPanels = [
@@ -77,6 +110,8 @@ const Settings: React.FC = () => {
     <ReportsSettingsPanel />,
     <KitchenSettingsPanel />,
     <DashboardSettingsPanel />,
+    <CashierSettingsPanel />,
+    <BarSettingsPanel />,
     <SecuritySettingsPanel />,
     <SubscriptionSettingsPanel />,
   ];
@@ -89,9 +124,17 @@ const Settings: React.FC = () => {
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
         p: isMobile ? 1 : 2,
-        minHeight: "80vh"
+        minHeight: "80vh",
+        position: "relative"
       }}
     >
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1, position: 'absolute' }}
+        open={loading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+
       <Tabs
         orientation={isMobile ? "horizontal" : "vertical"}
         variant="scrollable"

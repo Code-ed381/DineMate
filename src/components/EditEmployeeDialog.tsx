@@ -16,6 +16,9 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE } from "../utils/phoneValidation";
+import { useSettings } from "../providers/settingsProvider";
+import Swal from "sweetalert2";
 
 interface EditEmployeeDialogProps {
   open: boolean;
@@ -42,6 +45,8 @@ const EditEmployeeDialog: React.FC<EditEmployeeDialogProps> = ({ open, onClose, 
   const [saving, setSaving] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { settings } = useSettings();
+  const allowSuspend = (settings as any)?.employee_permissions?.allow_suspend_employee !== false;
 
   useEffect(() => {
     if (employee) {
@@ -64,6 +69,10 @@ const EditEmployeeDialog: React.FC<EditEmployeeDialogProps> = ({ open, onClose, 
   };
 
   const handleSubmit = async () => {
+    if (phone && !isValidGhanaianPhone(phone)) {
+      Swal.fire("Invalid Phone", GHANA_PHONE_ERROR_MESSAGE, "error");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -170,7 +179,7 @@ const EditEmployeeDialog: React.FC<EditEmployeeDialogProps> = ({ open, onClose, 
             >
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="pending">Pending</MenuItem>
-              <MenuItem value="suspended">Suspended</MenuItem>
+              {allowSuspend && <MenuItem value="suspended">Suspended</MenuItem>}
             </TextField>
           </Grid>
         </Grid>

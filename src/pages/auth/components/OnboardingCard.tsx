@@ -11,14 +11,17 @@ import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import { styled } from '@mui/material/styles';
 import { SitemarkIcon } from './CustomIcons';
 import { useState, useEffect, useRef } from 'react';
 import useAuthStore from '../../../lib/authStore';
 import useAppStore from '../../../lib/appstore';
+import Swal from 'sweetalert2';
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE, toE164 } from '../../../utils/phoneValidation';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
-import Swal from 'sweetalert2';
 
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
@@ -63,7 +66,12 @@ const OnboardingCard: React.FC = () => {
   const [email, setEmail] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [idType, setIdType] = useState("Ghana Card");
+  const [idNumber, setIdNumber] = useState("");
+  const [idImageFile, setIdImageFile] = useState<File | null>(null);
+  const [idImagePreview, setIdImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const idFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const hash = window.location.hash; // HashRouter uses # as routing, so we need to be careful.
@@ -126,14 +134,32 @@ const OnboardingCard: React.FC = () => {
     }
   };
 
+  const handleIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setIdImageFile(file);
+      setIdImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const getIdPlaceholder = () => {
+    if (idType === "Ghana Card") return "GHA-123456789-0";
+    if (idType === "Passport") return "G1234567";
+    return "License Number";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setProcessing(true);
 
       if (!validateConfirmPassword(password, confirmPassword)) return;
-      if (!firstName || !lastName) {
-          Swal.fire("Error", "Name fields are required.", "error");
+      if (!firstName || !lastName || !idNumber || !idImageFile) {
+          Swal.fire("Error", "All fields including ID details are required.", "error");
+          return;
+      }
+      if (phone && !isValidGhanaianPhone(phone)) {
+          Swal.fire("Invalid Phone", GHANA_PHONE_ERROR_MESSAGE, "error");
           return;
       }
 
@@ -142,14 +168,23 @@ const OnboardingCard: React.FC = () => {
           finalAvatarUrl = await uploadFile(avatarFile, "avatars");
       }
 
+      let finalIdUrl = "";
+      if (idImageFile) {
+        finalIdUrl = await uploadFile(idImageFile, "documents");
+      }
+
       // Update auth user
+      const normalizedPhone = phone ? toE164(phone) : '';
       const { data: authResult, error: authError } = await supabase.auth.updateUser({ 
           password,
           data: {
               firstName,
               lastName,
-              phone,
-              profileAvatar: finalAvatarUrl
+              phone: normalizedPhone,
+              profileAvatar: finalAvatarUrl,
+              id_type: idType,
+              id_number: idNumber,
+              id_document_url: finalIdUrl
           }
       });
 
@@ -165,7 +200,7 @@ const OnboardingCard: React.FC = () => {
         .update({
             first_name: firstName,
             last_name: lastName,
-            phone: phone,
+            phone: normalizedPhone,
             status: 'active'
         })
         .eq('user_id', authResult.user.id);
@@ -291,7 +326,67 @@ const OnboardingCard: React.FC = () => {
                 onChange={(e) => setPhone(e.target.value)}
                 variant="outlined"
                 size="small"
+                placeholder="+233..."
             />
+        </FormControl>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          <FormControl size="small">
+            <FormLabel>ID Type</FormLabel>
+            <Select
+              value={idType}
+              onChange={(e) => setIdType(e.target.value)}
+              variant="outlined"
+            >
+              <MenuItem value="Ghana Card">Ghana Card</MenuItem>
+              <MenuItem value="Passport">Passport</MenuItem>
+              <MenuItem value="Driver's License">Driver's License</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small">
+            <FormLabel>ID Number</FormLabel>
+            <TextField
+              required
+              fullWidth
+              value={idNumber}
+              onChange={(e) => setIdNumber(e.target.value)}
+              variant="outlined"
+              size="small"
+              placeholder={getIdPlaceholder()}
+            />
+          </FormControl>
+        </Box>
+
+        <FormControl>
+          <FormLabel>Upload ID Photo (Front)</FormLabel>
+          <Box 
+            sx={{ 
+              mt: 1, 
+              p: 2, 
+              border: '2px dashed #ddd', 
+              borderRadius: 2, 
+              textAlign: 'center',
+              cursor: 'pointer',
+              bgcolor: idImagePreview ? 'alpha(primary.main, 0.05)' : 'transparent',
+              '&:hover': { border: '2px dashed #1976d2' }
+            }}
+            onClick={() => idFileInputRef.current?.click()}
+          >
+            {idImagePreview ? (
+              <img src={idImagePreview} alt="ID Preview" style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '4px' }} />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Click to upload ID photo
+              </Typography>
+            )}
+            <input
+              type="file"
+              hidden
+              ref={idFileInputRef}
+              accept="image/*"
+              onChange={handleIdFileChange}
+            />
+          </Box>
         </FormControl>
 
         <FormControl>

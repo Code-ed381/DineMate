@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { persist } from "zustand/middleware";
 import Swal from "sweetalert2";
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE, toE164 } from "../utils/phoneValidation";
 import { database_logs } from "./logActivities";
 import { Session, User } from "@supabase/supabase-js";
 import useRestaurantStore from "./restaurantStore";
@@ -17,6 +18,9 @@ export interface PersonalInfo {
   password?: string;
   confirmPassword?: string;
   profileAvatar?: string;
+  idType?: string;
+  idNumber?: string;
+  idDocumentUrl?: string;
 }
 
 export interface RestaurantInfo {
@@ -32,6 +36,7 @@ export interface RestaurantInfo {
   email: string;
   website: string;
   logo: string;
+  business_certificate_url?: string;
   addressLine1?: string; // Legacy fields used in insertRestaurant
   addressLine2?: string;
   zipCode?: string;
@@ -87,6 +92,12 @@ export interface AuthState {
   activeStep: number;
   consent: boolean;
   processing: boolean;
+  tempFiles: {
+    avatar?: File;
+    idDocument?: File;
+    logo?: File;
+    businessCertificate?: File;
+  };
 
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
@@ -107,6 +118,7 @@ export interface AuthState {
   updatePersonalInfo: (field: keyof PersonalInfo, value: string) => void;
   updateRestaurantInfo: (field: keyof RestaurantInfo, value: string) => void;
   updateSubscription: (field: string, value: any) => void;
+  updateTempFile: (field: keyof AuthState['tempFiles'], file: File | undefined) => void;
   validatePersonalInfo: () => Record<string, string>;
   validateRestaurantInfo: () => Record<string, string>;
   validateSubscriptionInfo: () => Record<string, string>;
@@ -166,6 +178,9 @@ const useAuthStore = create<AuthState>()(
         password: "",
         confirmPassword: "",
         profileAvatar: "",
+        idType: "Ghana Card",
+        idNumber: "",
+        idDocumentUrl: "",
       },
       restaurantInfo: {
         name: "",
@@ -180,6 +195,7 @@ const useAuthStore = create<AuthState>()(
         email: "",
         website: "",
         logo: "",
+        business_certificate_url: "",
       },
       subscription: {
         subscription_plan: "free",
@@ -244,6 +260,7 @@ const useAuthStore = create<AuthState>()(
       activeStep: 0,
       consent: false,
       processing: false,
+      tempFiles: {},
 
       setEmail: (value) => set({ email: value }),
       setPassword: (value) => set({ password: value }),
@@ -387,6 +404,12 @@ const useAuthStore = create<AuthState>()(
         });
       },
 
+      updateTempFile: (field, file) => {
+        set((state) => ({
+          tempFiles: { ...state.tempFiles, [field]: file },
+        }));
+      },
+
       validatePersonalInfo: () => {
         const { personalInfo } = get();
         const errors: Record<string, string> = {};
@@ -413,6 +436,18 @@ const useAuthStore = create<AuthState>()(
           errors.confirmPassword = "Passwords do not match";
         }
 
+        if (!personalInfo.idNumber?.trim()) {
+          errors.idNumber = "ID number is required";
+        }
+
+        if (!personalInfo.idDocumentUrl?.trim()) {
+          errors.idDocumentUrl = "ID document photo is required";
+        }
+
+        if (personalInfo.phone_number && !isValidGhanaianPhone(personalInfo.phone_number)) {
+          errors.phone_number = GHANA_PHONE_ERROR_MESSAGE;
+        }
+
         return errors;
       },
 
@@ -435,11 +470,22 @@ const useAuthStore = create<AuthState>()(
 
         if (!restaurantInfo.phone_number.trim())
           errors.phone_number = "Phone number is required";
+        else if (!isValidGhanaianPhone(restaurantInfo.phone_number)) {
+          errors.phone_number = GHANA_PHONE_ERROR_MESSAGE;
+        }
 
         if (!restaurantInfo.email.trim()) {
           errors.email = "Email is required";
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(restaurantInfo.email)) {
           errors.email = "Invalid email format";
+        }
+
+        if (!restaurantInfo.logo?.trim()) {
+          errors.logo = "Restaurant logo is required";
+        }
+
+        if (!restaurantInfo.business_certificate_url?.trim()) {
+          errors.business_certificate_url = "Business certificate (PDF) is required";
         }
 
         return errors;
@@ -500,6 +546,9 @@ const useAuthStore = create<AuthState>()(
 
         if (Object.keys(errors).length > 0) {
           set({ validationErrors: errors });
+          if (errors.phone_number) {
+            Swal.fire("Invalid Phone", errors.phone_number, "error");
+          }
           return { success: false, errors };
         }
 
@@ -553,13 +602,17 @@ const useAuthStore = create<AuthState>()(
       },
 
       updateUserDetailsAsAdmin: async (userId, details) => {
+        const normalizedPhone = details.phone_number && details.phone_number.trim()
+          ? toE164(details.phone_number)
+          : details.phone_number || '';
+
         const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
           userId,
           {
-            phone: details.phone_number,
             user_metadata: {
               firstName: details.first_name,
               lastName: details.last_name,
+              phone: normalizedPhone,
             },
           }
         );
@@ -598,6 +651,9 @@ const useAuthStore = create<AuthState>()(
               firstName: extraData.firstName,
               lastName: extraData.lastName,
               phone: extraData.phone_number,
+              idType: extraData.idType,
+              idNumber: extraData.idNumber,
+              idDocumentUrl: extraData.idDocumentUrl,
             },
           },
         });
@@ -689,7 +745,7 @@ const useAuthStore = create<AuthState>()(
         const { data, error } = await supabase.from("restaurants").insert([
           {
             name: restaurantInfo.name,
-            ownerId: userId,
+            owner_id: userId,
             description: restaurantInfo.description || "",
             address_line_1: restaurantInfo.addressLine1 || restaurantInfo.address_line_1,
             address_line_2: restaurantInfo.addressLine2 || restaurantInfo.address_line_2 || "",
@@ -701,6 +757,7 @@ const useAuthStore = create<AuthState>()(
             email: restaurantInfo.email,
             website: restaurantInfo.website || "",
             logo: restaurantInfo.logo || "",
+            business_certificate_url: restaurantInfo.business_certificate_url || "",
           },
         ]);
         if (error) throw error;

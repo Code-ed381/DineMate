@@ -20,9 +20,13 @@ import useProfileStore from "../lib/profileStore";
 import useAuthStore from "../lib/authStore";
 import useAppStore from "../lib/appstore";
 import Swal from "sweetalert2";
+import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE } from "../utils/phoneValidation";
+import { useSettings } from "../providers/settingsProvider";
 
 const Profile: React.FC = () => {
   const { profile, getProfile, updateProfile, loading } = useProfileStore();
+  const { settings } = useSettings();
+  const canUpdateProfile = (settings as any)?.employee_permissions?.employees_update_profile !== false;
   const { refreshSession } = useAuthStore();
   const { uploadFile } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
@@ -42,6 +46,10 @@ const Profile: React.FC = () => {
     if (isEditing) {
       if (!editedProfile.first_name || !editedProfile.last_name) {
           Swal.fire("Error", "First and last name are required", "error");
+          return;
+      }
+      if (editedProfile.phone && !isValidGhanaianPhone(editedProfile.phone)) {
+          Swal.fire("Invalid Phone", GHANA_PHONE_ERROR_MESSAGE, "error");
           return;
       }
       
@@ -168,6 +176,7 @@ const Profile: React.FC = () => {
                 <Button
                   startIcon={isEditing ? <SaveIcon /> : <EditIcon />}
                   onClick={handleEditToggle}
+                  disabled={!isEditing && !canUpdateProfile}
                 >
                   {isEditing ? "Save" : "Edit"}
                 </Button>

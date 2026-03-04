@@ -6,6 +6,7 @@ interface EmptyStateProps {
   title?: string;
   description?: string;
   icon?: React.ReactNode;
+  emoji?: string;
   action?: {
     label: string;
     onClick: () => void;
@@ -16,10 +17,13 @@ interface EmptyStateProps {
 const EmptyState: React.FC<EmptyStateProps> = ({
   title = "No Data Found",
   description = "There are no records available at the moment.",
-  icon = <SentimentDissatisfiedIcon sx={{ fontSize: 60, color: "text.secondary", mb: 2 }} />,
+  icon, // No default icon here, handled by defaultIcon variable
+  emoji = "🌫️", // Default emoji
   action,
   height = "100%",
 }) => {
+  const defaultIcon = icon || <Typography variant="h2" sx={{ mb: 2 }}>{emoji}</Typography>;
+
   return (
     <Box
       sx={{
@@ -33,7 +37,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
         width: "100%",
       }}
     >
-      {icon}
+      {defaultIcon}
       <Typography variant="h6" fontWeight="bold" gutterBottom>
         {title}
       </Typography>

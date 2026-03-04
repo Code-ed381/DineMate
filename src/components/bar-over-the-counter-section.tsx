@@ -40,6 +40,7 @@ import BarTakeAwaySkeleton from "./skeletons/bar-takeaway-skeleton";
 import { printReceipt } from "./PrintWindow";
 import { getCurrencySymbol } from "../utils/currency";
 import { useSettingsStore } from "../lib/settingsStore";
+import { useSettings } from "../providers/settingsProvider";
 import { History as HistoryIcon, RemoveCircleOutline } from "@mui/icons-material";
 
 const OTCTabs: React.FC = () => {
@@ -80,6 +81,8 @@ const OTCTabs: React.FC = () => {
   } = useBarStore();
   const { selectedRestaurant } = useRestaurantStore();
   const { settings } = useSettingsStore();
+  const { settings: appSettings } = useSettings();
+  const bs = (appSettings as any).bar_settings || {};
 
   useEffect(() => {
     handleFetchItems();
@@ -103,10 +106,12 @@ const OTCTabs: React.FC = () => {
     const cashValue = parseFloat(cash) || 0;
     const cardValue = parseFloat(card) || 0;
     const { settings } = useSettingsStore.getState();
-    const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+    const taxRate = settings?.menu_settings?.default_tax_rate ? parseFloat(String(settings.menu_settings.default_tax_rate)) / 100 : (settings?.general?.tax_rate ? parseFloat(String(settings.general.tax_rate)) / 100 : 0);
     const taxAmount = total * taxRate;
     const grandTotal = total + taxAmount;
     const change = (cashValue + cardValue - grandTotal).toFixed(2);
+
+    const footerMsg = bs.otc_receipt_footer || "THANK YOU FOR DINING WITH US!";
 
     printReceipt(
       isFinal ? "OTC-" + Date.now().toString().slice(-6) : "PROFORMA",
@@ -119,7 +124,8 @@ const OTCTabs: React.FC = () => {
       cashValue.toFixed(2),
       cardValue.toFixed(2),
       change,
-      selectedRestaurant
+      selectedRestaurant,
+      footerMsg,
     );
   };
 
@@ -129,7 +135,7 @@ const OTCTabs: React.FC = () => {
       
       // Update taxAmount in store before progressing
       const { settings } = useSettingsStore.getState();
-      const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+      const taxRate = settings?.menu_settings?.default_tax_rate ? parseFloat(String(settings.menu_settings.default_tax_rate)) / 100 : (settings?.general?.tax_rate ? parseFloat(String(settings.general.tax_rate)) / 100 : 0);
       const taxAmount = (total * taxRate).toFixed(2);
       useBarStore.setState({ taxAmount });
       
@@ -138,6 +144,7 @@ const OTCTabs: React.FC = () => {
       const success = await completeOTCPayment();
       if (success) {
         handlePrintReceipt(true);
+        if (bs.auto_print_otc) handlePrintReceipt(true);
       }
     }
   };
@@ -419,7 +426,7 @@ const OTCTabs: React.FC = () => {
 
             <Box sx={{ mt: 3 }}>
               {(() => {
-                const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+                const taxRate = settings?.menu_settings?.default_tax_rate ? parseFloat(String(settings.menu_settings.default_tax_rate)) / 100 : (settings?.general?.tax_rate ? parseFloat(String(settings.general.tax_rate)) / 100 : 0);
                 const taxAmountValue = total * taxRate;
                 const grandTotal = total + taxAmountValue;
 
@@ -462,16 +469,19 @@ const OTCTabs: React.FC = () => {
                     onChange={(e) => setCard(e.target.value)}
                     InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
                   />
-                  <TextField 
-                    fullWidth 
-                    label="Tip Amount" 
-                    type="number" 
-                    value={tip} 
-                    onChange={(e) => setTip(e.target.value)}
-                    InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
-                  />
+                  {/* Tip input */}
+                  {bs.allow_tips !== false && (
+                    <TextField 
+                      fullWidth 
+                      label="Tip Amount" 
+                      type="number" 
+                      value={tip} 
+                      onChange={(e) => setTip(e.target.value)}
+                      InputProps={{ startAdornment: <InputAdornment position="start">{getCurrencySymbol()}</InputAdornment> }}
+                    />
+                  )}
                   {(() => {
-                    const taxRate = settings?.general?.tax_rate ? parseFloat(settings.general.tax_rate) / 100 : 0;
+                    const taxRate = settings?.menu_settings?.default_tax_rate ? parseFloat(String(settings.menu_settings.default_tax_rate)) / 100 : (settings?.general?.tax_rate ? parseFloat(String(settings.general.tax_rate)) / 100 : 0);
                     const grandTotal = total * (1 + taxRate);
                     const paid = (parseFloat(cash) || 0) + (parseFloat(card) || 0);
                     if (paid > grandTotal) {
@@ -524,7 +534,7 @@ const OTCTabs: React.FC = () => {
                 </Button>
               </Stack>
               
-              {activeStep === 0 && activeCart.length > 0 && (
+              {activeStep === 0 && activeCart.length > 0 && (bs.show_otc_proforma !== false) && (
                 <Button 
                   fullWidth 
                   startIcon={<ReceiptIcon />} 
@@ -535,8 +545,8 @@ const OTCTabs: React.FC = () => {
                 </Button>
               )}
 
-              {/* Task 3.4: Recent Orders Section */}
-              {recentOTCOrders.length > 0 && activeStep === 0 && (
+              {/* Recent Orders Section */}
+              {bs.show_recent_orders !== false && recentOTCOrders.length > 0 && activeStep === 0 && (
                 <Box sx={{ mt: 4 }}>
                   <Divider sx={{ mb: 2 }}>
                     <Chip label="Recent Orders" size="small" icon={<HistoryIcon />} />
@@ -548,9 +558,11 @@ const OTCTabs: React.FC = () => {
                           <Typography variant="caption" fontWeight="bold" display="block">Order #{prevOrder.id.toString().slice(-4)}</Typography>
                           <Typography variant="caption" color="text.secondary">{getCurrencySymbol()}{formatCashInput(prevOrder.total)} • {dayjs(prevOrder.created_at).format('HH:mm')}</Typography>
                         </Box>
-                        <IconButton size="small" color="error" onClick={() => handleVoidOTCOrder(prevOrder.id)}>
-                          <RemoveCircleOutline fontSize="small" />
-                        </IconButton>
+                        {bs.allow_void_orders !== false && (
+                          <IconButton size="small" color="error" onClick={() => handleVoidOTCOrder(prevOrder.id)}>
+                            <RemoveCircleOutline fontSize="small" />
+                          </IconButton>
+                        )}
                       </Paper>
                     ))}
                   </Stack>

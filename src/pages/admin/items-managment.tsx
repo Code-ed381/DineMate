@@ -27,6 +27,7 @@ import CategoryItem from "../../components/category";
 import AdminHeader from "../../components/admin-header";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
+import EmptyState from "../../components/empty-state";
 import { useSettingsStore } from "../../lib/settingsStore";
 import { formatCurrency, getCurrencySymbol } from "../../utils/currency";
 import MenuItemDialog from "../../components/MenuItemDialog";
@@ -52,6 +53,13 @@ const baseColumns: GridColDef[] = [
     flex: 1,
     sortable: true,
     editable: true,
+  },
+  {
+    field: "description",
+    headerName: "Description",
+    flex: 1.5,
+    sortable: true,
+    renderCell: (params: any) => params.row.description || "—",
   },
   {
     field: "category_name",
@@ -312,6 +320,14 @@ const MenuItemsManagement: React.FC = () => {
               />
             ))}
           </Box>
+          {categories.length === 0 && (
+            <EmptyState 
+              title="No Categories" 
+              description="Add a category to organize your menu."
+              emoji="📁"
+              height={150}
+            />
+          )}
           <TextField
             size="small"
             fullWidth
@@ -339,14 +355,23 @@ const MenuItemsManagement: React.FC = () => {
               <IconButton onClick={handleAddCategory}><AddIcon /></IconButton>
             </Box>
             <List>
-              {categories.map((cat) => (
-                <CategoryItem 
-                  key={cat.id} 
-                  category={cat} 
-                  handleEditCategory={handleEditCategory}
-                  handleDeleteCategory={handleDeleteCategory}
-                />
-              ))}
+              {categories.length === 0 ? (
+                 <EmptyState 
+                    title="No Categories" 
+                    description="Add categories to manage your menu items properly."
+                    emoji="📁"
+                    height={300}
+                 />
+              ) : (
+                categories.map((cat) => (
+                  <CategoryItem 
+                    key={cat.id} 
+                    category={cat} 
+                    handleEditCategory={handleEditCategory}
+                    handleDeleteCategory={handleDeleteCategory}
+                  />
+                ))
+              )}
             </List>
           </Box>
         )}
@@ -375,27 +400,51 @@ const MenuItemsManagement: React.FC = () => {
 
           {isMobile && (
             <Grid container spacing={2}>
-              {paginatedMenuItems.map((item) => (
-                <Grid item xs={6} sm={6} key={item.id}>
-                  <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                    <CardMedia component="img" height="120" image={item.image_url} alt={item.name} />
-                    <CardContent sx={{ flexGrow: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="body2" fontWeight="bold" noWrap>{item.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)}</Typography>
-                    </CardContent>
-                    <Divider />
-                    <Box sx={{ px: 0.5, py: 0.5, display: "flex", justifyContent: "space-between" }}>
-                      <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditItem(item)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Edit</Button>
-                      <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteItem(item.id)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Del</Button>
-                    </Box>
-                  </Card>
+              {filteredMenuItems.length === 0 ? (
+                <Grid item xs={12}>
+                  <EmptyState
+                    title="No Items Found"
+                    description="Try adjusting your search or filters, or add a new menu item."
+                    emoji="🍴"
+                    height={300}
+                  />
                 </Grid>
-              ))}
+              ) : (
+                paginatedMenuItems.map((item) => (
+                  <Grid item xs={6} sm={6} key={item.id}>
+                    <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                      <CardMedia component="img" height="120" image={item.image_url} alt={item.name} />
+                      <CardContent sx={{ flexGrow: 1, p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Typography variant="body2" fontWeight="bold" noWrap>{item.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">{formatCurrency(item.price)}</Typography>
+                      </CardContent>
+                      <Divider />
+                      <Box sx={{ px: 0.5, py: 0.5, display: "flex", justifyContent: "space-between" }}>
+                        <Button size="small" startIcon={<EditIcon />} onClick={() => handleEditItem(item)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Edit</Button>
+                        <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteItem(item.id)} sx={{ fontSize: '0.7rem', minWidth: 0 }}>Del</Button>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))
+              )}
             </Grid>
           )}
 
           {!isMobile && (
-            <DataTable rows={filteredMenuItems} columns={updatedColumns} />
+            filteredMenuItems.length === 0 ? (
+              <EmptyState
+                title="No Items Found"
+                description="Try adjusting your search or filters, or add a new menu item."
+                emoji="🍴"
+                height={400}
+              />
+            ) : (
+              <DataTable 
+                rows={filteredMenuItems} 
+                columns={updatedColumns} 
+                sx={{ minHeight: 400 }}
+              />
+            )
           )}
 
           {isMobile && pageCount > 1 && (

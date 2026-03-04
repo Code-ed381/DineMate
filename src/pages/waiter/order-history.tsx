@@ -38,11 +38,14 @@ import useRestaurantStore from "../../lib/restaurantStore";
 
 import { printReceipt } from "../../components/PrintWindow";
 import { getCurrencySymbol } from "../../utils/currency";
+import { useSettings } from "../../providers/settingsProvider";
 
 const OrderHistory: React.FC = () => {
   const { user } = useAuthStore();
   const { myOrders, loadingMyOrders, fetchMyOrderHistory, getOrderItemsByOrderId } = useMenuStore();
   const { selectedRestaurant } = useRestaurantStore();
+  const { settings } = useSettings();
+  const ms = settings?.menu_settings || {};
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -235,16 +238,18 @@ const OrderHistory: React.FC = () => {
                       Details
                     </Button>
                     <Tooltip title="Reprint Receipt">
-                      <IconButton 
-                        color="secondary" 
-                        onClick={async () => {
-                          const items = await getOrderItemsByOrderId(order.id);
-                          handleReprint(order, items);
-                        }}
-                        sx={{ bgcolor: 'secondary.light', '&:hover': { bgcolor: 'secondary.main', color: 'white' } }}
-                      >
-                        <PrintIcon />
-                      </IconButton>
+                      {ms.allow_reprint !== false ? (
+                       <IconButton 
+                         color="secondary" 
+                         onClick={async () => {
+                           const items = await getOrderItemsByOrderId(order.id);
+                           handleReprint(order, items);
+                         }}
+                         sx={{ bgcolor: 'secondary.light', '&:hover': { bgcolor: 'secondary.main', color: 'white' } }}
+                       >
+                         <PrintIcon />
+                       </IconButton>
+                      ) : <span />}
                     </Tooltip>
                   </Box>
                 </Card>
@@ -324,6 +329,7 @@ const OrderHistory: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, justifyContent: 'center' }}>
+          {ms.allow_reprint !== false && (
           <Button 
             variant="contained" 
             fullWidth 
@@ -334,6 +340,7 @@ const OrderHistory: React.FC = () => {
           >
             Reprint Receipt
           </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

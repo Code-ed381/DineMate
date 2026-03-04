@@ -4,9 +4,15 @@ import { Schedule } from '@mui/icons-material';
 
 interface TableTimerProps {
   startDate: string;
+  warningMinutes?: number;
+  dangerMinutes?: number;
 }
 
-const TableTimer: React.FC<TableTimerProps> = ({ startDate }) => {
+const TableTimer: React.FC<TableTimerProps> = ({ 
+  startDate, 
+  warningMinutes = 60, 
+  dangerMinutes = 120 
+}) => {
   const [elapsed, setElapsed] = useState<string>('00:00');
   const [color, setColor] = useState<'success' | 'warning' | 'error'>('success');
 
@@ -33,9 +39,9 @@ const TableTimer: React.FC<TableTimerProps> = ({ startDate }) => {
       }
       setElapsed(formattedTime);
 
-      if (diffInMinutes < 60) {
+      if (diffInMinutes < warningMinutes) {
         setColor('success');
-      } else if (diffInMinutes < 120) {
+      } else if (diffInMinutes < dangerMinutes) {
         setColor('warning');
       } else {
         setColor('error');

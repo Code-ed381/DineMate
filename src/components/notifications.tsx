@@ -16,6 +16,10 @@ import {
   Tab,
   alpha,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import {
   Restaurant as RestaurantIcon,
@@ -25,10 +29,13 @@ import {
   Delete as DeleteIcon,
   Close as CloseIcon,
   Person as PersonIcon,
+  ReportProblem as ReportProblemIcon,
 } from "@mui/icons-material";
 import Diversity3TwoToneIcon from "@mui/icons-material/Diversity3TwoTone";
 
 import useNotificationStore from "../lib/notificationStore";
+import useRestaurantStore from "../lib/restaurantStore";
+
 
 const formatDateTime = (dateString: string) => {
   const date = new Date(dateString);
@@ -52,6 +59,7 @@ const getNotificationStyle = (type: string) => {
     general: { icon: <RestaurantIcon />, color: "#FFE135", bgColor: "#FFF4E0" },
     role: { icon: <Diversity3TwoToneIcon />, color: "#deb372ff", bgColor: "#b3684bff" },
     user: { icon: <PersonIcon />, color: "#0edb15ff", bgColor: "#FFF4E0" },
+    complaint: { icon: <ReportProblemIcon />, color: "#d32f2f", bgColor: "#ffebee" },
     default: { icon: <NotificationsIcon />, color: "#16b9c5ff", bgColor: "#F0F0F0" },
   };
   return styles[type] || styles.default;
@@ -78,6 +86,8 @@ const NotificationList: React.FC<NotificationListProps> = ({
 }) => {
   const theme = useTheme();
   const [tab, setTab] = useState(0);
+  const { role } = useRestaurantStore();
+  const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
   const {
     fetchNotifications,
     markAsRead,
@@ -95,11 +105,18 @@ const NotificationList: React.FC<NotificationListProps> = ({
     return () => unsubscribe();
   }, [open, subscribeToNotifications, fetchNotifications, requestPermission, unsubscribe]);
 
+  const isComplaint = (n: any) => n.notification?.metadata?.is_complaint === true;
+
   const filteredNotifications = useMemo(() => {
     if (tab === 0) return notifications;
-    if (tab === 1) return notifications.filter(n => n.notification?.type === 'order');
-    return notifications.filter(n => n.notification?.type !== 'order');
-  }, [notifications, tab]);
+    if (tab === 1) { // Middle tab
+      if (role === "owner" || role === "admin") return notifications.filter(n => isComplaint(n));
+      if (role === "cashier") return notifications.filter(n => n.notification?.type === 'payment');
+      return notifications.filter(n => n.notification?.type === 'order' || n.notification?.type === 'role');
+    }
+    // Third tab (SYSTEM)
+    return notifications.filter(n => !isComplaint(n) && n.notification?.type !== 'order' && n.notification?.type !== 'payment');
+  }, [notifications, tab, role]);
 
   const handleMarkAsRead = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,6 +130,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
   };
 
   return (
+    <>
     <Popover
       open={open}
       anchorEl={anchorEl}
@@ -140,7 +158,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
               Clear all
             </Button>
           )}
-          <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'action.hover' }}>
+          <IconButton size="small" onClick={onClose} sx={{ bgcolor: 'action.hover', borderRadius: '50%', width: 30, height: 30 }}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -157,7 +175,9 @@ const NotificationList: React.FC<NotificationListProps> = ({
           }}
         >
           <Tab label={`ALL (${notifications.length})`} />
-          <Tab label="ORDERS" />
+          {(role === "owner" || role === "admin") && <Tab label="COMPLAINTS" />}
+          {role === "cashier" && <Tab label="PAYMENTS" />}
+          {role !== "owner" && role !== "admin" && role !== "cashier" && <Tab label="ORDERS" />}
           <Tab label="SYSTEM" />
         </Tabs>
       </Box>
@@ -182,7 +202,12 @@ const NotificationList: React.FC<NotificationListProps> = ({
                     cursor: 'pointer',
                     py: 1.5
                   }} 
-                  onClick={(e) => handleMarkAsRead(n.id, e)}
+                  onClick={(e) => {
+                    handleMarkAsRead(n.id, e);
+                    if (isComplaint(n) && (role === 'owner' || role === 'admin')) {
+                      setSelectedComplaint(n);
+                    }
+                  }}
                 >
                   <ListItemAvatar>
                     <Avatar 
@@ -205,14 +230,12 @@ const NotificationList: React.FC<NotificationListProps> = ({
                       </Typography>
                     }
                     secondary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.disabled' }}>
-                          {formatDateTime(n?.created_at)}
-                        </Typography>
+                      <Typography variant="caption" component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, fontWeight: 600, color: 'text.disabled' }}>
+                        {formatDateTime(n?.created_at)}
                         {isUnread && (
-                          <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                          <Box component="span" sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', display: 'inline-block' }} />
                         )}
-                      </Box>
+                      </Typography>
                     }
                   />
                   <IconButton 
@@ -237,6 +260,45 @@ const NotificationList: React.FC<NotificationListProps> = ({
         </Box>
       )}
     </Popover>
+
+      {/* Complaint Detail Modal */}
+      <Dialog open={!!selectedComplaint} onClose={() => setSelectedComplaint(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 800 }}>
+          <ReportProblemIcon color="error" />
+          {selectedComplaint?.notification?.title || 'Complaint'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Avatar
+              src={selectedComplaint?.notification?.sender?.avatar_url}
+              sx={{ width: 36, height: 36 }}
+            >
+              {selectedComplaint?.notification?.sender?.full_name?.charAt(0) || '?'}
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700}>
+                {selectedComplaint?.notification?.sender?.full_name || 'Unknown Staff'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {selectedComplaint?.notification?.sender?.default_role?.toUpperCase() || 'STAFF'} • {selectedComplaint?.created_at ? formatDateTime(selectedComplaint.created_at) : ''}
+              </Typography>
+            </Box>
+            <Chip
+              label={selectedComplaint?.notification?.priority?.toUpperCase() || 'NORMAL'}
+              size="small"
+              color={selectedComplaint?.notification?.priority === 'urgent' ? 'error' : selectedComplaint?.notification?.priority === 'high' ? 'warning' : 'default'}
+              sx={{ ml: 'auto', fontWeight: 700, fontSize: '0.65rem' }}
+            />
+          </Box>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+            {selectedComplaint?.notification?.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedComplaint(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

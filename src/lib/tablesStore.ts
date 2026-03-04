@@ -7,6 +7,8 @@ import useRestaurantStore from "./restaurantStore";
 import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
+let tablesDebounceTimer: NodeJS.Timeout | null = null;
+
 export interface RestaurantTable {
   id: string;
   table_number: number;
@@ -141,7 +143,10 @@ const useTablesStore = create<TableState>()(
       },
 
       getTables: async () => {
-        set({ loadingTables: true, tablesLoaded: false });
+        const isInitialLoad = get().tables.length === 0;
+        if (isInitialLoad) {
+          set({ loadingTables: true, tablesLoaded: false });
+        }
         const { selectedRestaurant } = useRestaurantStore.getState();
         const restaurantId = selectedRestaurant?.id;
 
@@ -189,7 +194,10 @@ const useTablesStore = create<TableState>()(
               filter: `restaurant_id=eq.${restaurantId}`,
             },
             () => {
-              get().getTablesOverview();
+              if (tablesDebounceTimer) clearTimeout(tablesDebounceTimer);
+              tablesDebounceTimer = setTimeout(() => {
+                get().getTablesOverview();
+              }, 300);
             }
           )
           .on(
@@ -201,7 +209,10 @@ const useTablesStore = create<TableState>()(
               filter: `restaurant_id=eq.${restaurantId}`,
             },
             () => {
-              get().getTablesOverview();
+              if (tablesDebounceTimer) clearTimeout(tablesDebounceTimer);
+              tablesDebounceTimer = setTimeout(() => {
+                get().getTablesOverview();
+              }, 300);
             }
           )
           .on(
@@ -213,8 +224,11 @@ const useTablesStore = create<TableState>()(
               filter: `restaurant_id=eq.${restaurantId}`,
             },
             () => {
-              get().getServiceRequests();
-              set({ snackbar: { open: true, message: "New Service Request!", severity: "info", id: Date.now() }});
+              if (tablesDebounceTimer) clearTimeout(tablesDebounceTimer);
+              tablesDebounceTimer = setTimeout(() => {
+                get().getServiceRequests();
+                set({ snackbar: { open: true, message: "New Service Request!", severity: "info", id: Date.now() }});
+              }, 300);
             }
           )
           .subscribe();
@@ -458,7 +472,10 @@ const useTablesStore = create<TableState>()(
         const restaurantId = selectedRestaurant?.id;
         const waiterId = useAuthStore.getState().user?.id;
 
-        set({ loadingSessionsOverview: true });
+        const isInitialLoad = get().sessionsOverview.length === 0;
+        if (isInitialLoad) {
+          set({ loadingSessionsOverview: true });
+        }
 
         if (!restaurantId || !waiterId) {
           set({ loadingSessionsOverview: false });
@@ -499,7 +516,10 @@ const useTablesStore = create<TableState>()(
         const restaurantId = selectedRestaurant?.id;
         if (!restaurantId) return;
 
-        set({ loadingServiceRequests: true });
+        const isInitialLoad = get().serviceRequests.length === 0;
+        if (isInitialLoad) {
+          set({ loadingServiceRequests: true });
+        }
         try {
           const { data, error } = await supabase
             .from("service_requests")
@@ -597,9 +617,7 @@ const useTablesStore = create<TableState>()(
         const { data: tableSession, error: tableSessionError } = await supabase
           .from("table_sessions")
           .update({ status: "close", closed_at: new Date().toISOString() })
-          .eq("table_id", table_id)
-          .eq("waiter_id", waiter_id)
-          .eq("restaurant_id", restaurant_id)
+          .eq("id", selected.session_id)
           .select()
           .maybeSingle();
 

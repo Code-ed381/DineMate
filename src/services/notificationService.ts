@@ -121,6 +121,50 @@ class NotificationService {
        return { success: false, error };
     }
   }
+
+  async sendComplaint(restaurantId: string, senderId: string, { title, message, priority = "normal" }: NotificationPayload) {
+    try {
+      const { data: notification, error: notifError } = await supabase
+        .from("notifications")
+        .insert({
+          restaurant_id: restaurantId,
+          title: `[Complaint] ${title}`,
+          message,
+          type: "role",
+          priority,
+          target_type: "role",
+          target_roles: ["owner", "admin"],
+          sender_id: senderId,
+          metadata: { is_complaint: true },
+        })
+        .select()
+        .single();
+
+      if (notifError) throw notifError;
+
+      const { data: users, error: usersError } = await supabase
+        .from("restaurant_members")
+        .select("user_id")
+        .eq("restaurant_id", restaurantId)
+        .in("role", ["owner", "admin"]);
+
+      if (usersError) throw usersError;
+
+      if (users.length === 0) return { success: true, notification };
+
+      const userNotifications = users.map((user) => ({
+        notification_id: notification.id,
+        user_id: user.user_id,
+        restaurant_id: restaurantId,
+      }));
+
+      await supabase.from("user_notifications").insert(userNotifications);
+      return { success: true, notification };
+    } catch (error) {
+       console.error("Error sending complaint:", error);
+       return { success: false, error };
+    }
+  }
 }
 
 export const notificationService = new NotificationService();

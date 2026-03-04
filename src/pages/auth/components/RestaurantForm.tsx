@@ -12,6 +12,7 @@ import {
   InputLabel,
   Select,
   FormHelperText,
+  Button,
 } from "@mui/material";
 
 import useAuthStore from "../../../lib/authStore";
@@ -27,7 +28,21 @@ const RestaurantForm: React.FC = () => {
       updateRestaurantInfo,
       validationErrors,
       countries,
+      updateTempFile,
+      tempFiles,
     } = useAuthStore();
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+        updateTempFile("logo", e.target.files[0]);
+      }
+    };
+
+    const handleCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+        updateTempFile("businessCertificate", e.target.files[0]);
+      }
+    };
   
   return (
     <Grid container spacing={3} mt={4}>
@@ -321,6 +336,53 @@ const RestaurantForm: React.FC = () => {
           )}
         </FormControl>
       </FormGrid>
+
+      {/* Logo Upload */}
+      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
+        <FormLabel required>Restaurant Logo</FormLabel>
+        <Button
+          variant="outlined"
+          component="label"
+          fullWidth
+          sx={{ mt: 1, borderRadius: "10px", py: 1.5, borderColor: validationErrors.logo ? "error.main" : "inherit" }}
+        >
+          {tempFiles.logo ? "Change Logo" : "Upload Logo"}
+          <input hidden accept="image/*" type="file" onChange={handleLogoChange} />
+        </Button>
+        {tempFiles.logo ? (
+          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
+            File selected: {tempFiles.logo.name}
+          </Typography>
+        ) : (
+          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.logo ? "error.main" : "text.secondary" }}>
+            Required for restaurant identification.
+          </Typography>
+        )}
+      </FormGrid>
+
+      {/* Business Certificate PDF Upload */}
+      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
+        <FormLabel required>Business Certificate (PDF)</FormLabel>
+        <Button
+          variant="outlined"
+          component="label"
+          fullWidth
+          sx={{ mt: 1, borderRadius: "10px", py: 1.5, borderColor: validationErrors.business_certificate_url ? "error.main" : "inherit" }}
+        >
+          {tempFiles.businessCertificate ? "Change Certificate" : "Upload PDF Certificate"}
+          <input hidden accept="application/pdf" type="file" onChange={handleCertificateChange} />
+        </Button>
+        {tempFiles.businessCertificate ? (
+          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
+            File selected: {tempFiles.businessCertificate.name}
+          </Typography>
+        ) : (
+          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.business_certificate_url ? "error.main" : "text.secondary" }}>
+            Official registration document (PDF format).
+          </Typography>
+        )}
+      </FormGrid>
+
       {/* Use this address for payment details */}
       <FormGrid item xs={12} sx={{ mb: 2 }}>
         <FormControlLabel

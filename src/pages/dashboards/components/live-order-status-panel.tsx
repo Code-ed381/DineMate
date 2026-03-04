@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Card, CardHeader, CardContent, Divider, Typography, Chip, Stack, Paper, LinearProgress } from "@mui/material";
 import OutdoorGrillTwoToneIcon from "@mui/icons-material/OutdoorGrillTwoTone";
 import PendingActionsTwoToneIcon from "@mui/icons-material/PendingActionsTwoTone";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import EmptyState from "../../../components/empty-state";
 import { elapsedMinutesSince, formatDateTimeWithSuffix } from "../../../utils/format-datetime";
 
 interface LiveOrderQueueCardProps {
@@ -114,10 +114,12 @@ const LiveOrderQueueCard: React.FC<LiveOrderQueueCardProps> = ({ pendingMeals, f
             );
           })}
           {pendingMeals?.filter((meal) => meal?.order_item_status === filter).length === 0 && (
-            <Box sx={{ p: 4, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.6 }}>
-              <InfoOutlinedIcon sx={{ mb: 1, fontSize: 40 }} />
-              <Typography variant="body1" fontWeight={500}>No orders pending</Typography>
-            </Box>
+            <EmptyState 
+              title="No Tasks" 
+              description={`No orders ${filter} currently.`} 
+              emoji="👨‍🍳"
+              height={200}
+            />
           )}
         </Stack>
       </CardContent>

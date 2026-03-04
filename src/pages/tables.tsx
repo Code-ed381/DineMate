@@ -49,6 +49,7 @@ import useAuthStore from "../lib/authStore";
 import useRestaurantStore from "../lib/restaurantStore";
 import TableTimer from "../components/TableTimer";
 import { formatCurrency, getCurrencySymbol } from "../utils/currency";
+import { useSettings } from "../providers/settingsProvider";
 
 const statusColors: Record<string, any> = {
   available: { color: "success", icon: CheckCircle, main: "success.main" },
@@ -58,9 +59,12 @@ const statusColors: Record<string, any> = {
 };
 
 const TableManagement: React.FC = () => {
+  const { settings } = useSettings();
+  const tableSettings = (settings as any).table_settings || {};
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "floor">(tableSettings.default_view_mode || "grid");
   const {
     tables,
     handleStatusChange,
@@ -72,6 +76,7 @@ const TableManagement: React.FC = () => {
     getTables,
     getSessionsOverview,
     selectedSession,
+    selectedTable,
     getSession, 
     updateTablePosition,
     cancelReservation,
@@ -129,6 +134,13 @@ const TableManagement: React.FC = () => {
     return () => unsubscribeFromTables();
   }, [getTables, getSessionsOverview, subscribeToTables, unsubscribeFromTables]);
 
+  // Sync default view mode once settings finish loading
+  useEffect(() => {
+    if (tableSettings.default_view_mode) {
+      setViewMode(tableSettings.default_view_mode);
+    }
+  }, [tableSettings.default_view_mode]);
+
   const handleTransferClick = async (table: any) => {
     if (!user?.id || !selectedRestaurant?.id) return;
     const session = await getSession(table.id, user.id, selectedRestaurant.id);
@@ -159,7 +171,7 @@ const TableManagement: React.FC = () => {
       setSnackbar({ id: 3, open: true, message: "Table occupied now", severity: "success" });
       navigate("/app/menu");
     } else if (result.message === "viewing") {
-      navigate("/app/menu");
+      // Modal already opens in handleStatusChange, no navigation needed
     }
   };
 
@@ -168,12 +180,14 @@ const TableManagement: React.FC = () => {
     <Box sx={{ p: 2 }}>
       {tablesLoaded && (
         <Box>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "primary.main", mr: 2 }}><TableRestaurant /></Avatar><Box><Typography variant="h6">{tableStats.total}</Typography><Typography variant="body2" color="text.secondary">Total Tables</Typography></Box></Paper></Grid>
-            <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "success.main", mr: 2 }}><EventSeat /></Avatar><Box><Typography variant="h6">{tableStats.available}</Typography><Typography variant="body2" color="text.secondary">Available</Typography></Box></Paper></Grid>
-            <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "error.main", mr: 2 }}><LocalDining /></Avatar><Box><Typography variant="h6">{tableStats.occupied}</Typography><Typography variant="body2" color="text.secondary">Occupied</Typography></Box></Paper></Grid>
-            <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "warning.main", mr: 2 }}><LockClock /></Avatar><Box><Typography variant="h6">{tableStats.reserved}</Typography><Typography variant="body2" color="text.secondary">Reserved</Typography></Box></Paper></Grid>
-          </Grid>
+          {tableSettings.show_table_stats !== false && (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "primary.main", mr: 2 }}><TableRestaurant /></Avatar><Box><Typography variant="h6">{tableStats.total}</Typography><Typography variant="body2" color="text.secondary">Total Tables</Typography></Box></Paper></Grid>
+              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "success.main", mr: 2 }}><EventSeat /></Avatar><Box><Typography variant="h6">{tableStats.available}</Typography><Typography variant="body2" color="text.secondary">Available</Typography></Box></Paper></Grid>
+              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "error.main", mr: 2 }}><LocalDining /></Avatar><Box><Typography variant="h6">{tableStats.occupied}</Typography><Typography variant="body2" color="text.secondary">Occupied</Typography></Box></Paper></Grid>
+              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "warning.main", mr: 2 }}><LockClock /></Avatar><Box><Typography variant="h6">{tableStats.reserved}</Typography><Typography variant="body2" color="text.secondary">Reserved</Typography></Box></Paper></Grid>
+            </Grid>
+          )}
 
           <Grid container spacing={2} mb={4} alignItems="center" justifyContent="space-between">
             <Grid item xs={12} md="auto">
@@ -189,21 +203,23 @@ const TableManagement: React.FC = () => {
                 <ToggleButton value="reserved">Reserved</ToggleButton>
               </ToggleButtonGroup>
             </Grid>
-            <Grid item xs={12} md="auto">
-              <ToggleButtonGroup
-                exclusive
-                size="large"
-                value={viewMode}
-                onChange={(_, value) => value && setViewMode(value)}
-              >
-                <ToggleButton value="grid" aria-label="grid view">
-                  <GridViewIcon sx={{ mr: 1 }} /> Grid
-                </ToggleButton>
-                <ToggleButton value="floor" aria-label="floor plan">
-                  <MapIcon sx={{ mr: 1 }} /> Floor Plan
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
+            {tableSettings.show_floor_plan !== false && (
+              <Grid item xs={12} md="auto">
+                <ToggleButtonGroup
+                  exclusive
+                  size="large"
+                  value={viewMode}
+                  onChange={(_, value) => value && setViewMode(value)}
+                >
+                  <ToggleButton value="grid" aria-label="grid view">
+                    <GridViewIcon sx={{ mr: 1 }} /> Grid
+                  </ToggleButton>
+                  <ToggleButton value="floor" aria-label="floor plan">
+                    <MapIcon sx={{ mr: 1 }} /> Floor Plan
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Grid>
+            )}
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth size="small"
@@ -227,13 +243,19 @@ const TableManagement: React.FC = () => {
                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                            <Typography variant="h6" fontWeight="bold">Table {table.table_number}</Typography>
                            <Stack direction="row" spacing={1} alignItems="center">
-                              {status === 'occupied' && (() => {
+                              {status === 'occupied' && tableSettings.show_session_timer !== false && (() => {
                                 const session = sessionsOverview?.find((s: any) => s.table_id === table.id);
-                                return session?.opened_at ? <TableTimer startDate={session.opened_at} /> : null;
+                                return session?.opened_at ? (
+                                  <TableTimer 
+                                    startDate={session.opened_at}
+                                    warningMinutes={tableSettings.timer_warning_minutes ?? 60}
+                                    dangerMinutes={tableSettings.timer_danger_minutes ?? 120}
+                                  />
+                                ) : null;
                               })()}
                               
                               {/* Service Request Alert */}
-                              {(() => {
+                              {tableSettings.show_service_alerts !== false && (() => {
                                  const request = serviceRequests?.find((r: any) => r.table_id === table.id);
                                  if (request) { 
                                    return (
@@ -262,15 +284,42 @@ const TableManagement: React.FC = () => {
                     </CardContent>
                     <Box p={2}>
                         <Stack direction="row" spacing={1} sx={{ '& > *': { flex: 1 } }}>
-                          <Button 
-                            fullWidth 
-                            onClick={() => handleTableActionButtonClick(table)} 
-                            color={status === "available" ? "success" : status === "occupied" ? "error" : "warning"}
-                            variant={status === "reserved" ? "contained" : "text"}
-                          >
-                             {status === "available" ? "Reserve" : status === "occupied" ? "View Order" : "Start Order"}
-                          </Button>
-                          {status === "occupied" && (
+                          {status === "available" && tableSettings.enable_reservations === false ? (
+                            <Button 
+                              fullWidth 
+                              onClick={async () => {
+                                // Skip reservation, directly occupy + start session
+                                const restaurantId = selectedRestaurant?.id;
+                                const waiterId = user?.id;
+                                if (!restaurantId || !waiterId) return;
+
+                                const { error } = await (await import('../lib/supabase')).supabase
+                                  .from("restaurant_tables")
+                                  .update({ status: "occupied" })
+                                  .eq("id", table.id)
+                                  .eq("restaurant_id", restaurantId);
+                                if (error) return;
+
+                                await useTablesStore.getState().startSession(table.id, waiterId, restaurantId);
+                                setSnackbar({ id: Date.now(), open: true, message: "Table opened – start ordering!", severity: "success" });
+                                navigate("/app/menu");
+                              }} 
+                              color="success"
+                              variant="contained"
+                            >
+                               Start Order
+                            </Button>
+                          ) : (
+                            <Button 
+                              fullWidth 
+                              onClick={() => handleTableActionButtonClick(table)} 
+                              color={status === "available" ? "success" : status === "occupied" ? "error" : "warning"}
+                              variant={status === "reserved" ? "contained" : "text"}
+                            >
+                               {status === "available" ? "Reserve" : status === "occupied" ? "View Order" : "Start Order"}
+                            </Button>
+                          )}
+                          {status === "occupied" && tableSettings.enable_table_transfer !== false && (
                             <Button 
                               fullWidth 
                               onClick={() => handleTransferClick(table)} 
@@ -281,7 +330,7 @@ const TableManagement: React.FC = () => {
                                Transfer
                             </Button>
                           )}
-                           {status === "reserved" && (
+                           {status === "reserved" && tableSettings.allow_waiter_cancel !== false && (
                             <Button 
                               fullWidth 
                               onClick={() => cancelReservation(table, 'cancelled')} 
@@ -294,7 +343,7 @@ const TableManagement: React.FC = () => {
                           )}
                           
                           {/* Resolve Service Request Button */}
-                          {(() => {
+                          {tableSettings.show_service_alerts !== false && (() => {
                              const request = serviceRequests?.find((r: any) => r.table_id === table.id);
                              if (request) {
                                return (
@@ -330,7 +379,7 @@ const TableManagement: React.FC = () => {
           )}
         </Box>
       )}
-      {loadingTables && <TableSectionSkeleton />}
+      {loadingTables && !tablesLoaded && <TableSectionSkeleton />}
 
       <TransferTableDialog
         open={transferDialogOpen}
@@ -363,7 +412,22 @@ const TableManagement: React.FC = () => {
                 <Divider sx={{ my: 2 }} />
 
                 {currentOrderItems.length === 0 ? (
-                  <Typography align="center" sx={{ py: 4 }}>No items found in this order.</Typography>
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography gutterBottom>No items found in this order.</Typography>
+                    <Button 
+                      variant="outlined" 
+                      color="error" 
+                      sx={{ mt: 2 }}
+                      onClick={() => {
+                        if (selectedTable) {
+                          cancelReservation(selectedTable as any, 'closed');
+                          handleClose();
+                        }
+                      }}
+                    >
+                      Close Table
+                    </Button>
+                  </Box>
                 ) : (
                   <>
                      <Box sx={{maxHeight: '60vh', overflow: 'auto'}}>

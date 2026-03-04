@@ -299,7 +299,7 @@ export const menuService = {
           title: "Item Marked FREE",
           message: `Table ${tableNumber || '?'}: ${menuItem?.name || 'Item'} is now FREE (Comped).`,
           priority: "high",
-          roles: itemType === 'drink' ? ["barman", "admin", "owner"] : ["chef", "admin", "owner"]
+          roles: itemType === 'drink' ? ["barman", "bartender"] : ["chef", "kitchen"]
         }).catch(e => console.error("❌ Comp notification error:", e));
       }
     }
@@ -386,7 +386,7 @@ export const menuService = {
             title: `Course ${course} Fired!`,
             message: `Table ${tableNumber || '?'}: ${foodCount} food items are now active.`,
             priority: "high",
-            roles: ["chef", "admin", "owner"]
+            roles: ["chef", "kitchen"]
           }).catch(e => console.error("❌ Course notification error:", e));
         }
         
@@ -395,7 +395,7 @@ export const menuService = {
             title: `Course ${course} Fired!`,
             message: `Table ${tableNumber || '?'}: ${drinkCount} drink items are now active.`,
             priority: "high",
-            roles: ["barman", "admin", "owner"]
+            roles: ["barman", "bartender"]
           }).catch(e => console.error("❌ Course notification error:", e));
         }
       }

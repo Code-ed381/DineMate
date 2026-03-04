@@ -33,6 +33,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { elapsedMinutesSince } from "../utils/format-datetime";
 import BarDineInPanelSkeleton from "./skeletons/bar-dine-in-panel-skeleton";
+import { useSettings } from "../providers/settingsProvider";
 
 dayjs.extend(relativeTime);
 
@@ -43,6 +44,8 @@ interface BartenderDineInPanelProps {
 const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscription = false }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { settings } = useSettings();
+  const bs = (settings as any).bar_settings || {};
   const {
     orderItemsLoading,
     handleFetchOrderItems,
@@ -110,7 +113,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                 transition: 'all 0.3s ease',
                 border: `1px solid ${theme.palette.divider}`,
                 borderLeft: `6px solid ${isCritical ? theme.palette.error.main : isWarning ? theme.palette.warning.main : theme.palette.info.main}`,
-                animation: isCritical ? "pulseCriticalBar 2s infinite" : "none",
+                animation: (isCritical && bs.enable_overdue_pulse !== false) ? "pulseCriticalBar 2s infinite" : "none",
                 "@keyframes pulseCriticalBar": {
                   "0%": { boxShadow: `0 0 0 0 ${theme.palette.error.light}40` },
                   "70%": { boxShadow: `0 0 0 10px ${theme.palette.error.light}00` },
@@ -136,7 +139,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                   </Typography>
                 </Stack>
 
-                {order.notes && (
+                {bs.show_order_notes !== false && order.notes && (
                   <Box sx={{ mb: 1, p: 1, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 152, 0, 0.05)', borderLeft: '3px solid', borderColor: 'warning.main' }}>
                     <Typography variant="caption" sx={{ fontStyle: 'italic', fontWeight: 600, color: isDark ? 'warning.light' : 'warning.dark', display: 'block' }}>
                       Note: {order.notes}
@@ -144,7 +147,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                   </Box>
                 )}
 
-                {order.recipe && (
+                {bs.show_recipes !== false && order.recipe && (
                   <Box 
                     sx={{ 
                       mb: 1, p: 1, borderRadius: 1.5, 
@@ -184,19 +187,21 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                   </Box>
                 )}
 
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ flex: 1 }}>
-                     <LinearProgress 
-                        variant="determinate" 
-                        value={progress} 
-                        sx={{ height: 6, borderRadius: 3 }}
-                        color={isCritical ? "error" : isWarning ? "warning" : "primary"} 
-                      />
+                {bs.show_sla_progress !== false && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ flex: 1 }}>
+                       <LinearProgress 
+                          variant="determinate" 
+                          value={progress} 
+                          sx={{ height: 6, borderRadius: 3 }}
+                          color={isCritical ? "error" : isWarning ? "warning" : "primary"} 
+                        />
+                    </Box>
+                    <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 40 }}>
+                       {elapsedMins}/{sla}m
+                    </Typography>
                   </Box>
-                  <Typography variant="caption" fontWeight="bold" sx={{ minWidth: 40 }}>
-                     {elapsedMins}/{sla}m
-                  </Typography>
-                </Box>
+                )}
               </Box>
             </ListItem>
           );
@@ -301,7 +306,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
               >
                 <Tab label={`Active (${pendingOrders.length})`} />
                 <Tab label={`Ready (${readyOrders.length})`} />
-                <Tab label={`Served (${servedOrders.length})`} />
+                {bs.show_served_column !== false && <Tab label={`Served (${servedOrders.length})`} />}
               </Tabs>
               <Card sx={{ 
                 borderRadius: 4, 
@@ -319,7 +324,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
               }}>
                 {mobileTab === 0 && renderActiveList()}
                 {mobileTab === 1 && renderReadyList()}
-                {mobileTab === 2 && renderServedList()}
+                {mobileTab === 2 && (bs.show_served_column !== false) && renderServedList()}
               </Card>
             </Box>
           ) : (
@@ -354,6 +359,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                    {renderReadyList()}
                  </Card>
               </Grid>
+              {bs.show_served_column !== false && (
               <Grid item xs={12} md={4}>
                  <Card sx={{ 
                    borderRadius: 4, 
@@ -369,6 +375,7 @@ const BartenderDineInPanel: React.FC<BartenderDineInPanelProps> = ({ skipSubscri
                    {renderServedList()}
                  </Card>
               </Grid>
+              )}
             </Grid>
           )}
         </>

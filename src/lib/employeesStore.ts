@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import Swal from 'sweetalert2';
+import { toE164 } from '../utils/phoneValidation';
 import useRestaurantStore from './restaurantStore';
 import { useAuditStore } from './auditStore';
 
@@ -97,6 +98,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
 
     addEmployee: async ({ firstName, lastName, email, phone, role, avatarUrl }) => {
         try {
+            const normalizedPhone = phone ? toE164(phone) : '';
             // 1. Invite user via email (they set their own password)
             const { supabaseAdmin } = await import('./supabaseAdmin');
             
@@ -104,7 +106,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
                 data: {
                     firstName: firstName,
                     lastName: lastName,
-                    phone: phone,
+                    phone: normalizedPhone,
                     profileAvatar: avatarUrl,
                     role: 'employee'
                 },
@@ -128,7 +130,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
                     status: 'pending',
                     first_name: firstName,
                     last_name: lastName,
-                    phone: phone,
+                    phone: normalizedPhone,
                     email: email
                 }]);
 

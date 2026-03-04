@@ -68,11 +68,14 @@ import { useCurrency } from "../utils/currency";
 import ModifierSelectionDialog from "../components/ModifierSelectionDialog";
 import SplitBillDialog from "../components/SplitBillDialog";
 import MenuImage from "../components/MenuImage";
+import { useSettings } from "../providers/settingsProvider";
 
 const Menu: React.FC = () => {
   const { currencySymbol } = useCurrency();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { settings } = useSettings();
+  const ms = settings?.menu_settings || {};
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const {
@@ -543,6 +546,7 @@ const Menu: React.FC = () => {
         
         return (
           <Stack spacing={3} mt={2} alignItems="center">
+            {ms.enable_tips !== false && (
             <Box width="100%">
               <Typography variant="caption" color="text.secondary" fontWeight="bold">SELECT TIP</Typography>
               <Stack direction="row" spacing={1} mt={1} flexWrap="wrap">
@@ -572,6 +576,7 @@ const Menu: React.FC = () => {
                 />
               </Stack>
             </Box>
+            )}
 
             <Divider sx={{ width: '100%' }} />
 
@@ -594,6 +599,7 @@ const Menu: React.FC = () => {
             <Stack spacing={2} width="100%">
                <TextField fullWidth label="Card Payment" type="number" value={card} onChange={(e) => setCard(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
                <TextField fullWidth label="Cash Payment" type="number" value={cash} onChange={(e) => setCash(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment> }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
+               {ms.allow_split_bill !== false && (
                <Button 
                 variant="outlined" 
                 onClick={() => setSplitBillOpen(true)}
@@ -602,6 +608,7 @@ const Menu: React.FC = () => {
                >
                  Split Bill / Multiple Payments
                </Button>
+               )}
             </Stack>
           </Stack>
         );
@@ -614,11 +621,21 @@ const Menu: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 1, md: 3 }, minHeight: '90vh', bgcolor: 'background.default' }}>
       {sessionsOverview?.length === 0 ? (
-         <Box sx={{ textAlign: "center", mt: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <TableRestaurantIcon sx={{ fontSize: 120, color: "text.disabled", opacity: 0.5 }} />
-            <Typography variant="h5" color="textSecondary" fontWeight="bold">No tables assigned to you</Typography>
-            <Typography color="textSecondary">You need to book tables from the table management section first.</Typography>
-            <Button variant="contained" size="large" onClick={() => navigate("/app/tables")} sx={{ borderRadius: 2, px: 4 }}>Go to Tables</Button>
+         <Box sx={{ textAlign: "center", py: 15, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, bgcolor: 'background.paper', borderRadius: 4, border: '1px solid', borderColor: 'divider', m: 3 }}>
+            <TableRestaurantIcon sx={{ fontSize: 120, color: "primary.main", mb: 2, opacity: 0.1 }} />
+            <Typography variant="h4" color="textPrimary" fontWeight="bold">No Active Sessions</Typography>
+            <Typography color="textSecondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+              You don't have any tables assigned yet. You need to "Start Order" from a table in the management section to begin taking orders.
+            </Typography>
+            <Button 
+              variant="contained" 
+              size="large" 
+              onClick={() => navigate("/app/tables")} 
+              startIcon={<TableRestaurantIcon />}
+              sx={{ borderRadius: 2, px: 6, py: 1.5, mt: 2, fontSize: '1rem', fontWeight: 'bold' }}
+            >
+              Go to Tables
+            </Button>
          </Box>
       ) : (
         <Grid container spacing={3}>
@@ -644,6 +661,7 @@ const Menu: React.FC = () => {
 
             {currentSession ? (
               <Box sx={{ animation: 'fadeIn 0.5s ease-in-out' }}>
+                {ms.show_search_bar !== false && (
                 <TextField 
                   fullWidth 
                   variant="outlined"
@@ -653,6 +671,7 @@ const Menu: React.FC = () => {
                   sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: 'background.paper' } }} 
                   InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon color="primary" /></InputAdornment> }}
                 />
+                )}
                 
                 <Typography variant="subtitle2" gutterBottom fontWeight="bold" color="textSecondary">CATEGORIES</Typography>
                 <Stack direction="row" spacing={1.5} sx={{ mb: 3, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 } }}>
@@ -660,6 +679,7 @@ const Menu: React.FC = () => {
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} variant="rectangular" width={100} height={40} sx={{ borderRadius: 2, flexShrink: 0 }} />)
                   ) : (
                     <>
+                      {ms.enable_favorites !== false && (
                       <Button 
                         variant={"Favorites" === selectedCategory ? "contained" : "outlined"} 
                         onClick={() => handleCategoryClick({ name: "Favorites" })}
@@ -668,6 +688,7 @@ const Menu: React.FC = () => {
                       >
                         Favorites
                       </Button>
+                      )}
                       {categories.map((c: any, idx) => (
                         <Button 
                           key={idx} 
@@ -705,12 +726,20 @@ const Menu: React.FC = () => {
                                sx={{ display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, alignItems: 'center', p: { xs: 1, sm: 0 }, justifyContent: 'flex-start' }}
                              >
                                <Box sx={{ width: { xs: 70, sm: '100%' }, height: { xs: 70, sm: 150 }, borderRadius: { xs: 2, sm: 0 }, overflow: 'hidden', flexShrink: 0 }}>
-                                  <MenuImage 
-                                    src={item.image_url} 
-                                    name={item.name} 
-                                    category={item.category_name} 
-                                    sx={{ width: '100%', height: '100%' }}
-                                  />
+                                  {ms.show_item_images !== false ? (
+                                    <MenuImage 
+                                      src={item.image_url} 
+                                      name={item.name} 
+                                      category={item.category_name} 
+                                      sx={{ width: '100%', height: '100%' }}
+                                    />
+                                  ) : (
+                                    <Box sx={{ width: '100%', height: '100%', bgcolor: 'action.selected', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                                        {item.category_name?.charAt(0)?.toUpperCase() || '?'}
+                                      </Typography>
+                                    </Box>
+                                  )}
                                 </Box>
                                 <CardContent sx={{ flexGrow: 1, width: '100%', py: { xs: 0, sm: 2 }, px: 2 }}>
                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -724,6 +753,7 @@ const Menu: React.FC = () => {
                                     </Stack>
                                  </CardContent>
                               </CardActionArea>
+                              {ms.enable_favorites !== false && (
                               <IconButton 
                                 size="small" 
                                 onClick={(e) => {
@@ -741,6 +771,7 @@ const Menu: React.FC = () => {
                               >
                                 {isFavorite(item.id) ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
                               </IconButton>
+                              )}
                            </Card>
                         </Grid>
                       ))
@@ -756,10 +787,18 @@ const Menu: React.FC = () => {
                 </Grid>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 15, bgcolor: 'action.hover', borderRadius: 4, border: '2px dashed', borderColor: 'divider' }}>
-                 <TableRestaurantIcon sx={{ fontSize: 80, color: "text.disabled", mb: 2 }} />
-                 <Typography variant="h5" color="textSecondary" fontWeight="bold">Ready to take an order?</Typography>
-                 <Typography color="textSecondary">Select an active table above to view the menu and start ordering.</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 15, bgcolor: 'background.paper', borderRadius: 4, border: '2px dashed', borderColor: 'divider' }}>
+                 <TableRestaurantIcon sx={{ fontSize: 80, color: "primary.main", mb: 2, opacity: 0.2 }} />
+                 <Typography variant="h5" color="textPrimary" fontWeight="bold">Ready to take an order?</Typography>
+                 <Typography color="textSecondary" sx={{ mb: 3 }}>Select an active table above to view the menu and start ordering.</Typography>
+                 <Button 
+                    variant="outlined" 
+                    onClick={() => navigate("/app/tables")}
+                    startIcon={<TableRestaurantIcon />}
+                    sx={{ borderRadius: 2 }}
+                 >
+                    Manage Other Tables
+                 </Button>
               </Box>
             )}
           </Grid>
@@ -768,6 +807,7 @@ const Menu: React.FC = () => {
              {currentSession ? (
                <Card sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, position: isMobile ? 'static' : 'sticky', top: 20, maxHeight: isMobile ? 'auto' : 'calc(100vh - 100px)', overflowY: isMobile ? 'visible' : 'auto' }}>
                    <Typography variant="h5" fontWeight="bold">Table {currentSession.table_number} Order</Typography>
+                   {ms.enable_course_selector !== false && (
                    <Box sx={{ mt: 1, mb: 2 }}>
                      <Typography variant="caption" color="text.secondary" fontWeight="bold">ADD TO COURSE</Typography>
                      <ToggleButtonGroup
@@ -784,6 +824,7 @@ const Menu: React.FC = () => {
                         <ToggleButton value={4} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>DRINKS</ToggleButton>
                      </ToggleButtonGroup>
                    </Box>
+                   )}
                    <Stepper activeStep={activeStep} orientation={isMobile ? "vertical" : "horizontal"} sx={{ mb: 4, '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' } }}>
                     {steps.map(s => <Step key={s}><StepLabel optional={isMobile ? <Typography variant="caption">{s}</Typography> : null}>{!isMobile && s}</StepLabel></Step>)}
                   </Stepper>
@@ -796,6 +837,7 @@ const Menu: React.FC = () => {
                         </Stack>
                       ) : (
                         <Stack direction="row" spacing={2} width="100%">
+                          {ms.show_print_bill !== false && (
                           <Button 
                             fullWidth 
                             variant="contained" 
@@ -806,6 +848,7 @@ const Menu: React.FC = () => {
                           >
                             Print Bill
                           </Button>
+                          )}
                           {isBilled && (
                             <Button 
                               fullWidth 
@@ -851,12 +894,16 @@ const Menu: React.FC = () => {
         open={Boolean(itemMenuAnchor)}
         onClose={handleCloseItemMenu}
       >
-        <MuiMenuItem onClick={handleVoidItem} sx={{ color: 'error.main' }}>
-          <BlockIcon sx={{ mr: 1, fontSize: 20 }} /> Void Item
-        </MuiMenuItem>
-        <MuiMenuItem onClick={handleCompItem} sx={{ color: 'success.main' }}>
-          <LocalOfferIcon sx={{ mr: 1, fontSize: 20 }} /> Comp Item (Free)
-        </MuiMenuItem>
+        {ms.allow_void_items !== false && (
+          <MuiMenuItem onClick={handleVoidItem} sx={{ color: 'error.main' }}>
+            <BlockIcon sx={{ mr: 1, fontSize: 20 }} /> Void Item
+          </MuiMenuItem>
+        )}
+        {ms.allow_comp_items !== false && (
+          <MuiMenuItem onClick={handleCompItem} sx={{ color: 'success.main' }}>
+            <LocalOfferIcon sx={{ mr: 1, fontSize: 20 }} /> Comp Item (Free)
+          </MuiMenuItem>
+        )}
       </MuiMenu>
 
       <ModifierSelectionDialog 

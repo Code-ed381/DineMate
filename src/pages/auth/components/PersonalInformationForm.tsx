@@ -5,6 +5,9 @@ import OutlinedInput from "@mui/material/OutlinedInput";
 import { styled } from "@mui/material/styles";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import Box from "@mui/material/Box";
 import useAuthStore from "../../../lib/authStore";
 
 const FormGrid = styled(Grid)(() => ({
@@ -17,7 +20,27 @@ const PersonalInformationForm: React.FC = () => {
     personalInfo,
     updatePersonalInfo,
     validationErrors,
+    updateTempFile,
+    tempFiles,
   } = useAuthStore();
+
+  const handleIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      updateTempFile("idDocument", e.target.files[0]);
+    }
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      updateTempFile("avatar", e.target.files[0]);
+    }
+  };
+
+  const getIdPlaceholder = () => {
+    if (personalInfo.idType === "Ghana Card") return "GHA-123456789-0";
+    if (personalInfo.idType === "Passport") return "G1234567";
+    return "License Number";
+  };
 
   return (
     <Grid container spacing={3} mt={4}>
@@ -40,8 +63,14 @@ const PersonalInformationForm: React.FC = () => {
             type="file"
             id="profile-picture"
             name="profilePicture"
+            onChange={handleAvatarFileChange}
           />
         </Button>
+        {tempFiles.avatar && (
+          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
+            File selected: {tempFiles.avatar.name}
+          </Typography>
+        )}
         <Typography
           variant="caption"
           display="block"
@@ -206,6 +235,69 @@ const PersonalInformationForm: React.FC = () => {
           </Typography>
         )}
       </FormGrid>
+
+      {/* ID Collection */}
+      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
+        <FormLabel required>ID Type</FormLabel>
+        <Select
+          value={personalInfo.idType || "Ghana Card"}
+          onChange={(e) => updatePersonalInfo("idType", e.target.value)}
+          size="medium"
+          sx={{ mr: { md: 2 } }}
+        >
+          <MenuItem value="Ghana Card">Ghana Card</MenuItem>
+          <MenuItem value="Passport">Passport</MenuItem>
+          <MenuItem value="Driver's License">Driver's License</MenuItem>
+        </Select>
+      </FormGrid>
+
+      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
+        <FormLabel required>ID Number</FormLabel>
+        <OutlinedInput
+          placeholder={getIdPlaceholder()}
+          value={personalInfo.idNumber}
+          onChange={(e) => updatePersonalInfo("idNumber", e.target.value)}
+          error={Boolean(validationErrors.idNumber)}
+          size="medium"
+        />
+        {validationErrors.idNumber && (
+          <Typography color="error" variant="caption">
+            {validationErrors.idNumber}
+          </Typography>
+        )}
+      </FormGrid>
+
+      <FormGrid item xs={12} mb={2}>
+        <FormLabel required>Upload ID Photo (Front)</FormLabel>
+        <Button
+          variant="outlined"
+          component="label"
+          sx={{
+            mt: 1,
+            textTransform: "none",
+            borderRadius: "10px",
+            borderColor: validationErrors.idDocumentUrl ? "error.main" : "inherit"
+          }}
+        >
+          {tempFiles.idDocument ? "Change ID Photo" : "Upload ID Photo"}
+          <input
+            hidden
+            accept="image/*"
+            type="file"
+            onChange={handleIdFileChange}
+          />
+        </Button>
+        {tempFiles.idDocument ? (
+          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
+            File selected: {tempFiles.idDocument.name}
+          </Typography>
+        ) : (
+          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.idDocumentUrl ? "error.main" : "text.secondary" }}>
+            JPG or PNG required.
+          </Typography>
+        )}
+      </FormGrid>
+
     </Grid>
   );
 };

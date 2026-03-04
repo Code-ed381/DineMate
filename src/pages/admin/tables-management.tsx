@@ -38,6 +38,7 @@ import useTableManagementStore from "../../lib/tableManagementStore";
 import AdminHeader from "../../components/admin-header";
 import FAB from "../../components/fab";
 import DataTable from "../../components/data-table";
+import EmptyState from "../../components/empty-state";
 import { useSettingsStore } from "../../lib/settingsStore";
 import TableDialog from "../../components/TableDialog";
 import { useFeatureGate } from "../../hooks/useFeatureGate";
@@ -46,6 +47,8 @@ import Swal from "sweetalert2";
 import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
 import useRestaurantStore from "../../lib/restaurantStore";
+import { useSettings } from "../../providers/settingsProvider";
+
 const statusColors: Record<string, { color: any; icon: any }> = {
   available: { color: "success", icon: CheckCircleIcon },
   unavailable: { color: "default", icon: BlockIcon },
@@ -58,6 +61,8 @@ const statusColors: Record<string, { color: any; icon: any }> = {
 
 const TableManagement: React.FC = () => {
   const { getTablesOverview, addTable, tables, handleSave, handleDelete } = useTableManagementStore();
+  const { settings } = useSettings();
+  const tableSettings = (settings as any).table_settings || {};
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,7 +81,10 @@ const TableManagement: React.FC = () => {
 
   const filteredTables = useMemo(() => {
     return tables.filter((table: any) => {
-      const matchesSearch = table.table_number.toString().includes(searchTerm) || (table.location || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = 
+        table.table_number.toString().includes(searchTerm) || 
+        (table.location || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (table.description || "").toLowerCase().includes(searchTerm.toLowerCase());
       const status = table.effective_status || table.table_status || "available";
       const matchesStatus = statusFilter === "all" || status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -144,6 +152,7 @@ const TableManagement: React.FC = () => {
     { field: "table_number", headerName: "Table #", flex: 1 },
     { field: "capacity", headerName: "Capacity", flex: 1 },
     { field: "location", headerName: "Location", flex: 1 },
+    { field: "description", headerName: "Description", flex: 1.5 },
     {
       field: "effective_status",
       headerName: "Status",
@@ -175,32 +184,34 @@ const TableManagement: React.FC = () => {
     <Box sx={{ p: 2 }}>
       <AdminHeader title="Table Management" description="Manage your restaurant tables" />
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-            <Avatar sx={{ bgcolor: "white", color: "primary.main", mr: 2 }}><TableRestaurant /></Avatar>
-            <Box><Typography variant="h4" fontWeight="bold">{tableStats.total}</Typography><Typography variant="body2" fontWeight="bold">Total Tables</Typography></Box>
-          </Paper>
+      {tableSettings.show_table_stats !== false && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+              <Avatar sx={{ bgcolor: "white", color: "primary.main", mr: 2 }}><TableRestaurant /></Avatar>
+              <Box><Typography variant="h4" fontWeight="bold">{tableStats.total}</Typography><Typography variant="body2" fontWeight="bold">Total Tables</Typography></Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'success.light', color: 'success.contrastText' }}>
+              <Avatar sx={{ bgcolor: "white", color: "success.main", mr: 2 }}><CheckCircleIcon /></Avatar>
+              <Box><Typography variant="h4" fontWeight="bold">{tableStats.available}</Typography><Typography variant="body2" fontWeight="bold">Available</Typography></Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'error.light', color: 'error.contrastText' }}>
+              <Avatar sx={{ bgcolor: "white", color: "error.main", mr: 2 }}><RestaurantIcon /></Avatar>
+              <Box><Typography variant="h4" fontWeight="bold">{tableStats.occupied}</Typography><Typography variant="body2" fontWeight="bold">Occupied</Typography></Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+              <Avatar sx={{ bgcolor: "white", color: "warning.main", mr: 2 }}><EventSeatIcon /></Avatar>
+              <Box><Typography variant="h4" fontWeight="bold">{tableStats.reserved}</Typography><Typography variant="body2" fontWeight="bold">Reserved</Typography></Box>
+            </Paper>
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'success.light', color: 'success.contrastText' }}>
-            <Avatar sx={{ bgcolor: "white", color: "success.main", mr: 2 }}><CheckCircleIcon /></Avatar>
-            <Box><Typography variant="h4" fontWeight="bold">{tableStats.available}</Typography><Typography variant="body2" fontWeight="bold">Available</Typography></Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'error.light', color: 'error.contrastText' }}>
-            <Avatar sx={{ bgcolor: "white", color: "error.main", mr: 2 }}><RestaurantIcon /></Avatar>
-            <Box><Typography variant="h4" fontWeight="bold">{tableStats.occupied}</Typography><Typography variant="body2" fontWeight="bold">Occupied</Typography></Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'warning.light', color: 'warning.contrastText' }}>
-            <Avatar sx={{ bgcolor: "white", color: "warning.main", mr: 2 }}><EventSeatIcon /></Avatar>
-            <Box><Typography variant="h4" fontWeight="bold">{tableStats.reserved}</Typography><Typography variant="body2" fontWeight="bold">Reserved</Typography></Box>
-          </Paper>
-        </Grid>
-      </Grid>
+      )}
 
       <Box sx={{ 
         display: "flex", 
@@ -232,7 +243,14 @@ const TableManagement: React.FC = () => {
         </Box>
       </Box>
 
-      {isMobile ? (
+      {filteredTables.length === 0 ? (
+        <EmptyState
+          title="No Tables Found"
+          description="Try adjusting your filters or add a new table."
+          emoji="🪑"
+          height={400}
+        />
+      ) : isMobile ? (
         <Grid container spacing={3}>
           {paginatedTables.map((table: any) => {
             const status = table.effective_status || table.table_status || "available";

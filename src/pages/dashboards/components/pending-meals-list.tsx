@@ -17,6 +17,9 @@ interface PendingMealsListProps {
   getTimeAgo: (timestamp: string) => string;
   elapsedMinutesSince: (timestamp: string) => number;
   progressValue: (timestamp: string, prepTime: number) => number;
+  defaultPrepTime?: number;
+  showTimers?: boolean;
+  enableBorderFlash?: boolean;
 }
 
 const useNow = (interval = 60000) => {
@@ -33,6 +36,9 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
   getTimeAgo,
   elapsedMinutesSince,
   progressValue,
+  defaultPrepTime = 15,
+  showTimers = true,
+  enableBorderFlash = true,
 }) => {
   useNow(30000);
 
@@ -40,10 +46,10 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
     <List sx={{ p: 0 }}>
       {pendingMeals?.map((dish, index) => {
         const timeFromUpdate = elapsedMinutesSince(dish.order_item_updated_at);
-        const prepTime = dish?.menu_item_prep_time || 15;
+        const prepTime = dish?.menu_item_prep_time || defaultPrepTime;
         const nearDeadline = timeFromUpdate >= prepTime - 2 && timeFromUpdate < prepTime;
         const overdue = timeFromUpdate >= prepTime;
-        const shouldBlink = elapsedMinutesSince(dish.order_item_created_at) >= prepTime - 2;
+        const shouldBlink = enableBorderFlash && elapsedMinutesSince(dish.order_item_created_at) >= prepTime - 2;
 
         return (
           <ListItem
@@ -126,7 +132,7 @@ const PendingMealsList: React.FC<PendingMealsListProps> = ({
                 </Box>
               )}
             </Box>
-            {dish?.order_item_status === "preparing" && (
+            {showTimers && dish?.order_item_status === "preparing" && (
               <Box sx={{ width: { xs: "100%", sm: 140 }, ml: { xs: 0, sm: 2 }, mt: { xs: 2, sm: 0 }, position: "relative" }}>
                 <LinearProgress variant="determinate" value={Math.min(progressValue(dish?.order_item_updated_at, prepTime), 100)} sx={{ height: 10, borderRadius: 5, backgroundColor: "#ffe0b2", "& .MuiLinearProgress-bar": { bgcolor: overdue ? "#c62828" : nearDeadline ? "#f57c00" : "#ff5722", borderRadius: 5 } }} />
                 <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: overdue ? "#c62828" : nearDeadline ? "#f57c00" : "#6d4c41", fontWeight: 600, textAlign: "center" }}>{Math.min(Math.floor(timeFromUpdate), prepTime)}/{prepTime} min</Typography>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -10,9 +10,10 @@ import {
   Tabs,
   Tab,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Button
 } from "@mui/material";
-import { PendingActions, DoneAll } from "@mui/icons-material";
+import { PendingActions, DoneAll, Block as BlockIcon } from "@mui/icons-material";
 import AlarmOnIcon from "@mui/icons-material/AlarmOn";
 import RestaurantMenuIcon from "@mui/icons-material/RestaurantMenu";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -24,6 +25,8 @@ import ReadyMealsList from "./dashboards/components/ready-meals-list";
 import ServedMealsList from "./dashboards/components/served-meals-list";
 import { formatDateTimeWithSuffix } from "../utils/format-datetime";
 import useAppStore from "../lib/appstore";
+import { useSettings } from "../providers/settingsProvider";
+import { useNavigate } from "react-router-dom";
 
 dayjs.extend(relativeTime);
 
@@ -38,9 +41,16 @@ const Kitchen: React.FC = () => {
     handleFetchServedMeals,
     subscribeToOrderItems,
     unsubscribeFromOrderItems,
+    startCookingTask,
   } = useKitchenStore();
 
+  const { settings } = useSettings();
+  const kitchenSettings = settings?.kitchen_settings;
+  const navigate = useNavigate();
+  
   const { setBreadcrumb } = useAppStore();
+  const prevPendingCount = useRef(pendingMeals?.length || 0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setBreadcrumb("Kitchen");
@@ -81,9 +91,44 @@ const Kitchen: React.FC = () => {
     };
   }, [handleFetchPendingMeals, handleFetchReadyMeals, handleFetchServedMeals, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
+  // Handle Sound Alerts
+  useEffect(() => {
+    if (kitchenSettings?.enable_sound_alerts && pendingMeals?.length > prevPendingCount.current) {
+      audioRef.current?.play().catch(e => console.log("Audio play failed:", e));
+    }
+    prevPendingCount.current = pendingMeals?.length || 0;
+  }, [pendingMeals?.length, kitchenSettings?.enable_sound_alerts]);
+
+  // Handle Auto-Accept
+  useEffect(() => {
+    if (kitchenSettings?.auto_accept_orders && pendingMeals?.length > 0) {
+      const pending = pendingMeals.filter(m => m.order_item_status === 'pending');
+      pending.forEach(m => {
+        startCookingTask(m);
+      });
+    }
+  }, [pendingMeals, kitchenSettings?.auto_accept_orders, startCookingTask]);
+
   const getTimeAgo = (timestamp: string) => formatDateTimeWithSuffix(timestamp);
 
+  if (kitchenSettings?.enable_kds === false) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center', mt: 10 }}>
+        <BlockIcon sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
+        <Typography variant="h4" fontWeight="bold">KDS Disabled</Typography>
+        <Typography color="textSecondary" sx={{ mb: 3 }}>The Kitchen Display System is currently disabled in settings.</Typography>
+        <Button variant="contained" onClick={() => navigate("/app/settings?tab=kitchen")}>Enable in Settings</Button>
+      </Box>
+    );
+  }
+
   const renderContent = () => {
+    const commonProps = {
+      defaultPrepTime: kitchenSettings?.default_prep_time || 15,
+      showTimers: kitchenSettings?.show_timers !== false,
+      enableBorderFlash: kitchenSettings?.enable_border_flash !== false
+    };
+
     if (isMobile) {
       return (
         <Box>
@@ -114,6 +159,7 @@ const Kitchen: React.FC = () => {
                     getTimeAgo={getTimeAgo}
                     elapsedMinutesSince={elapsedMinutesSince}
                     progressValue={progressValue}
+                    {...commonProps}
                   />
                 )}
               </Box>
@@ -199,6 +245,7 @@ const Kitchen: React.FC = () => {
                     getTimeAgo={getTimeAgo}
                     elapsedMinutesSince={elapsedMinutesSince}
                     progressValue={progressValue}
+                    {...commonProps}
                   />
                 )}
               </CardContent>
@@ -244,6 +291,7 @@ const Kitchen: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto" />
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <RestaurantMenuIcon sx={{ fontSize: 36, color: "primary.main" }} />

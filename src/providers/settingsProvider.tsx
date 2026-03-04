@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, ReactNode } from "react";
-import { useSettingsStore } from "../lib/settingsStore";
+import { useSettingsStore, AppSettings } from "../lib/settingsStore";
 import useRestaurantStore from "../lib/restaurantStore";
 import { RestaurantMember, Restaurant } from "../lib/restaurantStore";
 
 interface SettingsContextType {
-  settings: Record<string, any>;
-  updateSetting: (key: string, value: any) => Promise<void>;
-  getSetting: (key: string) => any;
+  settings: AppSettings;
+  updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
+  getSetting: <K extends keyof AppSettings>(key: K) => AppSettings[K] | undefined;
   restaurantId: string | undefined;
 }
 

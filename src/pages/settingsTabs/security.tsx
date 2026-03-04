@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -7,10 +7,42 @@ import {
   TextField,
   Button,
   Stack,
-  Divider,
+  CircularProgress
 } from "@mui/material";
+import { supabase } from "../../lib/supabase";
+import { toast } from "react-toastify";
 
 const SecuritySettingsPanel: React.FC = () => {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      console.error(error);
+      toast.error(error.message || "Failed to update password.");
+    } else {
+      toast.success("Password updated successfully.");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setLoading(false);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -27,10 +59,30 @@ const SecuritySettingsPanel: React.FC = () => {
               Change Password
             </Typography>
             <Stack spacing={2} sx={{ mt: 2 }}>
-              <TextField label="Current Password" type="password" fullWidth size="small" />
-              <TextField label="New Password" type="password" fullWidth size="small" />
-              <TextField label="Confirm New Password" type="password" fullWidth size="small" />
-              <Button variant="contained" color="primary">Update Password</Button>
+              <TextField 
+                label="New Password" 
+                type="password" 
+                fullWidth 
+                size="small"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <TextField 
+                label="Confirm New Password" 
+                type="password" 
+                fullWidth 
+                size="small"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+              <Button 
+                variant="contained" 
+                color="primary"
+                onClick={handleUpdatePassword}
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={24} /> : "Update Password"}
+              </Button>
             </Stack>
           </CardContent>
         </Card>

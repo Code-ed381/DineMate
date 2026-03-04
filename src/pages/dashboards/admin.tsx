@@ -20,6 +20,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  useMediaQuery,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -56,13 +57,17 @@ import {
   Area,
 } from "recharts";
 import DashboardHeader from "./components/dashboard-header";
+import EmptyState from "../../components/empty-state";
 import { useAnalyticsStore } from "../../lib/analyticsStore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import useNotificationStore from "../../lib/notificationStore";
 import { formatCurrency } from "../../utils/currency";
 import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import Swal from "sweetalert2";
+import { useSettings } from "../../providers/settingsProvider";
 
 dayjs.extend(relativeTime);
 
@@ -70,11 +75,14 @@ const COLORS = ["#1976d2", "#ff9800", "#4caf50", "#f44336", "#9c27b0", "#00bcd4"
 
 const AdminDashboard: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [timeRange, setTimeRange] = useState("today");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
-  const { selectedRestaurant } = useRestaurantStore();
+  const { selectedRestaurant, role } = useRestaurantStore();
+  const { settings } = useSettings();
   
   const { 
     kpis, 
@@ -105,16 +113,10 @@ const AdminDashboard: React.FC = () => {
     if (!autoRefresh || !selectedRestaurant?.id) return;
     const interval = setInterval(() => {
       fetchDashboardData(selectedRestaurant.id, timeRange);
-    }, 60000); // 1 minute refresh
+      fetchNotifications();
+    }, 30000); // 30 seconds refresh to match owner dashboard
     return () => clearInterval(interval);
-  }, [autoRefresh, selectedRestaurant?.id, timeRange]);
-
-  const handleRefresh = () => {
-    if (selectedRestaurant?.id) {
-        fetchDashboardData(selectedRestaurant.id, timeRange);
-        fetchNotifications();
-    }
-  };
+  }, [autoRefresh, selectedRestaurant?.id, timeRange, fetchDashboardData, fetchNotifications]);
 
   const getNotificationIcon = (priority: string, type: string) => {
     if (priority === 'urgent') return <ErrorIcon color="error" />;
@@ -143,67 +145,8 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, minHeight: "100vh" }}>
-      {/* Header Section */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <DashboardHeader
-            title="Admin Dashboard"
-            description={`Performance overview for ${selectedRestaurant?.name}`}
-            background="linear-gradient(135deg, rgba(25,118,210,1) 0%, rgba(0,200,150,1) 100%)"
-            color="#fff"
-            action={
-                <Box>
-                    <Button 
-                        variant="contained" 
-                        color="secondary" 
-                        startIcon={<Download />}
-                        onClick={handleExportClick}
-                        sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, backdropFilter: 'blur(10px)' }}
-                    >
-                        Export
-                    </Button>
-                    <Menu
-                        anchorEl={exportAnchorEl}
-                        open={Boolean(exportAnchorEl)}
-                        onClose={handleExportClose}
-                    >
-                        <MenuItem onClick={handleExportCSV}>
-                            <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                            Export Data (CSV)
-                        </MenuItem>
-                        <MenuItem onClick={handleExportPDF}>
-                            <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                            Print Dashboard (PDF)
-                        </MenuItem>
-                    </Menu>
-                </Box>
-            }
-        />
-        <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-            <ToggleButtonGroup
-              value={timeRange}
-              exclusive
-              onChange={(_e, v) => v && setTimeRange(v)}
-              size="small"
-              sx={{ bgcolor: 'background.paper' }}
-            >
-              <ToggleButton value="today">Today</ToggleButton>
-              <ToggleButton value="week">Week</ToggleButton>
-              <ToggleButton value="month">Month</ToggleButton>
-            </ToggleButtonGroup>
-             <Button
-                variant={autoRefresh ? "contained" : "outlined"}
-                startIcon={<Refresh />}
-                onClick={handleRefresh}
-                size="small"
-                sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.default' } }}
-              >
-                Refresh
-              </Button>
-        </Stack>
-      </Box>
-
-      {/* KPI Cards */}
-      <Grid container spacing={3}>
+      {/* KPI Cards - Now First Row */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
         {[
           {
             title: "Total Revenue",
@@ -265,6 +208,63 @@ const AdminDashboard: React.FC = () => {
         ))}
       </Grid>
 
+      {/* Controls - Now Second Row */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
+        <Box>
+            <Button 
+                variant="contained" 
+                color="primary" 
+                startIcon={<Download />}
+                onClick={handleExportClick}
+                fullWidth={isMobile}
+            >
+                Export
+            </Button>
+            <Menu
+                anchorEl={exportAnchorEl}
+                open={Boolean(exportAnchorEl)}
+                onClose={handleExportClose}
+            >
+                <MenuItem onClick={handleExportCSV}>
+                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                    Export Data (CSV)
+                </MenuItem>
+                <MenuItem onClick={handleExportPDF}>
+                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                    Print Dashboard (PDF)
+                </MenuItem>
+            </Menu>
+        </Box>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <ToggleButtonGroup
+              value={timeRange}
+              exclusive
+              onChange={(_e, v) => v && setTimeRange(v)}
+              size="small"
+              sx={{ bgcolor: 'background.paper', display: 'flex', width: '100%' }}
+            >
+              <ToggleButton value="today" sx={{ flex: 1 }}>Today</ToggleButton>
+              <ToggleButton value="week" sx={{ flex: 1 }}>Week</ToggleButton>
+              <ToggleButton value="month" sx={{ flex: 1 }}>Month</ToggleButton>
+            </ToggleButtonGroup>
+             <Button
+                variant={autoRefresh ? "contained" : "outlined"}
+                color="primary"
+                startIcon={<Refresh />}
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                size="small"
+                fullWidth={isMobile}
+                sx={{ 
+                  bgcolor: autoRefresh ? 'primary.main' : 'background.paper', 
+                  color: autoRefresh ? 'white' : 'primary.main',
+                  '&:hover': { bgcolor: autoRefresh ? 'primary.dark' : 'background.default' } 
+                }}
+              >
+                {autoRefresh ? "Live" : "Paused"}
+              </Button>
+        </Stack>
+      </Box>
+
       {/* Charts & Insights */}
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* Sales Trends */}
@@ -292,10 +292,12 @@ const AdminDashboard: React.FC = () => {
                         </AreaChart>
                     </ResponsiveContainer>
                 ) : (
-                    <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-                        <Typography color="text.secondary">No revenue data available</Typography>
-                    </Box>
-                )}
+                    <EmptyState 
+                    title="No Revenue" 
+                    description="No revenue data available" 
+                    emoji="📊"
+                    height={260}
+                  />)}
               </Box>
             </CardContent>
           </Card>
@@ -331,10 +333,12 @@ const AdminDashboard: React.FC = () => {
                         </PieChart>
                     </ResponsiveContainer>
                  ) : (
-                    <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-                        <Typography color="text.secondary">No sales data available</Typography>
-                    </Box>
-                )}
+                    <EmptyState 
+                    title="No Sales" 
+                    description="No sales data available" 
+                    emoji="🍳"
+                    height={260}
+                  />)}
               </Box>
             </CardContent>
           </Card>
@@ -362,10 +366,12 @@ const AdminDashboard: React.FC = () => {
                         </BarChart>
                     </ResponsiveContainer>
                  ) : (
-                    <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-                        <Typography color="text.secondary">No staff performance data</Typography>
-                    </Box>
-                )}
+                    <EmptyState 
+                    title="No Activity" 
+                    description="No staff performance data" 
+                    emoji="👥"
+                    height={260}
+                  />)}
               </Box>
             </CardContent>
           </Card>
@@ -410,9 +416,12 @@ const AdminDashboard: React.FC = () => {
                         </React.Fragment>
                     ))
                 ) : (
-                    <Box sx={{ p: 2, textAlign: 'center' }}>
-                        <Typography color="text.secondary">No new notifications</Typography>
-                    </Box>
+                    <EmptyState 
+                    title="All Caught Up" 
+                    description="No new notifications" 
+                    emoji="🔔"
+                    height={200}
+                  />
                 )}
               </List>
               <Button fullWidth size="small" sx={{ mt: 1 }}>View All Notifications</Button>
@@ -422,38 +431,63 @@ const AdminDashboard: React.FC = () => {
       </Grid>
 
       {/* Quick Actions */}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        {[
-          { label: "Manage Staff", icon: <Group /> },
-          { label: "Manage Menu", icon: <RestaurantMenu /> },
-          { label: "Reports", icon: <Assignment /> },
-          { label: "Settings", icon: <Settings /> },
-        ].map((item, i) => (
-          <Grid item xs={12} sm={6} md={3} key={i}>
-            <Card
-              sx={{
-                borderRadius: 3,
-                textAlign: "center",
-                "&:hover": { background: alpha(theme.palette.primary.main, 0.05), cursor: "pointer" },
-                transition: 'all 0.2s'
-              }}
-            >
-              <CardContent>
-                <Box sx={{ fontSize: 40, color: "#1976d2", mb: 1 }}>
-                  {item.icon}
-                </Box>
-                <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-                  {item.label}
-                </Typography>
-                <Divider sx={{ my: 1 }} />
-                <Button size="small" variant="outlined">
-                  Open
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      <Box sx={{ mt: 2, mb: 1 }}>
+        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+            Quick Actions
+        </Typography>
+        <Grid container spacing={3}>
+            {[
+            { label: "Manage Staff", icon: <Group />, desc: "Add or edit staff members", link: "/app/employees" },
+            { label: "Manage Menu", icon: <RestaurantMenu />, desc: "Update menu items and categories", link: "/app/menu-items-management" },
+            { label: "Sales Reports", icon: <Assignment />, desc: "View detailed financial reports", link: "/app/report" },
+            { label: "System Settings", icon: <Settings />, desc: "Configure restaurant details", link: "/app/settings" },
+            ].map((item, i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+                <Card
+                onClick={() => {
+                    if (item.link === "/app/report" && role === "admin" && !settings?.employee_permissions?.admins_view_report) {
+                        Swal.fire({
+                            title: "Access Denied",
+                            text: "You do not have permission to view sales reports. Please contact your restaurant owner.",
+                            icon: "warning",
+                            confirmButtonColor: theme.palette.primary.main
+                        });
+                        return;
+                    }
+                    navigate(item.link);
+                }}
+                sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    cursor: "pointer",
+                    border: '1px solid transparent',
+                    "&:hover": { 
+                        bgcolor: alpha(theme.palette.primary.main, 0.02),
+                        border: `1px solid ${theme.palette.primary.main}`,
+                        transform: 'translateY(-2px)'
+                    },
+                    transition: 'all 0.2s ease-in-out'
+                }}
+                >
+                    <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}>
+                        {item.icon}
+                    </Avatar>
+                    <Box>
+                        <Typography variant="subtitle2" fontWeight={700}>
+                            {item.label}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            {item.desc}
+                        </Typography>
+                    </Box>
+                </Card>
+            </Grid>
+            ))}
+        </Grid>
+      </Box>
     </Box>
   );
 };
