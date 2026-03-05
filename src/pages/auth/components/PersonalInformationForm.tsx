@@ -8,6 +8,9 @@ import Typography from "@mui/material/Typography";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Box from "@mui/material/Box";
+import Avatar from "@mui/material/Avatar";
+import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import DocumentScannerIcon from "@mui/icons-material/DocumentScanner";
 import useAuthStore from "../../../lib/authStore";
 
 const FormGrid = styled(Grid)(() => ({
@@ -23,6 +26,23 @@ const PersonalInformationForm: React.FC = () => {
     updateTempFile,
     tempFiles,
   } = useAuthStore();
+
+  const avatarPreview = React.useMemo(() => {
+    if (!tempFiles.avatar) return personalInfo.profileAvatar || "";
+    return URL.createObjectURL(tempFiles.avatar);
+  }, [tempFiles.avatar, personalInfo.profileAvatar]);
+
+  const idPreview = React.useMemo(() => {
+    if (!tempFiles.idDocument) return "";
+    return URL.createObjectURL(tempFiles.idDocument);
+  }, [tempFiles.idDocument]);
+
+  React.useEffect(() => {
+    return () => {
+      if (avatarPreview && avatarPreview.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
+      if (idPreview && idPreview.startsWith("blob:")) URL.revokeObjectURL(idPreview);
+    };
+  }, [avatarPreview, idPreview]);
 
   const handleIdFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,18 +65,53 @@ const PersonalInformationForm: React.FC = () => {
   return (
     <Grid container spacing={3} mt={4}>
       {/* Profile Picture */}
-      <FormGrid item xs={12} mb={2}>
-        <FormLabel htmlFor="profile-picture">Profile Picture</FormLabel>
-        <Button
-          variant="outlined"
+      <FormGrid item xs={12} mb={2} display="flex" flexDirection="column" alignItems="center">
+        <FormLabel htmlFor="profile-picture" required sx={{ mb: 2, fontWeight: 600 }}>Profile Icon</FormLabel>
+        <Box
           component="label"
+          htmlFor="profile-picture"
           sx={{
-            mt: 1,
-            textTransform: "none",
-            borderRadius: "10px",
+            position: 'relative',
+            cursor: 'pointer',
+            border: validationErrors.profileAvatar ? '2px solid' : 'none',
+            borderColor: 'error.main',
+            borderRadius: '50%',
+            p: 0.5,
+            '&:hover .overlay': { opacity: 1 },
           }}
         >
-          Upload Photo
+          <Avatar
+            src={avatarPreview}
+            sx={{
+              width: 100,
+              height: 100,
+              bgcolor: 'background.paper',
+              border: '2px dashed',
+              borderColor: 'divider',
+              boxShadow: 2,
+            }}
+          >
+            {!tempFiles.avatar && !personalInfo.profileAvatar && <AddPhotoAlternateIcon sx={{ fontSize: 40, color: 'text.secondary' }} />}
+          </Avatar>
+          <Box
+            className="overlay"
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              bgcolor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0,
+              transition: 'opacity 0.2s',
+            }}
+          >
+            <AddPhotoAlternateIcon sx={{ color: 'white' }} />
+          </Box>
           <input
             hidden
             accept="image/*"
@@ -65,17 +120,13 @@ const PersonalInformationForm: React.FC = () => {
             name="profilePicture"
             onChange={handleAvatarFileChange}
           />
-        </Button>
-        {tempFiles.avatar && (
-          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
-            File selected: {tempFiles.avatar.name}
+        </Box>
+        {validationErrors.profileAvatar && (
+          <Typography color="error" variant="caption" sx={{ mt: 1 }}>
+            {validationErrors.profileAvatar}
           </Typography>
         )}
-        <Typography
-          variant="caption"
-          display="block"
-          sx={{ mt: 1, color: "text.secondary" }}
-        >
+        <Typography variant="caption" sx={{ mt: 1, color: "text.secondary" }}>
           JPG, PNG, or GIF. Max size: 5MB.
         </Typography>
       </FormGrid>
@@ -267,35 +318,63 @@ const PersonalInformationForm: React.FC = () => {
         )}
       </FormGrid>
 
-      <FormGrid item xs={12} mb={2}>
-        <FormLabel required>Upload ID Photo (Front)</FormLabel>
-        <Button
-          variant="outlined"
+      <FormGrid item xs={12} minHeight={150} mb={2}>
+        <FormLabel required sx={{ mb: 1 }}>Upload ID Photo (Front)</FormLabel>
+        <Box
           component="label"
           sx={{
-            mt: 1,
-            textTransform: "none",
-            borderRadius: "10px",
-            borderColor: validationErrors.idDocumentUrl ? "error.main" : "inherit"
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px dashed',
+            borderColor: validationErrors.idDocumentUrl ? 'error.main' : 'divider',
+            borderRadius: 2,
+            p: 3,
+            cursor: 'pointer',
+            bgcolor: 'background.paper',
+            transition: 'background-color 0.2s',
+            '&:hover': { bgcolor: 'action.hover' },
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          {tempFiles.idDocument ? "Change ID Photo" : "Upload ID Photo"}
+          {tempFiles.idDocument ? (
+            <>
+              <Box
+                component="img"
+                src={idPreview}
+                alt="ID Preview"
+                sx={{
+                  maxHeight: 180,
+                  maxWidth: '100%',
+                  objectFit: 'contain',
+                  borderRadius: 1,
+                  mb: 1
+                }}
+              />
+              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                {tempFiles.idDocument.name}
+              </Typography>
+            </>
+          ) : (
+            <>
+              <DocumentScannerIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+              <Typography variant="body2" color="text.primary" fontWeight={600}>
+                Click to upload ID Photo
+              </Typography>
+              <Typography variant="caption" color={validationErrors.idDocumentUrl ? "error.main" : "text.secondary"}>
+                JPG or PNG required. Ensure details are clear.
+              </Typography>
+            </>
+          )}
           <input
             hidden
             accept="image/*"
             type="file"
             onChange={handleIdFileChange}
           />
-        </Button>
-        {tempFiles.idDocument ? (
-          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
-            File selected: {tempFiles.idDocument.name}
-          </Typography>
-        ) : (
-          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.idDocumentUrl ? "error.main" : "text.secondary" }}>
-            JPG or PNG required.
-          </Typography>
-        )}
+        </Box>
       </FormGrid>
 
     </Grid>

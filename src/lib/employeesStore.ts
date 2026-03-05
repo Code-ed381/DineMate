@@ -98,6 +98,17 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
 
     addEmployee: async ({ firstName, lastName, email, phone, role, avatarUrl }) => {
         try {
+            // ─── Subscription limit check ───
+            const { useSubscriptionStore } = await import('./subscriptionStore');
+            const { getPlanById } = await import('../config/plans');
+            const subPlan = useSubscriptionStore.getState().subscriptionPlan || 'free';
+            const plan = getPlanById(subPlan);
+            const currentCount = get().employees.length;
+            if (plan.limits.maxEmployees !== 9999 && currentCount >= plan.limits.maxEmployees) {
+              Swal.fire("Limit Reached", `Your ${plan.name} plan allows up to ${plan.limits.maxEmployees} employees. Please upgrade to add more.`, "warning");
+              return;
+            }
+
             const normalizedPhone = phone ? toE164(phone) : '';
             // 1. Invite user via email (they set their own password)
             const { supabaseAdmin } = await import('./supabaseAdmin');

@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon, Person as PersonIcon, ShoppingCart as CartIcon } from '@mui/icons-material';
 import { OrderItem } from '../types/menu';
+import { useFeatureGate } from '../hooks/useFeatureGate';
 
 interface Props {
   open: boolean;
@@ -36,6 +37,7 @@ const SplitBillDialog: React.FC<Props> = ({ open, onClose, items, currencySymbol
   const [numGuests, setNumGuests] = useState<number>(2);
   const [cash, setCash] = useState<string>('');
   const [card, setCard] = useState<string>('');
+  const { canAccess } = useFeatureGate();
 
   const unpaidItems = useMemo(() => items.filter(i => i.payment_status !== 'completed'), [items]);
   const totalUnpaid = useMemo(() => unpaidItems.reduce((sum, i) => sum + (i.sum_price || 0), 0), [unpaidItems]);
@@ -141,14 +143,26 @@ const SplitBillDialog: React.FC<Props> = ({ open, onClose, items, currencySymbol
               label="Cash" 
               placeholder="0.00" 
               value={cash} 
-              onChange={(e) => setCash(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length > 0 && card.length > 0 && !canAccess("canUseMultiplePayments")) {
+                  import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Splitting a single payment between Cash and Card requires an upgraded plan.", "info"));
+                  return;
+                }
+                setCash(e.target.value);
+              }}
             />
             <TextField 
               fullWidth 
               label="Card" 
               placeholder="0.00" 
               value={card} 
-              onChange={(e) => setCard(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length > 0 && cash.length > 0 && !canAccess("canUseMultiplePayments")) {
+                  import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Splitting a single payment between Cash and Card requires an upgraded plan.", "info"));
+                  return;
+                }
+                setCard(e.target.value);
+              }}
             />
           </Stack>
         </Box>

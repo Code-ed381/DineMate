@@ -25,9 +25,10 @@ import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
 import { getRoleRedirectPath } from "../utils/roleRedirects";
 import Swal from "sweetalert2";
 import AddRestaurantModal from "../components/modals/AddRestaurantModal";
+import Logo from "../assets/logo.png";
 
-const MotionBox = motion(Box);
-const MotionCard = motion(Card);
+const MotionBox = motion.create(Box);
+const MotionCard = motion.create(Card);
 
 const RestaurantSelectionPage: React.FC = () => {
   const { restaurants, getRestaurants, setSelectedRestaurant, setRole, loading } =
@@ -132,18 +133,21 @@ const RestaurantSelectionPage: React.FC = () => {
           zIndex: 10,
         }}
       >
-        <Typography
-          variant="h5"
-          fontWeight={800}
-          sx={{
-            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            letterSpacing: "-0.5px",
-          }}
-        >
-          DineMate
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <img src={Logo} alt="DineMate Logo" style={{ width: 40, height: 40 }} />
+          <Typography
+            variant="h5"
+            fontWeight={800}
+            sx={{
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              letterSpacing: "-0.5px",
+            }}
+          >
+            DineMate
+          </Typography>
+        </Box>
         <IconButton 
           onClick={handleLogout} 
           sx={{ 

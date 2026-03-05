@@ -92,7 +92,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
             await fetchSubscriptions();
           }
           onClose();
-          Swal.fire("Success", `Your plan has been upgraded!`, "success");
+          Swal.fire("Success", `Your plan has been upgraded to ${plan.name}!`, "success");
         } catch (error: any) {
           Swal.fire("Error", error.message, "error");
         }
@@ -109,6 +109,8 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
       Swal.fire("Error", "Paystack payment widget failed to load. Please refresh and try again.", "error");
     }
   };
+
+  const paidPlans = plans.filter((p) => p.id !== "free");
 
   return (
     <Dialog
@@ -128,12 +130,11 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
           Unlock powerful features by upgrading your plan.
         </Typography>
         <Grid container spacing={2}>
-          {plans
-            .filter((p) => p.id !== "free")
-            .map((plan) => {
+          {paidPlans.map((plan) => {
               const isCurrent = plan.id === currentPlanId;
+              const isDowngrade = plans.findIndex(p => p.id === plan.id) < plans.findIndex(p => p.id === currentPlanId);
               return (
-                <Grid item xs={12} md={6} key={plan.id}>
+                <Grid item xs={12} md={4} key={plan.id}>
                   <Card
                     variant="outlined"
                     sx={{
@@ -144,14 +145,32 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
                       flexDirection: "column",
                       border: isCurrent
                         ? "2px solid"
+                        : plan.popular
+                        ? "2px solid"
                         : "1px solid",
-                      borderColor: isCurrent ? "primary.main" : "divider",
+                      borderColor: isCurrent ? "primary.main" : plan.popular ? "primary.light" : "divider",
                       backgroundColor: isCurrent
                         ? "rgba(25, 118, 210, 0.04)"
                         : "background.paper",
+                      position: "relative",
                     }}
                   >
-                    <CardContent sx={{ flexGrow: 1 }}>
+                    {plan.popular && !isCurrent && (
+                      <Chip
+                        label="Most Popular"
+                        color="primary"
+                        size="small"
+                        sx={{
+                          position: "absolute",
+                          top: -12,
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          fontWeight: 700,
+                          fontSize: "0.7rem",
+                        }}
+                      />
+                    )}
+                    <CardContent sx={{ flexGrow: 1, pt: plan.popular && !isCurrent ? 3 : 2 }}>
                       <Box
                         display="flex"
                         justifyContent="space-between"
@@ -170,6 +189,9 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
                           />
                         )}
                       </Box>
+                      <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                        {plan.subtitle}
+                      </Typography>
                       <Typography
                         variant="h5"
                         fontWeight="bold"
@@ -187,25 +209,18 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
                       </Typography>
                       <Box sx={{ mt: 1 }}>
                         {plan.features
-                          .filter(
-                            (f) =>
-                              !f.text.startsWith("Edit") &&
-                              !f.text.startsWith("Add") &&
-                              !f.text.startsWith("Manage")
-                          )
+                          .filter((f) => f.included)
+                          .slice(0, 8)
                           .map((f, index) => (
                             <Typography
                               key={index}
                               variant="body2"
                               sx={{
-                                color: f.included
-                                  ? "text.primary"
-                                  : "text.disabled",
+                                color: "text.primary",
                                 mb: 0.5,
                               }}
                             >
-                              {f.included ? "✓ " : "✕ "}
-                              {f.text}
+                              ✓ {f.text}
                             </Typography>
                           ))}
                       </Box>
@@ -215,9 +230,9 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
                         variant={isCurrent ? "outlined" : "contained"}
                         fullWidth
                         onClick={() => handleUpgradeClick(plan.id)}
-                        disabled={isCurrent}
+                        disabled={isCurrent || isDowngrade}
                       >
-                        {isCurrent ? "Active Plan" : `Choose ${plan.name}`}
+                        {isCurrent ? "Active Plan" : isDowngrade ? "Current plan is higher" : `Choose ${plan.name}`}
                       </Button>
                     </Box>
                   </Card>

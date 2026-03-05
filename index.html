@@ -35,6 +35,12 @@
     -->
     <title>Annys Restaurant & Bar</title>
     <script src="https://js.paystack.co/v2/inline.js"></script>
+    <style>
+      /* Ensure SweetAlert2 is always on top of MUI Dialogs (1300) and Drawers (1200) */
+      .swal2-container {
+        z-index: 9999 !important;
+      }
+    </style>
   </head>
   <body>
     <script type="module" src="/src/index.tsx"></script>

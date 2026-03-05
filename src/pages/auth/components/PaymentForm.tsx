@@ -15,6 +15,7 @@ import Typography from "@mui/material/Typography";
 import { styled } from "@mui/material/styles";
 import Stack from "@mui/material/Stack";
 import CardContent from "@mui/material/CardContent";
+import Chip from "@mui/material/Chip";
 import useAuthStore from "../../../lib/authStore";
 
 import { plans } from "../../../config/plans";
@@ -36,10 +37,6 @@ const Card = styled(MuiCard, {
       borderColor: "primary.dark",
       boxShadow: "0px 1px 8px hsla(210, 100%, 25%, 0.5) ",
     }),
-  },
-  [theme.breakpoints.up("md")]: {
-    flexGrow: 1,
-    maxWidth: `calc(50% - ${theme.spacing(1)})`,
   },
   ...(selected && {
     borderColor: (theme as any).vars?.palette.primary.light || theme.palette.primary.light,
@@ -81,11 +78,12 @@ const PaymentForm: React.FC = () => {
         </Stack>
 
         {/* Plans */}
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={4}
-          justifyContent="center"
-          alignItems="stretch"
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(4, 1fr)" },
+            gap: 2,
+          }}
         >
           {plans.map((plan) => {
             const isSelected = subscription.subscription_plan === plan.id;
@@ -95,34 +93,52 @@ const PaymentForm: React.FC = () => {
                 key={plan.id}
                 selected={isSelected}
                 sx={{
-                  flex: 1,
-                  p: 3,
+                  p: 2,
                   borderRadius: 3,
                   textAlign: "center",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                  boxShadow: plan.popular ? "0 8px 32px rgba(25, 118, 210, 0.18)" : "0 4px 16px rgba(0,0,0,0.08)",
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                   "&:hover": {
                     transform: "translateY(-4px)",
                     boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
                   },
-                  border: isSelected ? "2px solid #1976d2" : "1px solid #333",
+                  border: isSelected ? "2px solid #1976d2" : plan.popular ? "2px solid #1976d2" : "1px solid #333",
+                  position: "relative",
                 }}
               >
-                <CardContent>
+                {plan.popular && (
+                  <Chip
+                    label="Most Popular"
+                    color="primary"
+                    size="small"
+                    sx={{
+                      position: "absolute",
+                      top: -12,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      fontWeight: 700,
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                )}
+                <CardContent sx={{ pt: plan.popular ? 2 : 1 }}>
                   {/* Plan Name */}
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                  <Typography variant="subtitle1" fontWeight={700} gutterBottom>
                     {plan.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>
+                    {plan.subtitle}
                   </Typography>
 
                   {/* Price */}
-                  <Typography variant="h4" fontWeight={800} gutterBottom>
+                  <Typography variant="h4" fontWeight={800} sx={{ mt: 1 }}>
                     {subscription.billing_cycle === "monthly"
                       ? plan.monthly === 0
                         ? "₵0"
                         : `₵${plan.monthly}`
                       : `₵${plan.yearly}`}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary">
                     {subscription.billing_cycle === "monthly" ? "per month" : "per year"}
                   </Typography>
 
@@ -130,36 +146,37 @@ const PaymentForm: React.FC = () => {
                   <Button
                     fullWidth
                     variant={isSelected ? "contained" : "outlined"}
-                    sx={{ mt: 3, borderRadius: 2, fontWeight: 600 }}
+                    size="small"
+                    sx={{ mt: 2, mb: 1, borderRadius: 2, fontWeight: 600 }}
                     onClick={() => updateSubscription("subscription_plan", plan.id)}
                   >
-                    {plan.cta}
+                    {isSelected ? "Selected" : plan.cta}
                   </Button>
 
                   {/* Divider */}
-                  <Divider sx={{ my: 3 }} />
+                  <Divider sx={{ my: 1.5 }} />
 
                   {/* Features */}
-                  <List dense>
+                  <List dense sx={{ p: 0 }}>
                     {plan.features.map((f, idx) => (
-                      <ListItem key={idx} sx={{ py: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 32 }}>
+                      <ListItem key={idx} sx={{ py: 0, px: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 28 }}>
                           {f.included ? (
                             <CheckCircleRoundedIcon
                               color="primary"
-                              fontSize="small"
+                              sx={{ fontSize: 16 }}
                             />
                           ) : (
                             <CancelRoundedIcon
                               color="disabled"
-                              fontSize="small"
+                              sx={{ fontSize: 16 }}
                             />
                           )}
                         </ListItemIcon>
                         <ListItemText
                           primary={
                             <Typography
-                              variant="body2"
+                              variant="caption"
                               color={
                                 f.included ? "text.primary" : "text.disabled"
                               }
@@ -175,7 +192,7 @@ const PaymentForm: React.FC = () => {
               </Card>
             );
           })}
-        </Stack>
+        </Box>
       </Stack>
 
       {subscription.subscription_plan !== "free" && (

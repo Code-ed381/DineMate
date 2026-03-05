@@ -13,7 +13,11 @@ import {
   Select,
   FormHelperText,
   Button,
+  Box,
+  Avatar,
 } from "@mui/material";
+import StorefrontIcon from "@mui/icons-material/Storefront";
+import DescriptionIcon from "@mui/icons-material/Description";
 
 import useAuthStore from "../../../lib/authStore";
 
@@ -31,6 +35,17 @@ const RestaurantForm: React.FC = () => {
       updateTempFile,
       tempFiles,
     } = useAuthStore();
+
+    const logoPreview = React.useMemo(() => {
+      if (!tempFiles.logo) return "";
+      return URL.createObjectURL(tempFiles.logo);
+    }, [tempFiles.logo]);
+
+    React.useEffect(() => {
+      return () => {
+        if (logoPreview && logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
+      };
+    }, [logoPreview]);
 
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -338,49 +353,94 @@ const RestaurantForm: React.FC = () => {
       </FormGrid>
 
       {/* Logo Upload */}
-      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
-        <FormLabel required>Restaurant Logo</FormLabel>
-        <Button
-          variant="outlined"
+      <FormGrid item xs={12} md={6} minHeight={150} mb={2}>
+        <FormLabel required sx={{ mb: 1 }}>Restaurant Logo</FormLabel>
+        <Box
           component="label"
-          fullWidth
-          sx={{ mt: 1, borderRadius: "10px", py: 1.5, borderColor: validationErrors.logo ? "error.main" : "inherit" }}
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px dashed',
+            borderColor: validationErrors.logo ? 'error.main' : 'divider',
+            borderRadius: 2,
+            p: 3,
+            cursor: 'pointer',
+            bgcolor: 'background.paper',
+            transition: 'background-color 0.2s',
+            '&:hover': { bgcolor: 'action.hover' },
+            position: 'relative',
+            overflow: 'hidden',
+          }}
         >
-          {tempFiles.logo ? "Change Logo" : "Upload Logo"}
+          {tempFiles.logo ? (
+            <>
+              <Avatar
+                src={logoPreview}
+                sx={{ width: 80, height: 80, mb: 1, boxShadow: 1 }}
+              />
+              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                {tempFiles.logo.name}
+              </Typography>
+            </>
+          ) : (
+            <>
+              <StorefrontIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+              <Typography variant="body2" color="text.primary" fontWeight={600}>
+                Click to upload Logo
+              </Typography>
+              <Typography variant="caption" color={validationErrors.logo ? "error.main" : "text.secondary"}>
+                Required for restaurant identification.
+              </Typography>
+            </>
+          )}
           <input hidden accept="image/*" type="file" onChange={handleLogoChange} />
-        </Button>
-        {tempFiles.logo ? (
-          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
-            File selected: {tempFiles.logo.name}
-          </Typography>
-        ) : (
-          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.logo ? "error.main" : "text.secondary" }}>
-            Required for restaurant identification.
-          </Typography>
-        )}
+        </Box>
       </FormGrid>
 
       {/* Business Certificate PDF Upload */}
-      <FormGrid item xs={12} md={6} sx={{ mb: 2 }}>
-        <FormLabel required>Business Certificate (PDF)</FormLabel>
-        <Button
-          variant="outlined"
+      <FormGrid item xs={12} md={6} minHeight={150} mb={2}>
+        <FormLabel required sx={{ mb: 1 }}>Business Certificate (PDF)</FormLabel>
+        <Box
           component="label"
-          fullWidth
-          sx={{ mt: 1, borderRadius: "10px", py: 1.5, borderColor: validationErrors.business_certificate_url ? "error.main" : "inherit" }}
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px dashed',
+            borderColor: validationErrors.business_certificate_url ? 'error.main' : 'divider',
+            borderRadius: 2,
+            p: 3,
+            cursor: 'pointer',
+            bgcolor: 'background.paper',
+            transition: 'background-color 0.2s',
+            '&:hover': { bgcolor: 'action.hover' },
+            position: 'relative',
+            overflow: 'hidden',
+          }}
         >
-          {tempFiles.businessCertificate ? "Change Certificate" : "Upload PDF Certificate"}
+          {tempFiles.businessCertificate ? (
+            <>
+              <DescriptionIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                {tempFiles.businessCertificate.name}
+              </Typography>
+            </>
+          ) : (
+            <>
+              <DescriptionIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+              <Typography variant="body2" color="text.primary" fontWeight={600}>
+                Click to upload PDF
+              </Typography>
+              <Typography variant="caption" color={validationErrors.business_certificate_url ? "error.main" : "text.secondary"}>
+                Official registration document.
+              </Typography>
+            </>
+          )}
           <input hidden accept="application/pdf" type="file" onChange={handleCertificateChange} />
-        </Button>
-        {tempFiles.businessCertificate ? (
-          <Typography variant="caption" sx={{ mt: 1, color: "success.main" }}>
-            File selected: {tempFiles.businessCertificate.name}
-          </Typography>
-        ) : (
-          <Typography variant="caption" sx={{ mt: 1, color: validationErrors.business_certificate_url ? "error.main" : "text.secondary" }}>
-            Official registration document (PDF format).
-          </Typography>
-        )}
+        </Box>
       </FormGrid>
 
       {/* Use this address for payment details */}

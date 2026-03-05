@@ -10,7 +10,7 @@ import {
   Button,
   ToggleButton,
   ToggleButtonGroup,
-  LinearProgress,
+  Skeleton,
   Stack,
   Alert,
   useTheme,
@@ -113,10 +113,25 @@ const EnhancedOwnerDashboard: React.FC = () => {
   if (loading) {
     return (
        <Box sx={{ width: '100%', p: isCompact ? 1.5 : 3 }}>
-          <LinearProgress />
-          <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
-            Aggregating restaurant performance data...
-          </Typography>
+        <Stack direction="row" spacing={2} sx={{ mb: 4 }} justifyContent="space-between">
+            <Skeleton variant="text" sx={{ fontSize: '2rem' }} width={200} />
+            <Skeleton variant="rounded" width={300} height={40} />
+        </Stack>
+        <Grid container spacing={isCompact ? 1.5 : 3} sx={{ mb: 3 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+              <Skeleton variant="rounded" height={120} />
+            </Grid>
+          ))}
+        </Grid>
+        <Grid container spacing={isCompact ? 1.5 : 3}>
+            <Grid item xs={12} md={8}>
+                <Skeleton variant="rounded" height={300} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+                <Skeleton variant="rounded" height={300} />
+            </Grid>
+        </Grid>
        </Box>
     );
   }

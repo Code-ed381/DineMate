@@ -1,5 +1,5 @@
 import { useSubscription } from "../providers/subscriptionProvider";
-import { getPlanById } from "../config/plans";
+import { getPlanById, PlanLimit } from "../config/plans";
 
 export const useFeatureGate = () => {
     const { subscriptionPlan } = useSubscription();
@@ -11,13 +11,22 @@ export const useFeatureGate = () => {
         return feature?.included ?? false;
     };
 
-    const isLimitReached = (limitType: 'maxEmployees' | 'maxTables' | 'maxMenuItems', currentCount: number): boolean => {
+    const canAccess = (feature: keyof PlanLimit): boolean => {
+        const value = plan.limits[feature];
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return value > 0;
+        return false;
+    };
+
+    const isLimitReached = (limitType: keyof PlanLimit, currentCount: number): boolean => {
         const limit = plan.limits[limitType];
+        if (typeof limit !== 'number') return false;
         return currentCount >= limit;
     };
 
-    const getRemaining = (limitType: 'maxEmployees' | 'maxTables' | 'maxMenuItems', currentCount: number): number => {
+    const getRemaining = (limitType: keyof PlanLimit, currentCount: number): number => {
         const limit = plan.limits[limitType];
+        if (typeof limit !== 'number') return 0;
         if (limit === 9999) return 9999; // Unlimited
         return Math.max(0, limit - currentCount);
     };
@@ -25,6 +34,7 @@ export const useFeatureGate = () => {
     return {
         plan,
         canUseFeature,
+        canAccess,
         isLimitReached,
         getRemaining,
     };

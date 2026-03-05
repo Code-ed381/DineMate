@@ -488,7 +488,8 @@ const useTablesStore = create<TableState>()(
               .from("table_sessions_overview")
               .select("*")
               .eq("restaurant_id", restaurantId)
-              .eq("waiter_id", waiterId);
+              .eq("waiter_id", waiterId)
+              .neq("session_status", "close");
 
           if (error) throw error;
 
@@ -741,7 +742,6 @@ const useTablesStore = create<TableState>()(
         selectedTable: state.selectedTable,
         selectedSession: state.selectedSession,
         sessions: state.sessions,
-        sessionsOverview: state.sessionsOverview,
       }),
       version: 1,
     }

@@ -17,7 +17,8 @@ export interface Subscription {
 export interface SubscriptionState {
   subscriptions: Subscription[];
   loading: boolean;
-  subscriptionPlan: string; // Current plan ID: free, basic, pro
+  subscriptionPlan: string;
+  subscriptionStatus: "active" | "pending" | "none";
 
   setSubscriptions: (subscriptions: Subscription[]) => void;
   setLoading: (loading: boolean) => void;
@@ -25,6 +26,7 @@ export interface SubscriptionState {
   createSubscription: (restaurantId: string, plan: string, billingCycle: string) => Promise<void>;
   updateSubscription: (subscriptionId: string, updates: Partial<Subscription>) => Promise<void>;
   cancelSubscription: (subscriptionId: string) => Promise<void>;
+  downgradeToFree: () => Promise<void>;
   
   // Derived state helper
   getCurrentSubscription: () => Subscription | null;
@@ -34,6 +36,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   subscriptions: [],
   loading: false,
   subscriptionPlan: "free",
+  subscriptionStatus: "none",
 
   setSubscriptions: (subscriptions) => set({ subscriptions }),
   setLoading: (loading) => set({ loading }),
@@ -53,7 +56,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
       .from("subscriptions")
       .select("*")
       .eq("restaurant_id", restaurant_id)
-      .eq("status", "active") // Only active ones for now
+      .in("status", ["active", "pending"])
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -63,9 +66,11 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
     }
 
     const subs = (subscriptions as Subscription[]) || [];
+    const currentSub = subs[0];
     set({
       subscriptions: subs,
-      subscriptionPlan: subs[0]?.subscription_plan || "free",
+      subscriptionPlan: currentSub?.subscription_plan || "free",
+      subscriptionStatus: currentSub ? (currentSub.status as any) : "none",
       loading: false,
     });
   },
@@ -109,6 +114,42 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
   cancelSubscription: async (subscriptionId) => {
     await get().updateSubscription(subscriptionId, { status: "cancelled" });
+  },
+
+  downgradeToFree: async () => {
+    const { selectedRestaurant } = useRestaurantStore.getState();
+    const restaurantId = selectedRestaurant?.id;
+    if (!restaurantId) return;
+
+    set({ loading: true });
+    try {
+      // Cancel all active subscriptions
+      const { subscriptions } = get();
+      for (const sub of subscriptions) {
+        if (sub.status === "active") {
+          await supabase
+            .from("subscriptions")
+            .update({ status: "cancelled" })
+            .eq("id", sub.id);
+        }
+      }
+
+      // Create a free subscription
+      const { error } = await supabase.from("subscriptions").insert({
+        restaurant_id: restaurantId,
+        subscription_plan: "free",
+        billing_cycle: "monthly",
+        status: "active",
+        starts_at: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+      await get().fetchSubscriptions();
+    } catch (err) {
+      console.error("Error downgrading to free:", err);
+    } finally {
+      set({ loading: false });
+    }
   },
 
   getCurrentSubscription: () => {

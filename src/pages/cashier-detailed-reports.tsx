@@ -37,6 +37,7 @@ import { exportToCSV } from "../utils/exportUtils";
 import { useSettings } from "../providers/settingsProvider";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { useFeatureGate } from "../hooks/useFeatureGate";
 
 const CashierDetailedReports: React.FC = () => {
   const theme = useTheme();
@@ -68,12 +69,17 @@ const CashierDetailedReports: React.FC = () => {
   const [selectedPersonnel, setSelectedPersonnel] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const { canAccess } = useFeatureGate();
 
   useEffect(() => {
     fetchDetailedReportItems(dateRange);
   }, [fetchDetailedReportItems, dateRange]);
 
   const handleExport = () => {
+    if (!canAccess("canUseCsvExport")) {
+      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info"));
+      return;
+    }
     if (detailedOrderItems.length > 0) {
       exportToCSV(detailedOrderItems, `audit_logs_${new Date().toISOString().split('T')[0]}`);
     }

@@ -69,6 +69,7 @@ import ModifierSelectionDialog from "../components/ModifierSelectionDialog";
 import SplitBillDialog from "../components/SplitBillDialog";
 import MenuImage from "../components/MenuImage";
 import { useSettings } from "../providers/settingsProvider";
+import { useFeatureGate } from "../hooks/useFeatureGate";
 
 const Menu: React.FC = () => {
   const { currencySymbol } = useCurrency();
@@ -77,6 +78,7 @@ const Menu: React.FC = () => {
   const { settings } = useSettings();
   const ms = settings?.menu_settings || {};
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { canAccess } = useFeatureGate();
 
   const {
     getOrderBySessionId,
@@ -602,7 +604,18 @@ const Menu: React.FC = () => {
                {ms.allow_split_bill !== false && (
                <Button 
                 variant="outlined" 
-                onClick={() => setSplitBillOpen(true)}
+                onClick={() => {
+                  if (!canAccess("canUseSplitBill")) {
+                    import("sweetalert2").then((m) => m.default.fire({
+                      title: "Upgrade Required",
+                      text: "Please upgrade your plan to use Split Bills & Multiple Payments.",
+                      icon: "info",
+                      confirmButtonText: "Got it"
+                    }));
+                    return;
+                  }
+                  setSplitBillOpen(true);
+                }}
                 startIcon={<ShoppingCartIcon />}
                 sx={{ borderRadius: 2, py: 1.5 }}
                >

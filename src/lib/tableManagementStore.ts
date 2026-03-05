@@ -108,6 +108,17 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
     const restaurantId = selectedRestaurant && selectedRestaurant.id;
     if (!restaurantId) return;
 
+    // ─── Subscription limit check ───
+    const { useSubscriptionStore } = await import('./subscriptionStore');
+    const { getPlanById } = await import('../config/plans');
+    const subPlan = useSubscriptionStore.getState().subscriptionPlan || 'free';
+    const plan = getPlanById(subPlan);
+    const currentTableCount = get().tables.length;
+    if (plan.limits.maxTables !== 9999 && currentTableCount >= plan.limits.maxTables) {
+      Swal.fire("Limit Reached", `Your ${plan.name} plan allows up to ${plan.limits.maxTables} tables. Please upgrade to add more.`, "warning");
+      return;
+    }
+
     if (!table_number || isNaN(Number(table_number))) {
       Swal.fire("Error", "Please enter a valid table number.", "error");
       return;

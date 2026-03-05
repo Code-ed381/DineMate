@@ -20,6 +20,9 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import { useSettings } from "../../providers/settingsProvider";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
+
+import Swal from "sweetalert2";
 
 interface NavItemProps {
   to: string;
@@ -27,17 +30,32 @@ interface NavItemProps {
   label: string;
   onClick: () => void;
   drawerOpen?: boolean;
+  locked?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen }) => {
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen, locked }) => {
   const location = useLocation();
   const theme = useTheme();
   const isActive = location.pathname === to;
 
+  const handleLockedClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    Swal.fire({
+      title: "Upgrade Required",
+      text: "Please upgrade your plan in Settings to access this feature.",
+      icon: "info",
+      confirmButtonText: "Got it"
+    });
+  };
+
   const content = (
-    <Link to={to} style={{ textDecoration: "none", color: "inherit" }} onClick={onClick}>
+    <Link 
+      to={locked ? "#" : to} 
+      style={{ textDecoration: "none", color: "inherit" }} 
+      onClick={locked ? handleLockedClick : onClick}
+    >
       <ListItemButton
-        selected={isActive}
+        selected={!locked && isActive}
         sx={{
           py: 1.5,
           px: 2.5,
@@ -46,6 +64,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen 
           mb: 0.5,
           transition: 'all 0.2s ease',
           justifyContent: drawerOpen ? 'initial' : 'center',
+          opacity: locked ? 0.6 : 1,
           '&.Mui-selected': {
             bgcolor: alpha(theme.palette.primary.main, 0.1),
             color: theme.palette.primary.main,
@@ -67,7 +86,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen 
             minWidth: 0, 
             mr: drawerOpen ? 2 : 'auto', 
             justifyContent: 'center',
-            color: isActive ? theme.palette.primary.main : theme.palette.text.secondary,
+            color: (!locked && isActive) ? theme.palette.primary.main : theme.palette.text.secondary,
           }}
         >
           {icon}
@@ -77,7 +96,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen 
           sx={{ 
             opacity: drawerOpen ? 1 : 0,
             '& .MuiTypography-root': {
-              fontWeight: isActive ? 700 : 500,
+              fontWeight: (!locked && isActive) ? 700 : 500,
               fontSize: '0.9rem',
             }
           }} 
@@ -88,7 +107,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen 
 
   if (!drawerOpen) {
     return (
-      <Tooltip title={label} placement="right">
+      <Tooltip title={locked ? `${label} (Locked)` : label} placement="right">
         {content}
       </Tooltip>
     );
@@ -100,6 +119,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen 
 export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }) => {
   const { role }: any = useRestaurantStore();
   const { setBreadcrumb }: any = useAppStore();
+  const { canAccess } = useFeatureGate();
 
   return (
     <React.Fragment>
@@ -177,6 +197,7 @@ export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }
             label="Audit Logs" 
             onClick={() => setBreadcrumb("Detailed Reports")} 
             drawerOpen={drawerOpen}
+            locked={!canAccess("canUseAuditLogs")}
           />
         </>
       )}
@@ -188,6 +209,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
   const { setBreadcrumb }: any = useAppStore();
   const { role }: any = useRestaurantStore();
   const { settings }: any = useSettings();
+  const { canAccess } = useFeatureGate();
 
   const isOwnerOrAdmin = role === "owner" || role === "admin";
 
@@ -226,6 +248,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
             label="Reports" 
             onClick={() => setBreadcrumb("Reports")} 
             drawerOpen={drawerOpen}
+            locked={!canAccess("canUseReports")}
           />
           <NavItem 
             to="/app/cashier-reports" 
@@ -233,6 +256,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
             label="Audit Logs" 
             onClick={() => setBreadcrumb("Detailed Reports")} 
             drawerOpen={drawerOpen}
+            locked={!canAccess("canUseAuditLogs")}
           />
         </>
       )}

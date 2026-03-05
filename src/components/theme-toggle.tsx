@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { FormGroup, FormControlLabel, Switch, styled } from "@mui/material";
 import { useColorMode } from "../theme/app-theme-provider";
 import TooltipComponent from "./tooltip";
-import { useSubscription } from "../providers/subscriptionProvider";
+import { useFeatureGate } from "../hooks/useFeatureGate";
 import UpgradeModal from "./UpgradeModal";
 
 const MaterialUISwitch = styled(Switch)(({ theme }) => ({
@@ -50,11 +50,11 @@ const MaterialUISwitch = styled(Switch)(({ theme }) => ({
 
 const ThemeSwitch: React.FC = () => {
   const { mode, setMode } = useColorMode();
-  const { subscriptionPlan } = useSubscription();
+  const { canAccess } = useFeatureGate();
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
 
   const handleChange = () => {
-    if (subscriptionPlan === "free") {
+    if (!canAccess("canToggleTheme")) {
       setOpenUpgradeModal(true);
       return;
     }

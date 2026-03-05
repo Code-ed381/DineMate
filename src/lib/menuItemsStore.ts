@@ -246,6 +246,17 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
       return;
     }
 
+    // ─── Subscription limit check ───
+    const { useSubscriptionStore } = await import('./subscriptionStore');
+    const { getPlanById } = await import('../config/plans');
+    const subPlan = useSubscriptionStore.getState().subscriptionPlan || 'free';
+    const planLimits = getPlanById(subPlan);
+    const totalItems = get().menuItems.length;
+    if (planLimits.limits.maxMenuItems !== 9999 && totalItems >= planLimits.limits.maxMenuItems) {
+      Swal.fire("Limit Reached", `Your ${planLimits.name} plan allows up to ${planLimits.limits.maxMenuItems} menu items. Please upgrade to add more.`, "warning");
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from("menu_items")
@@ -272,6 +283,17 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
     const { drink, price, categoryDrinks } = get();
     if (!drink || !price || !categoryDrinks) {
       Swal.fire("Error", "Please fill in all fields for the drink.", "error");
+      return;
+    }
+
+    // ─── Subscription limit check ───
+    const { useSubscriptionStore } = await import('./subscriptionStore');
+    const { getPlanById } = await import('../config/plans');
+    const subPlan = useSubscriptionStore.getState().subscriptionPlan || 'free';
+    const planLimits = getPlanById(subPlan);
+    const totalItems = get().menuItems.length;
+    if (planLimits.limits.maxMenuItems !== 9999 && totalItems >= planLimits.limits.maxMenuItems) {
+      Swal.fire("Limit Reached", `Your ${planLimits.name} plan allows up to ${planLimits.limits.maxMenuItems} menu items. Please upgrade to add more.`, "warning");
       return;
     }
 
@@ -414,6 +436,17 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
     try {
       const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
       if (!restaurantId) throw new Error("No restaurant selected");
+
+      // ─── Subscription limit check ───
+      const { useSubscriptionStore } = await import('./subscriptionStore');
+      const { getPlanById } = await import('../config/plans');
+      const subPlan = useSubscriptionStore.getState().subscriptionPlan || 'free';
+      const planLimits = getPlanById(subPlan);
+      const totalItems = get().menuItems.length;
+      if (planLimits.limits.maxMenuItems !== 9999 && totalItems >= planLimits.limits.maxMenuItems) {
+        Swal.fire("Limit Reached", `Your ${planLimits.name} plan allows up to ${planLimits.limits.maxMenuItems} menu items. Please upgrade to add more.`, "warning");
+        return;
+      }
 
       let finalImageUrl = item.image_url || "";
 

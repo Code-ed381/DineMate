@@ -39,6 +39,7 @@ import {
   NotificationsActive,
 } from "@mui/icons-material";
 import FloorPlan from "../components/FloorPlan";
+import { useFeatureGate } from "../hooks/useFeatureGate";
 import useMenuStore from "../lib/menuStore";
 import TransitionsModal from "../components/modal";
 import TableSectionSkeleton from "../components/skeletons/table-section-skeleton";
@@ -60,6 +61,7 @@ const statusColors: Record<string, any> = {
 
 const TableManagement: React.FC = () => {
   const { settings } = useSettings();
+  const { canAccess } = useFeatureGate();
   const tableSettings = (settings as any).table_settings || {};
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -209,7 +211,18 @@ const TableManagement: React.FC = () => {
                   exclusive
                   size="large"
                   value={viewMode}
-                  onChange={(_, value) => value && setViewMode(value)}
+                  onChange={(_, value) => {
+                    if (value === "floor" && !canAccess("canUseFloorPlan")) {
+                      import("sweetalert2").then((m) => m.default.fire({
+                        title: "Upgrade Required",
+                        text: "Please upgrade your plan to access the Floor Plan view.",
+                        icon: "info",
+                        confirmButtonText: "Got it"
+                      }));
+                      return;
+                    }
+                    if (value) setViewMode(value);
+                  }}
                 >
                   <ToggleButton value="grid" aria-label="grid view">
                     <GridViewIcon sx={{ mr: 1 }} /> Grid

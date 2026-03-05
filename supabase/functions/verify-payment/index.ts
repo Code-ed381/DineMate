@@ -60,6 +60,8 @@ Deno.serve(async (req) => {
       restaurant_id: restaurantId,
       subscription_plan: planId,
       billing_cycle: billingCycle,
+      price: result.data.amount / 100, // Paystack amount is in kobo/cents
+      paystack_reference: reference,
       status: "active",
       starts_at: new Date().toISOString(),
     };

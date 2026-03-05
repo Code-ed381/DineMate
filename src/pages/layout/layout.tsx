@@ -55,6 +55,9 @@ import Chip from "@mui/material/Chip";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { motion, AnimatePresence } from "framer-motion";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
+import { useSubscription } from "../../providers/subscriptionProvider";
+import PaymentWall from "../../components/PaymentWall";
 
 function Copyright(props: any) {
   return (
@@ -158,6 +161,8 @@ const Layout: React.FC = () => {
     clearAllNotifications
   } = useNotificationStore();
   const isOnline = useOnlineStatus();
+  const { canAccess } = useFeatureGate();
+  const { subscriptionStatus } = useSubscription();
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
@@ -400,6 +405,10 @@ const Layout: React.FC = () => {
       </Box>
     </Box>
   );
+
+  if (subscriptionStatus === "pending" && role === "owner") {
+    return <PaymentWall />;
+  }
 
   return (
     <>
@@ -645,7 +654,7 @@ const Layout: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <SecondaryListItems drawerOpen={true} />
             </List>
-            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && (
+            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && canAccess("canUseComplaints") && (
               <Box sx={{ px: 2, pb: 1 }}>
                 <Button
                   fullWidth
@@ -689,7 +698,7 @@ const Layout: React.FC = () => {
               <Divider sx={{ my: 1 }} />
               <SecondaryListItems drawerOpen={open} />
             </List>
-            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && (
+            {role !== "owner" && role !== "admin" && gs.allow_complaints !== false && canAccess("canUseComplaints") && (
               <Box sx={{ px: open ? 2 : 0.5, pb: 1 }}>
                 {open ? (
                   <Button

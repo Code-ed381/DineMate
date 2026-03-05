@@ -42,6 +42,7 @@ import BarChartTwoToneIcon from "@mui/icons-material/BarChartTwoTone";
 import useMenuStore from "../../lib/menuStore";
 import useTablesStore from "../../lib/tablesStore";
 import FloorPlan from "../../components/FloorPlan";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
 import DashboardHeader from "./components/dashboard-header";
 import WaiterDashboardSkeleton from "./components/skeletons/waiter-dashboard-skeleton";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
@@ -131,6 +132,7 @@ const WaiterDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
   const { tables, getTables, updateTablePosition } = useTablesStore();
+  const { canAccess } = useFeatureGate();
 
   
   const getItemStatusBreakdown = (itemId: string) => {
@@ -420,7 +422,18 @@ const WaiterDashboard: React.FC = () => {
             <ToggleButtonGroup
               exclusive
               value={viewMode}
-              onChange={(_e, value) => value && setViewMode(value)}
+              onChange={(_e, value) => {
+                if (value === "floor" && !canAccess("canUseFloorPlan")) {
+                  import("sweetalert2").then((m) => m.default.fire({
+                    title: "Upgrade Required",
+                    text: "Please upgrade your plan to access the Floor Plan view.",
+                    icon: "info",
+                    confirmButtonText: "Got it"
+                  }));
+                  return;
+                }
+                if (value) setViewMode(value);
+              }}
               sx={{
                 "& .MuiToggleButton-root": {
                   px: 2,

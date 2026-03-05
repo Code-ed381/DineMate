@@ -32,6 +32,7 @@ import MetricCard from "../components/MetricCard";
 import { useSettings } from "../providers/settingsProvider";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
+import { useFeatureGate } from "../hooks/useFeatureGate";
 
 const ReportDashboard: React.FC = () => {
   const theme = useTheme();
@@ -42,6 +43,7 @@ const ReportDashboard: React.FC = () => {
   const { settings } = useSettings();
   const rs = settings?.report_settings || {};
   const navigate = useNavigate();
+  const { canAccess } = useFeatureGate();
   const { 
     getOrdersNow, 
     getWaiters, 
@@ -128,6 +130,16 @@ const ReportDashboard: React.FC = () => {
   };
 
   const handleExport = () => {
+    if (!canAccess("canUseCsvExport")) {
+      Swal.fire({
+        title: "Upgrade Required",
+        text: "Please upgrade your plan to export data to CSV.",
+        icon: "info",
+        confirmButtonText: "Got it"
+      });
+      return;
+    }
+
     if (filteredOrders.length > 0) {
         const reportTitle = reportMode === "standard" ? "Sales" : `${reportMode} Report`;
         exportToCSV(filteredOrders, `${reportTitle.toLowerCase().replace(" ", "_")}_${selectedRestaurant?.name || 'restaurant'}`);

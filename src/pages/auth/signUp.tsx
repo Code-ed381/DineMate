@@ -15,7 +15,8 @@ import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import Info from './components/Info';
 import InfoMobile from './components/InfoMobile';
-import SitemarkIcon from './components/SitemarkIcon';
+import Logo from '../../assets/logo.png';
+import CircularProgress from "@mui/material/CircularProgress";
 import AppTheme from "./components/shared-theme/AppTheme";
 import ColorModeIconToggle from './components/shared-theme/ColorModeIconToggle';
 import useAuthStore from '../../lib/authStore';
@@ -23,6 +24,17 @@ import useAppStore from '../../lib/appstore';
 import AuthStepperContent from './components/AuthStepperContent';
 import Swal from 'sweetalert2';
 import { usePaystackPayment } from 'react-paystack';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from "../../lib/supabase";
+import { plans } from "../../config/plans";
+
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
 
 const Checkout: React.FC = (props) => {
   const {
@@ -34,112 +46,117 @@ const Checkout: React.FC = (props) => {
     restaurantInfo,
     subscription,
     setProcessing,
+    processing,
+    paymentComplete,
+    setPaymentComplete,
+    paymentError,
+    setPaymentError,
+    handleNext,
   } = useAuthStore();
 
-  const config = {
+  const navigate = useNavigate();
+  const [signupError, setSignupError] = React.useState<string | null>(null);
+
+  const config = React.useMemo(() => ({
     reference: (new Date()).getTime().toString(),
     email: personalInfo.email,
     amount: (subscription.price || 0) * 100,
     currency: "GHS",
     publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '',
-  };
+  }), [personalInfo.email, subscription.price]);
 
   const initializePayment = usePaystackPayment(config);
 
-  const onNext = () => {
+  const onNext = async () => {
     const result = handleNextWithValidation();
     if (!result.success) {
       return;
     }
 
     if (activeStep === steps.length - 1) {
+      const signupResult = await onSubmit();
+      if (!signupResult) return;
+
       if (subscription.subscription_plan !== 'free') {
         if (!config.publicKey) {
           Swal.fire("Configuration Error", "Paystack public key is not set", "error");
+          handleNext(); // Still show welcome screen so they can try payment later
           return;
         }
+
         initializePayment({
-            onSuccess: (reference: any) => {
-              useAuthStore.getState().updateSubscription('paystack_reference', reference.reference);
-              onSubmit();
-            },
-            onClose: () => {
-              Swal.fire("Payment Cancelled", "You cancelled the payment.", "info");
+          onSuccess: async (referenceData: any) => {
+            setProcessing(true);
+            try {
+              const { data, error } = await supabase.functions.invoke('verify-payment', {
+                body: {
+                  reference: referenceData.reference,
+                  planId: subscription.subscription_plan,
+                  billingCycle: subscription.billing_cycle,
+                  restaurantId: signupResult.restaurantId,
+                  userId: signupResult.userId
+                }
+              });
+              if (!error) {
+                setPaymentComplete(true);
+              } else {
+                throw error;
+              }
+            } catch (err) {
+              console.error("Payment verification failed", err);
+              setPaymentError("Could not verify your payment. Please contact support.");
+            } finally {
+              setProcessing(false);
+              handleNext();
             }
+          },
+          onClose: () => {
+            setPaymentError("Payment was not completed. You can refresh to try again.");
+            handleNext();
+          }
         });
       } else {
-        onSubmit();
+        handleNext();
       }
     }
   };
 
   const onSubmit = async () => {
     setProcessing(true);
+    setPaymentError(null);
+    setSignupError(null); // Clear previous errors
     try {
-      const { tempFiles, updatePersonalInfo, updateRestaurantInfo } = useAuthStore.getState();
-      const { uploadFile } = useAppStore.getState();
+      const { tempFiles } = useAuthStore.getState();
 
-      // 1. Upload Persona Files
-      let avatarUrl = personalInfo.profileAvatar;
-      if (tempFiles.avatar) {
-        avatarUrl = await uploadFile(tempFiles.avatar, "avatars");
-        updatePersonalInfo("profileAvatar", avatarUrl);
-      }
-
-      let idUrl = personalInfo.idDocumentUrl;
-      if (tempFiles.idDocument) {
-        idUrl = await uploadFile(tempFiles.idDocument, "documents");
-        updatePersonalInfo("idDocumentUrl", idUrl);
-      }
-
-      // 2. Upload Restaurant Files
-      let logoUrl = restaurantInfo.logo;
-      if (tempFiles.logo) {
-        logoUrl = await uploadFile(tempFiles.logo, "avatars");
-        updateRestaurantInfo("logo", logoUrl);
-      }
-
-      let certUrl = restaurantInfo.business_certificate_url;
-      if (tempFiles.businessCertificate) {
-        certUrl = await uploadFile(tempFiles.businessCertificate, "documents");
-        updateRestaurantInfo("business_certificate_url", certUrl);
-      }
-
-      // Re-fetch state for final payload
-      const updatedState = useAuthStore.getState();
-
-      const res = await fetch(
-        `https://bvgukcijhcmsfhzywros.supabase.co/functions/v1/signup`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey:
-              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z3VrY2lqaGNtc2Zoenl3cm9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDE1NDksImV4cCI6MjA3MDkxNzU0OX0.EP068h4rdMhq_EgMrLbN50VXN6K_TEAQTfdiLJNNj70",
-            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z3VrY2lqaGNtc2Zoenl3cm9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDE1NDksImV4cCI6MjA3MDkxNzU0OX0.EP068h4rdMhq_EgMrLbN50VXN6K_TEAQTfdiLJNNj70",
-          },
-          body: JSON.stringify({
-            personalInfo: updatedState.personalInfo,
-            restaurantInfo: updatedState.restaurantInfo,
-            subscription: updatedState.subscription,
-          }),
+      const payload = {
+        personalInfo,
+        restaurantInfo,
+        subscription: {
+          ...subscription,
+          limits: plans.find(p => p.id === subscription.subscription_plan)?.limits || plans[0].limits
+        },
+        files: {
+          avatar: tempFiles.avatar ? await fileToBase64(tempFiles.avatar) : null,
+          idDocument: tempFiles.idDocument ? await fileToBase64(tempFiles.idDocument) : null,
+          logo: tempFiles.logo ? await fileToBase64(tempFiles.logo) : null,
+          businessCertificate: tempFiles.businessCertificate ? await fileToBase64(tempFiles.businessCertificate) : null
         }
-      );
+      };
 
-      const data = await res.json();
+      const { data, error } = await supabase.functions.invoke('signup', {
+        body: payload,
+      });
 
-      if (!res.ok) {
-        throw new Error(data.error || "Signup failed");
+      if (error) {
+        throw new Error(error.message || "Signup failed");
       }
 
-      Swal.fire({
-        title: "Success",
-        text: "Account created! Please check your email to confirm.",
-        icon: "success",
-      });
+      return { userId: data.user.id, restaurantId: data.restaurant.id };
     } catch (error: any) {
       console.error("Signup error:", error);
-      Swal.fire({ title: "Error", text: error.message, icon: "error" });
+      setSignupError(error.message);
+      // Removed handleNext() so user stays on the form to fix errors
+      return null;
     } finally {
       setProcessing(false);
     }
@@ -183,7 +200,12 @@ const Checkout: React.FC = (props) => {
             gap: 4,
           }}
         >
-          <SitemarkIcon />
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <img src={Logo} alt="DineMate Logo" style={{ width: 40, height: 40 }} />
+            <Typography variant="h5" fontWeight={800} color="primary">
+              DineMate
+            </Typography>
+          </Box>
           <Box
             sx={{
               display: "flex",
@@ -306,25 +328,77 @@ const Checkout: React.FC = (props) => {
                 </Step>
               ))}
             </Stepper>
+
             {activeStep === steps.length ? (
-              <Stack spacing={2} useFlexGap>
-                <Typography variant="h1">📦</Typography>
-                <Typography variant="h5">Thank you for your order!</Typography>
-                <Typography variant="body1" sx={{ color: "text.secondary" }}>
-                  Your order number is
-                  <strong>&nbsp;#140396</strong>. We have emailed your order
-                  confirmation and will update you once its shipped.
+              <Stack spacing={2} useFlexGap sx={{ alignItems: "center", textAlign: "center", py: 4 }}>
+                <Typography variant="h1">
+                  {signupError ? "❌" : paymentError ? "⌛" : "🎉"}
                 </Typography>
-                <Button
-                  variant="contained"
-                  sx={{ alignSelf: "start", width: { xs: "100%", sm: "auto" } }}
-                >
-                  Go to my orders
-                </Button>
+                <Typography variant="h5" fontWeight={700}>
+                  {signupError
+                    ? "Signup Failed"
+                    : paymentError
+                    ? "Account Ready!"
+                    : "Welcome to DineMate!"}
+                </Typography>
+                <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 480 }}>
+                  {signupError ? (
+                    <Box sx={{ color: "error.main" }}>
+                      We encountered an error while creating your account: {signupError}
+                    </Box>
+                  ) : subscription.subscription_plan === "free" || paymentComplete ? (
+                    <>
+                      Your account has been created successfully. We've sent a
+                      confirmation email to <strong>{personalInfo.email}</strong>.
+                      Please verify your email to get started.
+                    </>
+                  ) : (
+                    <>
+                      Your account has been created, but your payment is still pending. 
+                      Once you complete your payment, your restaurant plan will be activated. 
+                      {paymentError && <Box sx={{ color: 'error.main', mt: 1 }}>{paymentError}</Box>}
+                    </>
+                  )}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                  {signupError ? (
+                    <Button
+                      variant="contained"
+                      onClick={() => window.location.reload()}
+                      sx={{ width: { xs: "100%", sm: "auto" } }}
+                    >
+                      Try Again
+                    </Button>
+                  ) : (
+                    <>
+                      {!paymentComplete && subscription.subscription_plan !== "free" && (
+                        <Button
+                          variant="contained"
+                          onClick={() => window.location.reload()}
+                          sx={{ width: { xs: "100%", sm: "auto" } }}
+                        >
+                          Try Payment Again
+                        </Button>
+                      )}
+                      <Button
+                        variant={paymentComplete || subscription.subscription_plan === "free" ? "contained" : "outlined"}
+                        onClick={() => navigate("/sign-in")}
+                        sx={{ width: { xs: "100%", sm: "auto" } }}
+                      >
+                        Go to Sign In
+                      </Button>
+                    </>
+                  )}
+                </Box>
               </Stack>
             ) : (
               <Fragment>
                 <AuthStepperContent step={activeStep} />
+                {signupError && activeStep === steps.length - 1 && (
+                  <Typography color="error" variant="body2" sx={{ textAlign: "right", mt: 2, fontWeight: 500 }}>
+                    {signupError}
+                  </Typography>
+                )}
                 <Box
                   sx={[
                     {
@@ -365,11 +439,12 @@ const Checkout: React.FC = (props) => {
                   )}
                   <Button
                     variant="contained"
-                    endIcon={<ChevronRightRoundedIcon />}
+                    endIcon={processing ? <CircularProgress size={20} color="inherit" /> : <ChevronRightRoundedIcon />}
                     onClick={onNext}
+                    disabled={processing}
                     sx={{ width: { xs: "100%", sm: "fit-content" } }}
                   >
-                    {activeStep === steps.length - 1 ? "Create account" : "Next"}
+                    {activeStep === steps.length - 1 ? (processing ? "Creating..." : "Create account") : "Next"}
                   </Button>
                 </Box>
               </Fragment>

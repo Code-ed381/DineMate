@@ -43,21 +43,10 @@ export interface RestaurantInfo {
   phoneNumber?: string;
 }
 
-export interface CardDetails {
-  card_number: string;
-  card_holder_name: string;
-  card_expiry_date: string;
-  card_cvv: string;
-  momo_number?: string;
-}
-
 export interface Subscription {
   subscription_plan: string;
   price: number;
   billing_cycle: string;
-  payment_method: string;
-  card_details: CardDetails;
-  momo_number: string;
   paystack_reference?: string;
 }
 
@@ -145,6 +134,10 @@ export interface AuthState {
   username: string;
   confirmPasswordError?: boolean;
   confirmPasswordErrorMessage?: string;
+  paymentComplete: boolean;
+  paymentError: string | null;
+  setPaymentComplete: (value: boolean) => void;
+  setPaymentError: (value: string | null) => void;
 }
 
 const useAuthStore = create<AuthState>()(
@@ -201,28 +194,12 @@ const useAuthStore = create<AuthState>()(
         subscription_plan: "free",
         price: 0,
         billing_cycle: "monthly",
-        payment_method: "",
-        card_details: {
-          card_number: "",
-          card_holder_name: "",
-          card_expiry_date: "",
-          card_cvv: "",
-        },
-        momo_number: "",
         paystack_reference: "",
       },
       defaultSubscription: {
         subscription_plan: "free",
         price: 0,
         billing_cycle: "monthly",
-        payment_method: "",
-        card_details: {
-          card_number: "",
-          card_holder_name: "",
-          card_expiry_date: "",
-          card_cvv: "",
-        },
-        momo_number: "",
         paystack_reference: "",
       },
       validationErrors: {},
@@ -261,6 +238,8 @@ const useAuthStore = create<AuthState>()(
       consent: false,
       processing: false,
       tempFiles: {},
+      paymentComplete: false,
+      paymentError: null,
 
       setEmail: (value) => set({ email: value }),
       setPassword: (value) => set({ password: value }),
@@ -272,6 +251,8 @@ const useAuthStore = create<AuthState>()(
       setPasswordErrorMessage: (value) => set({ passwordErrorMessage: value }),
       setConfirmPasswordError: (value) => set({ confirmPasswordError: value }),
       setConfirmPasswordErrorMessage: (value) => set({ confirmPasswordErrorMessage: value }),
+      setPaymentComplete: (value) => set({ paymentComplete: value }),
+      setPaymentError: (value) => set({ paymentError: value }),
 
       setLoading: (value) => set({ loading: value }),
 
@@ -440,8 +421,12 @@ const useAuthStore = create<AuthState>()(
           errors.idNumber = "ID number is required";
         }
 
-        if (!personalInfo.idDocumentUrl?.trim()) {
+        if (!personalInfo.idDocumentUrl?.trim() && !get().tempFiles.idDocument) {
           errors.idDocumentUrl = "ID document photo is required";
+        }
+
+        if (!personalInfo.profileAvatar?.trim() && !get().tempFiles.avatar) {
+          errors.profileAvatar = "Profile picture is required";
         }
 
         if (personalInfo.phone_number && !isValidGhanaianPhone(personalInfo.phone_number)) {
@@ -480,11 +465,11 @@ const useAuthStore = create<AuthState>()(
           errors.email = "Invalid email format";
         }
 
-        if (!restaurantInfo.logo?.trim()) {
+        if (!restaurantInfo.logo?.trim() && !get().tempFiles.logo) {
           errors.logo = "Restaurant logo is required";
         }
 
-        if (!restaurantInfo.business_certificate_url?.trim()) {
+        if (!restaurantInfo.business_certificate_url?.trim() && !get().tempFiles.businessCertificate) {
           errors.business_certificate_url = "Business certificate (PDF) is required";
         }
 
@@ -495,29 +480,8 @@ const useAuthStore = create<AuthState>()(
         const { subscription } = get();
         const errors: Record<string, string> = {};
 
-        // If not free plan, we MUST have a payment method
-        if (subscription.subscription_plan !== "free") {
-          if (!subscription.payment_method) {
-            errors.payment_method = "Please select a payment method";
-            return errors; 
-          }
-
-          if (subscription.payment_method === "creditCard") {
-            if (!subscription.card_details.card_number.trim())
-              errors.card_number = "Card number is required";
-            if (!subscription.card_details.card_holder_name.trim())
-              errors.card_holder_name = "Card holder name is required";
-            if (!subscription.card_details.card_expiry_date.trim())
-              errors.card_expiry_date = "Card expiry date is required";
-            if (!subscription.card_details.card_cvv.trim())
-              errors.card_cvv = "Card CVV is required";
-          }
-
-          if (subscription.payment_method === "momo") {
-            if (!subscription.momo_number.trim())
-              errors.momo_number = "Momo number is required";
-          }
-        }
+        // Subscription plan must be selected (it defaults to 'free' so this is always valid)
+        // Payment is handled via Paystack at submission time, so no payment_method validation here
 
         return errors;
       },
@@ -538,6 +502,9 @@ const useAuthStore = create<AuthState>()(
           validateUserAgreement,
         } = get();
         let errors: Record<string, string> = {};
+
+        // Clear stale validation errors first
+        set({ validationErrors: {} });
 
         if (activeStep === 0) errors = validatePersonalInfo();
         if (activeStep === 1) errors = validateRestaurantInfo();
@@ -770,6 +737,14 @@ const useAuthStore = create<AuthState>()(
         user: state.user,
         session: state.session,
         memberships: state.memberships,
+        activeStep: state.activeStep,
+        personalInfo: state.personalInfo,
+        restaurantInfo: state.restaurantInfo,
+        subscription: state.subscription,
+        consent: state.consent,
+        validationErrors: state.validationErrors,
+        paymentComplete: state.paymentComplete,
+        paymentError: state.paymentError,
       }),
     }
   )

@@ -68,6 +68,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Swal from "sweetalert2";
 import { useSettings } from "../../providers/settingsProvider";
+import { useFeatureGate } from "../../hooks/useFeatureGate";
 
 dayjs.extend(relativeTime);
 
@@ -83,6 +84,7 @@ const AdminDashboard: React.FC = () => {
 
   const { selectedRestaurant, role } = useRestaurantStore();
   const { settings } = useSettings();
+  const { canAccess } = useFeatureGate();
   
   const { 
     kpis, 
@@ -134,6 +136,11 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleExportCSV = () => {
+    if (!canAccess("canUseCsvExport")) {
+      handleExportClose();
+      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info"));
+      return;
+    }
     exportToCSV(revenueData, `revenue_data_${timeRange}`);
     handleExportClose();
   };
