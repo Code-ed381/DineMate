@@ -375,6 +375,27 @@ const useCashierStore = create<CashierState>()(
 
           if (orderError) throw orderError;
 
+          // 🆕 Record the payment in the ledger
+          const { selectedRestaurant } = useRestaurantStore.getState();
+          const { currentMember } = (await import("./authStore")).default.getState();
+          
+          const { error: paymentError } = await supabase
+            .from("payments")
+            .insert({
+              payment_type: "order",
+              order_id: parseInt(orderId),
+              restaurant_id: selectedRestaurant?.id,
+              cashier_id: currentMember?.user_id || currentMember?.id,
+              amount: finalTotal,
+              method: paymentMethod,
+              status: "completed",
+              reference: null // Order payments usually don't have a transaction reference unless digital
+            });
+
+          if (paymentError) {
+             console.error("Ledger recording failed:", paymentError);
+          }
+
           // If tableId is null (like in OTC), skipping the table update
           if (tableId) {
             const { error: tableError } = await supabase

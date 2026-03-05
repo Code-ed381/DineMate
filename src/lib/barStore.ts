@@ -228,6 +228,24 @@ const useBarStore = create<BarState>()(
 
           if (orderError) throw orderError;
 
+          // 🆕 Record the OTC payment in the unified ledger
+          const { error: paymentError } = await supabase
+            .from("payments")
+            .insert({
+              payment_type: "order",
+              order_id: order.id,
+              restaurant_id: restaurantId,
+              cashier_id: userId, // Bartender acting as cashier
+              amount: total + (parseFloat(get().taxAmount) || 0),
+              method: cashValue >= total ? "cash" : "card",
+              status: "completed",
+              reference: null
+            });
+
+          if (paymentError) {
+             console.error("Bar OTC Ledger recording failed:", paymentError);
+          }
+
           // 3. Create Order Items
           const orderItemsData = activeTabObj.cart.map((item) => ({
             order_id: order.id,

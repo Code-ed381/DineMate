@@ -692,10 +692,33 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
       
       if (allPaid) {
         const { tipAmount } = get();
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const { user: currentUser } = useAuthStore.getState();
+
         await supabase.from("orders").update({ 
           status: "served",
-          tip: tipAmount 
+          tip: tipAmount,
+          payment_method: cashVal >= roundedTotalToPay ? "cash" : "card"
         }).eq("id", oId);
+
+        // 🆕 Record the payment in the unified ledger
+        const { error: paymentError } = await supabase
+          .from("payments")
+          .insert({
+            payment_type: "order",
+            order_id: parseInt(oId),
+            restaurant_id: selectedRestaurant?.id,
+            cashier_id: currentUser?.id, // Waiter acting as cashier
+            amount: totalPaid,
+            method: cashVal >= roundedTotalToPay ? "cash" : "card",
+            status: "completed",
+            reference: null
+          });
+
+        if (paymentError) {
+           console.error("Waiter Ledger recording failed:", paymentError);
+        }
+
         const sId = currentOrder?.session_id;
         if (sId) {
           const session = await menuService.closeSession(sId);

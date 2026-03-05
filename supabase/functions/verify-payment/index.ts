@@ -84,6 +84,23 @@ Deno.serve(async (req) => {
 
     if (dbResponse.error) throw dbResponse.error;
 
+    // 🆕 Log the subscription payment in the ledger
+    const { error: paymentError } = await supabaseAdmin
+      .from("payments")
+      .insert({
+        payment_type: "subscription",
+        restaurant_id: restaurantId,
+        cashier_id: userId, // The owner/admin who paid
+        amount: updateData.price,
+        method: result.data.channel === "card" ? "card" : "momo",
+        status: "completed",
+        reference: reference
+      });
+
+    if (paymentError) {
+      console.error("Failed to log subscription payment:", paymentError);
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: "Payment verified successfully", subscription: dbResponse.data }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

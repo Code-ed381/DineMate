@@ -216,7 +216,7 @@ const Checkout: React.FC = (props) => {
               maxWidth: 600,
             }}
           >
-            <Info totalPrice={activeStep >= 2 ? "$144.97" : "$134.98"} />
+            <Info totalPrice={`$${subscription?.price || 0}`} />
           </Box>
         </Grid>
         <Grid
@@ -284,11 +284,11 @@ const Checkout: React.FC = (props) => {
                   Selected products
                 </Typography>
                 <Typography variant="body1">
-                  {activeStep >= 2 ? "$144.97" : "$134.98"}
+                  ${subscription?.price || 0}
                 </Typography>
               </div>
               <InfoMobile
-                totalPrice={activeStep >= 2 ? "$144.97" : "$134.98"}
+                totalPrice={`$${subscription?.price || 0}`}
               />
             </CardContent>
           </Card>
