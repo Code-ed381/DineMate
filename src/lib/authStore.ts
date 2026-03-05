@@ -409,8 +409,16 @@ const useAuthStore = create<AuthState>()(
 
         if (!personalInfo.password) {
           errors.password = "Password is required";
-        } else if (personalInfo.password.length < 6) {
-          errors.password = "Password must be at least 6 characters";
+        } else if (personalInfo.password.length < 8) {
+          errors.password = "Password must be at least 8 characters";
+        } else if (!/[A-Z]/.test(personalInfo.password)) {
+          errors.password = "Include at least one uppercase letter";
+        } else if (!/[a-z]/.test(personalInfo.password)) {
+          errors.password = "Include at least one lowercase letter";
+        } else if (!/[0-9]/.test(personalInfo.password)) {
+          errors.password = "Include at least one number";
+        } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(personalInfo.password)) {
+          errors.password = "Include at least one special character";
         }
 
         if (personalInfo.confirmPassword !== personalInfo.password) {
