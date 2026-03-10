@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,14 +13,17 @@ import {
   Typography,
   CircularProgress,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
 } from "@mui/material";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import Swal from "sweetalert2";
 import useEmployeesStore from "../lib/employeesStore";
 import { useSettings } from "../providers/settingsProvider";
 import useAppStore from "../lib/appstore";
-import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE } from "../utils/phoneValidation";
+import {
+  isValidGhanaianPhone,
+  GHANA_PHONE_ERROR_MESSAGE,
+} from "../utils/phoneValidation";
 
 interface AddEmployeeDialogProps {
   open: boolean;
@@ -28,7 +31,11 @@ interface AddEmployeeDialogProps {
   onSuccess: () => void;
 }
 
-const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, onSuccess }) => {
+const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({
+  open,
+  onClose,
+  onSuccess,
+}) => {
   const { addEmployee } = useEmployeesStore();
   const { settings } = useSettings();
   const ed = (settings as any)?.employee_defaults || {};
@@ -38,15 +45,30 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Ref for the first input field
+  const firstNameInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle focus when dialog opens
+  useEffect(() => {
+    if (open && firstNameInputRef.current) {
+      // Small timeout to ensure the dialog is fully rendered
+      setTimeout(() => {
+        firstNameInputRef.current?.focus();
+      }, 100);
+    }
+  }, [open]);
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState((settings as any)?.employee_defaults?.default_role || "waiter");
-  
+  const [role, setRole] = useState(
+    (settings as any)?.employee_defaults?.default_role || "waiter",
+  );
+
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +102,13 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Swal.fire("Error", "Please enter a valid email address", "error");
+      return;
+    }
+
     if (requireAvatar && !avatarFile) {
       Swal.fire("Error", "Please upload an avatar image", "error");
       return;
@@ -109,7 +138,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
         email,
         phone,
         role,
-        avatarUrl
+        avatarUrl,
       });
 
       handleClose();
@@ -123,10 +152,26 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen={isMobile}>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={isMobile}
+      disableEnforceFocus
+      disableAutoFocus
+      disableRestoreFocus
+    >
       <DialogTitle>Invite New Employee</DialogTitle>
       <DialogContent dividers>
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", mb: 3 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
           <Box position="relative">
             <Avatar
               src={avatarPreview || "/default-user.png"}
@@ -140,7 +185,7 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
                 right: -5,
                 backgroundColor: "primary.main",
                 color: "white",
-                "&:hover": { backgroundColor: "primary.dark" }
+                "&:hover": { backgroundColor: "primary.dark" },
               }}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -159,8 +204,15 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
           />
         </Box>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 2 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: 2,
+          }}
+        >
           <TextField
+            inputRef={firstNameInputRef}
             label="First Name"
             required
             fullWidth
@@ -181,6 +233,12 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
             fullWidth
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            error={email ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) : false}
+            helperText={
+              email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+                ? "Please enter a valid email address"
+                : undefined
+            }
           />
           <TextField
             label="Phone"
@@ -213,8 +271,17 @@ const AddEmployeeDialog: React.FC<AddEmployeeDialogProps> = ({ open, onClose, on
         <Button
           variant="contained"
           onClick={handleSubmit}
-          disabled={loading || !firstName || !lastName || !email || !role || (requireAvatar && !avatarFile)}
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+          disabled={
+            loading ||
+            !firstName ||
+            !lastName ||
+            !email ||
+            !role ||
+            (requireAvatar && !avatarFile)
+          }
+          startIcon={
+            loading ? <CircularProgress size={20} color="inherit" /> : null
+          }
         >
           {loading ? "Sending Invite..." : "Invite Employee"}
         </Button>

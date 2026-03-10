@@ -200,10 +200,10 @@ const Layout: React.FC = () => {
       return;
     }
 
-    console.log('🔔 Initializing notification system', {
-      userId: user.id,
-      restaurantId: selectedRestaurant.id
-    });
+    // console.log('🔔 Initializing notification system', {
+    //   userId: user.id,
+    //   restaurantId: selectedRestaurant.id
+    // });
     
     fetchNotifications();
     subscribeToNotifications();
@@ -211,7 +211,6 @@ const Layout: React.FC = () => {
     subscribeToUserMemberships();
 
     return () => {
-      console.log('🔕 Unsubscribing from systems');
       unsubscribe();
       unsubscribeFromCurrentRestaurant();
       unsubscribeFromUserMemberships();

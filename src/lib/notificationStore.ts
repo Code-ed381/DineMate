@@ -349,7 +349,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
       .subscribe((status) => {
         console.log('📡 Notification subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to notifications for user:', userId, 'restaurant:', restaurantId);
+          console.log('✅ Successfully subscribed to notifications');
         }
         if (status === 'CHANNEL_ERROR') {
           console.error('❌ Failed to subscribe to notifications. Check if realtime is enabled on user_notifications table.');

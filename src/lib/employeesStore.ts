@@ -139,7 +139,33 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
                 }
             });
 
-            if (authError || !authData?.success) throw new Error(authError?.message || "Failed to invite user");
+            if (authError) {
+                // Handle network/function invocation errors
+                console.log('Auth error object:', authError);
+                console.log('Auth error keys:', Object.keys(authError));
+                
+                // Check if the error contains a JSON response with specific error message
+                let errorMessage = authError.message || "Failed to invoke admin-actions function";
+                
+                // The context is a Response object, we need to read its body
+                if (authError.context && authError.context.text) {
+                    try {
+                        const errorText = await authError.context.text();
+                        console.log('Error response text:', errorText);
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (parseError) {
+                        console.log('Failed to parse error response:', parseError);
+                    }
+                }
+                
+                throw new Error(errorMessage);
+            }
+            
+            if (!authData?.success) {
+                // Handle business logic errors from Edge Function
+                throw new Error(authData?.error || "Failed to invite user");
+            }
             
             const user = authData.data.user;
             if (!user) throw new Error("Failed to retrieve invited user details");
