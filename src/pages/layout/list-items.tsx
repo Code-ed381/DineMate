@@ -21,6 +21,7 @@ import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import { useSettings } from "../../providers/settingsProvider";
 import { useFeatureGate } from "../../hooks/useFeatureGate";
+import UpgradeModal from "../../components/UpgradeModal";
 
 import Swal from "sweetalert2";
 
@@ -29,23 +30,28 @@ interface NavItemProps {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  onLockedClick?: () => void;
   drawerOpen?: boolean;
   locked?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, drawerOpen, locked }) => {
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, onClick, onLockedClick, drawerOpen, locked }) => {
   const location = useLocation();
   const theme = useTheme();
   const isActive = location.pathname === to;
 
   const handleLockedClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    Swal.fire({
-      title: "Upgrade Required",
-      text: "Please upgrade your plan in Settings to access this feature.",
-      icon: "info",
-      confirmButtonText: "Got it"
-    });
+    if (onLockedClick) {
+      onLockedClick();
+    } else {
+      Swal.fire({
+        title: "Upgrade Required",
+        text: "Please upgrade your plan in Settings to access this feature.",
+        icon: "info",
+        confirmButtonText: "Got it"
+      });
+    }
   };
 
   const content = (
@@ -120,6 +126,8 @@ export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }
   const { role }: any = useRestaurantStore();
   const { setBreadcrumb }: any = useAppStore();
   const { canAccess } = useFeatureGate();
+
+  const [openUpgrade, setOpenUpgrade] = React.useState(false);
 
   return (
     <React.Fragment>
@@ -198,9 +206,14 @@ export const MainListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerOpen }
             onClick={() => setBreadcrumb("Detailed Reports")} 
             drawerOpen={drawerOpen}
             locked={!canAccess("canUseAuditLogs")}
+            onLockedClick={() => setOpenUpgrade(true)}
           />
         </>
       )}
+      <UpgradeModal 
+        open={openUpgrade} 
+        onClose={() => setOpenUpgrade(false)} 
+      />
     </React.Fragment>
   );
 };
@@ -212,6 +225,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
   const { canAccess } = useFeatureGate();
 
   const isOwnerOrAdmin = role === "owner" || role === "admin";
+  const [openUpgrade, setOpenUpgrade] = React.useState(false);
 
   return (
     <React.Fragment>
@@ -249,6 +263,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
             onClick={() => setBreadcrumb("Reports")} 
             drawerOpen={drawerOpen}
             locked={!canAccess("canUseReports")}
+            onLockedClick={() => setOpenUpgrade(true)}
           />
           <NavItem 
             to="/app/cashier-reports" 
@@ -257,6 +272,7 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
             onClick={() => setBreadcrumb("Detailed Reports")} 
             drawerOpen={drawerOpen}
             locked={!canAccess("canUseAuditLogs")}
+            onLockedClick={() => setOpenUpgrade(true)}
           />
         </>
       )}
@@ -269,6 +285,10 @@ export const SecondaryListItems: React.FC<{ drawerOpen?: boolean }> = ({ drawerO
           drawerOpen={drawerOpen}
         />
       )}
+      <UpgradeModal 
+        open={openUpgrade} 
+        onClose={() => setOpenUpgrade(false)} 
+      />
     </React.Fragment>
   );
 };

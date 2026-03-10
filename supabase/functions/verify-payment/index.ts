@@ -2,8 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
-  Deno.env.get("PROJECT_URL") ?? "",
-  Deno.env.get("SERVICE_ROLE_KEY") ?? ""
+  Deno.env.get("SUPABASE_URL") ?? Deno.env.get("PROJECT_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? ""
 );
 
 const corsHeaders = {
@@ -22,6 +22,39 @@ Deno.serve(async (req) => {
 
     if (!reference || !planId || !billingCycle || !restaurantId || !userId) {
       throw new Error("Missing required parameters");
+    }
+
+    // 🛡️ SECURITY: Verify the user token
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing Authorization header");
+    }
+
+    const supabaseAuthClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? Deno.env.get("PROJECT_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("PROJECT_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseAuthClient.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized: Invalid token");
+    }
+
+    if (user.id !== userId) {
+      throw new Error("Unauthorized: User ID mismatch");
+    }
+
+    // 🛡️ SECURITY: Verify the user is an owner/admin of the restaurant
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from("restaurant_members")
+      .select("role")
+      .eq("restaurant_id", restaurantId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (membershipError || !membership || (membership.role !== "owner" && membership.role !== "admin")) {
+      throw new Error("Unauthorized: You do not have permission to upgrade this restaurant");
     }
 
     const paystackSecretKey = Deno.env.get("PAYSTACK_SECRET_KEY");
@@ -94,7 +127,8 @@ Deno.serve(async (req) => {
         amount: updateData.price,
         method: result.data.channel === "card" ? "card" : "momo",
         status: "completed",
-        reference: reference
+        reference: reference,
+        subscription_id: dbResponse.data.id // Now correctly linking the subscription
       });
 
     if (paymentError) {

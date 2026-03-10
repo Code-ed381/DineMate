@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, ReactNode } from "react";
 import { useSubscriptionStore } from "../lib/subscriptionStore";
 
+import useRestaurantStore from "../lib/restaurantStore";
+
 interface SubscriptionContextType {
   subscriptions: any[];
   loading: boolean;
@@ -11,11 +13,14 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { subscriptions, loading, fetchSubscriptions, subscriptionPlan, subscriptionStatus } = useSubscriptionStore();
+    const { subscriptions, loading, fetchSubscriptions, subscriptionPlan, subscriptionStatus, subscribeToSubscription, unsubscribeFromSubscription } = useSubscriptionStore();
+    const { selectedRestaurant } = useRestaurantStore();
 
     useEffect(() => {
         fetchSubscriptions();
-    }, [fetchSubscriptions]);
+        subscribeToSubscription();
+        return () => unsubscribeFromSubscription();
+    }, [fetchSubscriptions, selectedRestaurant?.id, subscribeToSubscription, unsubscribeFromSubscription]);
 
     return (
         <SubscriptionContext.Provider value={{ subscriptions, loading, subscriptionPlan, subscriptionStatus }}>

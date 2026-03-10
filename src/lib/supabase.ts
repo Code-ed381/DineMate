@@ -2,11 +2,14 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-export const PROJECT_URI = "https://bvgukcijhcmsfhzywros.supabase.co";
-export const PROJECT_ANON =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z3VrY2lqaGNtc2Zoenl3cm9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDE1NDksImV4cCI6MjA3MDkxNzU0OX0.EP068h4rdMhq_EgMrLbN50VXN6K_TEAQTfdiLJNNj70";
+export const PROJECT_URI = import.meta.env.VITE_SUPABASE_URL;
+export const PROJECT_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(PROJECT_URI, PROJECT_ANON, {
+if (!PROJECT_URI || !PROJECT_ANON) {
+  console.error("Missing Supabase environment variables. Please check your .env file.");
+}
+
+export const supabase = createClient(PROJECT_URI || "", PROJECT_ANON || "", {
   realtime: {
     params: {
       eventsPerSecond: 10,

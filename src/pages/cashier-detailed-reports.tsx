@@ -14,6 +14,9 @@ import {
   IconButton,
   Tooltip,
   Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
 } from "@mui/material";
 import {
   Assignment,
@@ -24,6 +27,8 @@ import {
   DateRange,
   Download,
   FilterList,
+  FileDownload,
+  Print,
 } from "@mui/icons-material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import useCashierStore from "../lib/cashierStore";
@@ -33,7 +38,7 @@ import { getCurrencySymbol } from "../utils/currency";
 import MetricCard from "../components/MetricCard";
 import { ShoppingBag, TrendingUp, PriceCheck } from "@mui/icons-material";
 import EmptyState from "../components/empty-state";
-import { exportToCSV } from "../utils/exportUtils";
+import { exportToCSV, exportToPDF } from "../utils/exportUtils";
 import { useSettings } from "../providers/settingsProvider";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
@@ -69,6 +74,27 @@ const CashierDetailedReports: React.FC = () => {
   const [selectedPersonnel, setSelectedPersonnel] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportClick = (e: React.MouseEvent<HTMLElement>) => setExportAnchorEl(e.currentTarget);
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const handleExportCSV = () => {
+    if (!canAccess("canUseCsvExport")) {
+      handleExportClose();
+      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info"));
+      return;
+    }
+    if (detailedOrderItems.length > 0) {
+      exportToCSV(detailedOrderItems, `audit_logs_${new Date().toISOString().split('T')[0]}`);
+    }
+    handleExportClose();
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF();
+    handleExportClose();
+  };
   const { canAccess } = useFeatureGate();
 
   useEffect(() => {
@@ -76,13 +102,7 @@ const CashierDetailedReports: React.FC = () => {
   }, [fetchDetailedReportItems, dateRange]);
 
   const handleExport = () => {
-    if (!canAccess("canUseCsvExport")) {
-      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info"));
-      return;
-    }
-    if (detailedOrderItems.length > 0) {
-      exportToCSV(detailedOrderItems, `audit_logs_${new Date().toISOString().split('T')[0]}`);
-    }
+    // This is now handled by handleExportCSV and handleExportPDF
   };
 
   const columns: GridColDef[] = [
@@ -308,11 +328,30 @@ const CashierDetailedReports: React.FC = () => {
             />
           <Stack direction="row" spacing={1}>
              {cs.enable_csv_export !== false && (
-               <Tooltip title="Export CSV">
-                 <IconButton onClick={handleExport} disabled={detailedOrderItems.length === 0}>
-                   <Download />
-                 </IconButton>
-               </Tooltip>
+               <Box>
+                 <Button
+                    variant="outlined"
+                    startIcon={<Download />}
+                    onClick={handleExportClick}
+                    disabled={detailedOrderItems.length === 0}
+                 >
+                    Export
+                 </Button>
+                 <Menu
+                    anchorEl={exportAnchorEl}
+                    open={Boolean(exportAnchorEl)}
+                    onClose={handleExportClose}
+                 >
+                    <MenuItem onClick={handleExportCSV}>
+                        <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                        Export CSV
+                    </MenuItem>
+                    <MenuItem onClick={handleExportPDF}>
+                        <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                        Print PDF (Browser)
+                    </MenuItem>
+                 </Menu>
+               </Box>
              )}
              <IconButton onClick={() => setShowFilters(!showFilters)}>
                 <FilterList color={showFilters ? "primary" : "inherit"} />
@@ -350,10 +389,11 @@ const CashierDetailedReports: React.FC = () => {
                     select
                     fullWidth
                     size="small"
-                    label="By Personnel"
+                     label="By Personnel"
                     value={selectedPersonnel}
                     onChange={(e) => setSelectedPersonnel(e.target.value)}
                     SelectProps={{ native: true }}
+                    InputLabelProps={{ shrink: true }}
                   >
                     <option value="">All Staff</option>
                     {uniquePersonnel.map(p => (
@@ -366,10 +406,11 @@ const CashierDetailedReports: React.FC = () => {
                     select
                     fullWidth
                     size="small"
-                    label="By Status"
+                     label="By Status"
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
                     SelectProps={{ native: true }}
+                    InputLabelProps={{ shrink: true }}
                   >
                     <option value="">All Statuses</option>
                     <option value="served">Served</option>

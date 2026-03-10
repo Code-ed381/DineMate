@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import useRestaurantStore from "./restaurantStore";
 import { supabase } from "./supabase";
 import { handleError } from "../components/Error";
+import Swal from "sweetalert2";
 
 interface CashierSession {
   session_id: string;
@@ -343,6 +344,12 @@ const useCashierStore = create<CashierState>()(
       },
 
       processPayment: async (sessionId: string, orderId: string, tableId: string) => {
+        const role = useRestaurantStore.getState().role;
+        if (role !== "owner" && role !== "admin" && role !== "cashier") {
+          Swal.fire("Unauthorized", "You don't have permission to process payments.", "error");
+          return;
+        }
+        
         const { paymentMethod, selectedOrderItems, discount } = get();
         set({ isProcessingPayment: true });
 

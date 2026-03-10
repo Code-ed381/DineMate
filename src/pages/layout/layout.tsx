@@ -42,6 +42,7 @@ import useDashboardStore from "../../lib/dashboardStore";
 import useAuthStore from "../../lib/authStore";
 import useAppStore from "../../lib/appstore";
 import useRestaurantStore from "../../lib/restaurantStore";
+import useProfileStore from "../../lib/profileStore";
 import ThemeToggle from "../../components/theme-toggle";
 import { useSettings } from "../../providers/settingsProvider";
 import { ToastContainer } from "react-toastify";
@@ -148,6 +149,10 @@ const Layout: React.FC = () => {
     setRole,
     restaurants,
     role,
+    subscribeToCurrentRestaurant,
+    unsubscribeFromCurrentRestaurant,
+    subscribeToUserMemberships,
+    unsubscribeFromUserMemberships,
   } = useRestaurantStore();
   const { settings } = useSettings() as any;
   const gs = settings?.general || {};
@@ -166,6 +171,13 @@ const Layout: React.FC = () => {
 
   const { fetchUser } = useDashboardStore();
   const { signOut, user } = useAuthStore();
+  const { profile, getProfile } = useProfileStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      getProfile();
+    }
+  }, [user?.id, getProfile]);
 
   // Sync sidebar default open state once settings load
   React.useEffect(() => {
@@ -176,9 +188,9 @@ const Layout: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.general?.sidebar_default_open === undefined ? 0 : 1]);
 
-  const first_name = user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
-  const last_name = user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
-  const avatar = user?.user_metadata?.profileAvatar || user?.user_metadata?.avatar_url || user?.user_metadata?.profile_avatar || user?.user_metadata?.avatar || "";
+  const first_name = profile?.first_name || user?.user_metadata?.firstName || user?.user_metadata?.first_name || "";
+  const last_name = profile?.last_name || user?.user_metadata?.lastName || user?.user_metadata?.last_name || "";
+  const avatar = profile?.avatar_url || user?.user_metadata?.profileAvatar || user?.user_metadata?.avatar_url || user?.user_metadata?.profile_avatar || user?.user_metadata?.avatar || "";
   const displayRole = (role || "staff").toUpperCase();
 
 
@@ -195,12 +207,16 @@ const Layout: React.FC = () => {
     
     fetchNotifications();
     subscribeToNotifications();
+    subscribeToCurrentRestaurant();
+    subscribeToUserMemberships();
 
     return () => {
-      console.log('🔕 Unsubscribing from notifications');
+      console.log('🔕 Unsubscribing from systems');
       unsubscribe();
+      unsubscribeFromCurrentRestaurant();
+      unsubscribeFromUserMemberships();
     };
-  }, [user?.id, selectedRestaurant?.id, fetchNotifications, subscribeToNotifications, unsubscribe]);
+  }, [user?.id, selectedRestaurant?.id, fetchNotifications, subscribeToNotifications, unsubscribe, subscribeToCurrentRestaurant, unsubscribeFromCurrentRestaurant, subscribeToUserMemberships, unsubscribeFromUserMemberships]);
 
   useEffect(() => {
     if (user?.id) {

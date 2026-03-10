@@ -332,7 +332,7 @@ const RestaurantForm: React.FC = () => {
           error={Boolean(validationErrors.country)}
           size="small"
         >
-          <InputLabel id="country-label">Country</InputLabel>
+          <InputLabel id="country-label" shrink>Country</InputLabel>
           <Select
             labelId="country-label"
             id="country"

@@ -25,6 +25,7 @@ import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
 import { getRoleRedirectPath } from "../utils/roleRedirects";
 import Swal from "sweetalert2";
 import AddRestaurantModal from "../components/modals/AddRestaurantModal";
+import { supabase } from "../lib/supabase";
 import Logo from "../assets/logo.png";
 
 const MotionBox = motion.create(Box);
@@ -53,11 +54,59 @@ const RestaurantSelectionPage: React.FC = () => {
   }, [user]);
 
   const handleSelect = async (restaurant: any) => {
-    if (restaurant.status !== 'active') {
+    const resStatus = restaurant.restaurants.status;
+    const memberStatus = restaurant.status;
+
+    if (resStatus === 'deactivated' || resStatus === 'pending_deletion') {
+      if (restaurant.role === 'owner') {
+        const result = await Swal.fire({
+          title: 'Account Deactivated',
+          text: `This restaurant is currently ${resStatus.replace('_', ' ')}. Do you want to reactivate it and resume operations?`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, Reactivate',
+          cancelButtonText: 'No, Keep Deactivated'
+        });
+
+        if (result.isConfirmed) {
+          try {
+            const { error: resError } = await supabase
+              .from('restaurants')
+              .update({ status: 'active', scheduled_deletion_date: null })
+              .eq('id', restaurant.restaurants.id);
+            
+            if (resError) throw resError;
+
+            const { error: userError } = await supabase
+              .from('users')
+              .update({ status: 'active', scheduled_deletion_date: null })
+              .eq('id', user?.id);
+
+            if (userError) throw userError;
+
+            Swal.fire('Reactivated!', 'Your restaurant is now active again.', 'success');
+            await getRestaurants(); // Refresh list
+            return;
+          } catch (error: any) {
+            Swal.fire('Error', error.message || 'Failed to reactivate.', 'error');
+            return;
+          }
+        }
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Restaurant Inactive',
+          text: 'This restaurant has been deactivated by the owner. Please contact management.',
+        });
+        return;
+      }
+    }
+
+    if (memberStatus !== 'active') {
       Swal.fire({
         icon: 'error',
         title: 'Access Denied',
-        text: 'Your account is not active for this restaurant. Please contact the administrator.',
+        text: 'Your staff account is not active for this restaurant. Please contact the administrator.',
       });
       return;
     }

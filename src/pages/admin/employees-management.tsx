@@ -17,11 +17,15 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-  Pagination
+  Pagination,
+  Menu,
+  MenuItem,
+  ListItemIcon
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
+import { Download, FileDownload, Print } from "@mui/icons-material";
 import AdminHeader from "../../components/admin-header";
 import DataTable from "../../components/data-table";
 import FAB from "../../components/fab";
@@ -41,6 +45,7 @@ import { useFeatureGate } from "../../hooks/useFeatureGate";
 import UpgradeModal from "../../components/UpgradeModal";
 import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
+import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
 import dayjs from "dayjs";
 
 interface EmployeeRow {
@@ -81,6 +86,33 @@ const EmployeeManagement: React.FC = () => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const handleExportCSV = () => {
+    if (!canUseFeature("canUseCsvExport")) {
+      handleExportClose();
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+      return;
+    }
+    const dataToExport = filteredEmployees.map(emp => ({
+        Name: `${emp.first_name} ${emp.last_name}`,
+        Email: emp.email,
+        Phone: emp.phone || 'N/A',
+        Role: emp.role,
+        Status: emp.status,
+        Joined: dayjs(emp.created_at).format('YYYY-MM-DD')
+    }));
+    exportToCSV(dataToExport, "restaurant_employees");
+    handleExportClose();
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF();
+    handleExportClose();
+  };
 
   useEffect(() => {
     fetchEmployees();
@@ -235,7 +267,32 @@ const EmployeeManagement: React.FC = () => {
       <AdminHeader
         title="Employee Management"
         description="Manage your restaurant staff, track roles, and update details"
-      />
+      >
+        <Box>
+            <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={handleExportClick}
+                sx={{ borderRadius: 2 }}
+            >
+                Export
+            </Button>
+            <Menu
+                anchorEl={exportAnchorEl}
+                open={Boolean(exportAnchorEl)}
+                onClose={handleExportClose}
+            >
+                <MenuItem onClick={handleExportCSV}>
+                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                    Export CSV
+                </MenuItem>
+                <MenuItem onClick={handleExportPDF}>
+                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                    Print PDF (Browser)
+                </MenuItem>
+            </Menu>
+        </Box>
+      </AdminHeader>
 
        <Box sx={{ 
           display: "flex", 

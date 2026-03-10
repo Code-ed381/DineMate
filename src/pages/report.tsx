@@ -16,9 +16,11 @@ import {
   CircularProgress,
   Chip,
   Stack,
+  Menu,
+  ListItemIcon,
 } from "@mui/material";
 import { GridColDef } from "@mui/x-data-grid";
-import { TrendingUp, FilterList, Download, CreditCard, AttachMoney, ReceiptLong } from "@mui/icons-material";
+import { TrendingUp, FilterList, Download, CreditCard, AttachMoney, ReceiptLong, FileDownload, Print } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import dayjs from "dayjs";
 
@@ -27,7 +29,7 @@ import useRestaurantStore from "../lib/restaurantStore";
 import DataTable from "../components/data-table";
 import EmptyState from "../components/empty-state";
 import { formatCurrency } from "../utils/currency";
-import { exportToCSV } from "../utils/exportUtils";
+import { exportToCSV, exportToPDF } from "../utils/exportUtils";
 import MetricCard from "../components/MetricCard";
 import { useSettings } from "../providers/settingsProvider";
 import Swal from "sweetalert2";
@@ -64,6 +66,34 @@ const ReportDashboard: React.FC = () => {
   const [endDate, setEndDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [selectedWaiter, setSelectedWaiter] = useState<string>("");
   const [reportMode, setReportMode] = useState<"standard" | "X" | "Z">("standard");
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const handleExportCSV = () => {
+    if (!canAccess("canUseCsvExport")) {
+      handleExportClose();
+      Swal.fire({
+        title: "Upgrade Required",
+        text: "Please upgrade your plan to export data to CSV.",
+        icon: "info",
+        confirmButtonText: "Got it"
+      });
+      return;
+    }
+
+    if (filteredOrders.length > 0) {
+        const reportTitle = reportMode === "standard" ? "Sales" : `${reportMode} Report`;
+        exportToCSV(filteredOrders, `${reportTitle.toLowerCase().replace(" ", "_")}_${selectedRestaurant?.name || 'restaurant'}`);
+    }
+    handleExportClose();
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF();
+    handleExportClose();
+  };
 
   // Security Check: Unauthorized Admin redirect
   useEffect(() => {
@@ -130,20 +160,7 @@ const ReportDashboard: React.FC = () => {
   };
 
   const handleExport = () => {
-    if (!canAccess("canUseCsvExport")) {
-      Swal.fire({
-        title: "Upgrade Required",
-        text: "Please upgrade your plan to export data to CSV.",
-        icon: "info",
-        confirmButtonText: "Got it"
-      });
-      return;
-    }
-
-    if (filteredOrders.length > 0) {
-        const reportTitle = reportMode === "standard" ? "Sales" : `${reportMode} Report`;
-        exportToCSV(filteredOrders, `${reportTitle.toLowerCase().replace(" ", "_")}_${selectedRestaurant?.name || 'restaurant'}`);
-    }
+    // This function is no longer used, replaced by handleExportCSV and handleExportPDF
   };
 
   // Columns for DataTable
@@ -221,9 +238,25 @@ const ReportDashboard: React.FC = () => {
           </Button>
           </>)}
           {rs.allow_csv_export !== false && (
-          <Button variant="contained" startIcon={<Download />} onClick={handleExport}>
-            Export
-          </Button>
+            <Box>
+                <Button variant="contained" startIcon={<Download />} onClick={handleExportClick}>
+                    Export
+                </Button>
+                <Menu
+                    anchorEl={exportAnchorEl}
+                    open={Boolean(exportAnchorEl)}
+                    onClose={handleExportClose}
+                >
+                    <MenuItem onClick={handleExportCSV}>
+                        <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                        Export CSV
+                    </MenuItem>
+                    <MenuItem onClick={handleExportPDF}>
+                        <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                        Print PDF (Browser)
+                    </MenuItem>
+                </Menu>
+            </Box>
           )}
           {rs.show_advanced_filters !== false && (
           <IconButton onClick={() => setShowFilters(!showFilters)}>
@@ -247,10 +280,11 @@ const ReportDashboard: React.FC = () => {
           <Grid container spacing={2} alignItems="flex-end">
             <Grid item xs={12} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Date Range</InputLabel>
+                <InputLabel shrink>Date Range</InputLabel>
                 <Select
                   value={filterType}
                   label="Date Range"
+                  displayEmpty
                   onChange={(e) => setFilterType(e.target.value)}
                 >
                   <MenuItem value="today">Today (X/Z Mode)</MenuItem>
@@ -288,10 +322,11 @@ const ReportDashboard: React.FC = () => {
             )}
             {rs.show_waiter_filter !== false && <Grid item xs={12} md={2.5}>
                 <FormControl fullWidth size="small">
-                    <InputLabel>Attendant / Waiter</InputLabel>
+                    <InputLabel shrink>Attendant / Waiter</InputLabel>
                     <Select
                         value={selectedWaiter}
                         label="Attendant / Waiter"
+                        displayEmpty
                         onChange={(e) => setSelectedWaiter(e.target.value)}
                     >
                         <MenuItem value="">All Personnel</MenuItem>

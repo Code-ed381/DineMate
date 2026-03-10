@@ -17,7 +17,10 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-  Pagination
+  Pagination,
+  Menu,
+  MenuItem,
+  ListItemIcon,
 } from "@mui/material";
 import {
   Search,
@@ -33,6 +36,9 @@ import {
   HourglassEmpty as HourglassEmptyIcon,
   Receipt as ReceiptIcon,
   DoneAll as DoneAllIcon,
+  Download,
+  FileDownload,
+  Print,
 } from "@mui/icons-material";
 import useTableManagementStore from "../../lib/tableManagementStore";
 import AdminHeader from "../../components/admin-header";
@@ -48,6 +54,7 @@ import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
 import useRestaurantStore from "../../lib/restaurantStore";
 import { useSettings } from "../../providers/settingsProvider";
+import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
 
 const statusColors: Record<string, { color: any; icon: any }> = {
   available: { color: "success", icon: CheckCircleIcon },
@@ -71,6 +78,32 @@ const TableManagement: React.FC = () => {
   const [editingTable, setEditingTable] = useState<any>(null);
   const { canUseFeature, isLimitReached, plan } = useFeatureGate();
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const handleExportCSV = () => {
+    if (!canUseFeature("canUseCsvExport")) {
+      handleExportClose();
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+      return;
+    }
+    const dataToExport = filteredTables.map(table => ({
+        TableNumber: table.table_number,
+        Capacity: table.capacity,
+        Location: table.location || 'Main Hall',
+        Status: table.effective_status || table.table_status || 'available',
+        Description: table.description || 'N/A'
+    }));
+    exportToCSV(dataToExport, "restaurant_tables");
+    handleExportClose();
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF();
+    handleExportClose();
+  };
   
   const [page, setPage] = useState(1);
   const cardsPerPage = 8;
@@ -182,7 +215,32 @@ const TableManagement: React.FC = () => {
 
   return (
     <Box sx={{ p: 2 }}>
-      <AdminHeader title="Table Management" description="Manage your restaurant tables" />
+      <AdminHeader title="Table Management" description="Manage your restaurant tables">
+        <Box>
+            <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={handleExportClick}
+                sx={{ borderRadius: 2 }}
+            >
+                Export
+            </Button>
+            <Menu
+                anchorEl={exportAnchorEl}
+                open={Boolean(exportAnchorEl)}
+                onClose={handleExportClose}
+            >
+                <MenuItem onClick={handleExportCSV}>
+                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                    Export CSV
+                </MenuItem>
+                <MenuItem onClick={handleExportPDF}>
+                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                    Print PDF (Browser)
+                </MenuItem>
+            </Menu>
+        </Box>
+      </AdminHeader>
 
       {tableSettings.show_table_stats !== false && (
         <Grid container spacing={2} sx={{ mb: 3 }}>

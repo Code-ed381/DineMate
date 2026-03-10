@@ -104,6 +104,11 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
   },
 
   addTable: async (table_number, status, capacity, location, notes) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { selectedRestaurant } = useRestaurantStore.getState();
     const restaurantId = selectedRestaurant && selectedRestaurant.id;
     if (!restaurantId) return;
@@ -178,6 +183,11 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
   },
 
   handleSave: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { rowData } = get();
     try {
       const { error } = await supabase
@@ -207,6 +217,11 @@ const useTableManagementStore = create<TableManagementState>()((set, get) => ({
   },
 
   handleDelete: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to revert this!",

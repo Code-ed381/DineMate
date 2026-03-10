@@ -197,6 +197,18 @@ Deno.serve(async (req) => {
       // We don't throw here to avoid failing the whole signup for settings
     }
 
+    // ✅ Trigger confirmation email
+    // Since we used admin.createUser with email_confirm: false, we must manually trigger the email.
+    const { error: resendError } = await supabaseAdmin.auth.resend({
+      type: "signup",
+      email: personalInfo.email,
+    });
+
+    if (resendError) {
+      console.error("Failed to send confirmation email:", resendError);
+      // We don't throw here to avoid failing a successful signup process
+    }
+
     return new Response(
       JSON.stringify({ 
         message: "Signup successful", 

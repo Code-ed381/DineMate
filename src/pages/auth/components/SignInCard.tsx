@@ -88,13 +88,23 @@ const SignInCard: React.FC = () => {
         navigate("/restaurant-selection", { replace: true });
       }
     } catch (error: any) {
-      Swal.fire({
-        title: "Error",
-        text: error.message,
-        icon: "error",
-        showConfirmButton: false,
-        timer: 2000,
-      });
+      if (error.message && error.message.toLowerCase().includes("email not confirmed")) {
+        Swal.fire({
+          title: "Email Not Confirmed",
+          text: "Please check your inbox and click the link we sent to confirm your account.",
+          footer: '<span style="color: #666; font-size: 0.9em;">Go to your mail and click on the link provided in the mail to proceed.</span>',
+          icon: "warning",
+          showConfirmButton: true,
+        });
+      } else {
+        Swal.fire({
+          title: "Error",
+          text: error.message,
+          icon: "error",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+      }
     } finally {
       setProcessing(false);
     }

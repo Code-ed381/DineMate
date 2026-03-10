@@ -30,6 +30,8 @@ export interface SubscriptionState {
   
   // Derived state helper
   getCurrentSubscription: () => Subscription | null;
+  subscribeToSubscription: () => void;
+  unsubscribeFromSubscription: () => void;
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
@@ -123,27 +125,39 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 
     set({ loading: true });
     try {
-      // Cancel all active subscriptions
-      const { subscriptions } = get();
-      for (const sub of subscriptions) {
-        if (sub.status === "active") {
-          await supabase
-            .from("subscriptions")
-            .update({ status: "cancelled" })
-            .eq("id", sub.id);
+      const activeSub = get().subscriptions.find(s => s.status === "active");
+      
+      if (activeSub) {
+        const { error } = await supabase
+          .from("subscriptions")
+          .update({
+            subscription_plan: "free",
+            billing_cycle: "monthly",
+            price: 0, 
+            status: "active"
+          })
+          .eq("id", activeSub.id);
+
+        if (error) throw error;
+      } else {
+        // Fallback: If no active subscription exists, create one
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+        
+        if (userId) {
+          const { error } = await supabase.from("subscriptions").insert({
+            restaurant_id: restaurantId,
+            user_id: userId,
+            subscription_plan: "free",
+            billing_cycle: "monthly",
+            status: "active",
+            starts_at: new Date().toISOString(),
+            paystack_reference: `free_fallback_${Date.now()}`
+          });
+          if (error) throw error;
         }
       }
 
-      // Create a free subscription
-      const { error } = await supabase.from("subscriptions").insert({
-        restaurant_id: restaurantId,
-        subscription_plan: "free",
-        billing_cycle: "monthly",
-        status: "active",
-        starts_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
       await get().fetchSubscriptions();
     } catch (err) {
       console.error("Error downgrading to free:", err);
@@ -155,5 +169,35 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   getCurrentSubscription: () => {
     const { subscriptions } = get();
     return subscriptions[0] || null;
-  }
+  },
+
+  subscribeToSubscription: () => {
+    const { selectedRestaurant } = useRestaurantStore.getState();
+    if (!selectedRestaurant?.id) return;
+
+    const channel = supabase
+      .channel(`subscription_changes_${selectedRestaurant.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `restaurant_id=eq.${selectedRestaurant.id}`,
+        },
+        () => {
+          get().fetchSubscriptions();
+        }
+      )
+      .subscribe();
+
+    (window as any).subscriptionChannel = channel;
+  },
+
+  unsubscribeFromSubscription: () => {
+    if ((window as any).subscriptionChannel) {
+      supabase.removeChannel((window as any).subscriptionChannel);
+      (window as any).subscriptionChannel = null;
+    }
+  },
 }));

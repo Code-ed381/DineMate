@@ -32,6 +32,38 @@ const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<any>(null);
 
+  // Password change state
+  const { changePassword } = useAuthStore();
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmNewPassword) {
+      Swal.fire("Error", "All password fields are required.", "error");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      Swal.fire("Error", "New passwords do not match.", "error");
+      return;
+    }
+    if (newPassword.length < 6) {
+      Swal.fire("Error", "New password must be at least 6 characters.", "error");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    const success = await changePassword(oldPassword, newPassword);
+    setIsChangingPassword(false);
+
+    if (success) {
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    }
+  };
+
   useEffect(() => {
     getProfile();
   }, [getProfile]);
@@ -218,6 +250,54 @@ const Profile: React.FC = () => {
                     disabled={!isEditing}
                     onChange={(e) => setEditedProfile({...editedProfile, phone: e.target.value})}
                   />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mt: 4 }}>
+            <CardContent>
+              <Typography variant="h6" fontWeight="bold" mb={2}>
+                Change Password
+              </Typography>
+              <Divider sx={{ mb: 3 }} />
+
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Current Password"
+                    type="password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="New Password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Confirm New Password"
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Button 
+                    variant="contained" 
+                    onClick={handleChangePassword}
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? "Updating Password..." : "Update Password"}
+                  </Button>
                 </Grid>
               </Grid>
             </CardContent>

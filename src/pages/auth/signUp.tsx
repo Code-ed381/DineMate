@@ -74,49 +74,88 @@ const Checkout: React.FC = (props) => {
     }
 
     if (activeStep === steps.length - 1) {
+      // 1. Create the account first while staying on the current step
       const signupResult = await onSubmit();
-      if (!signupResult) return;
+      if (!signupResult) return; // onSubmit handles its own errors and Swal alerts
 
+      // Initialize session so we can verify the payment securely
+      await supabase.auth.signInWithPassword({
+        email: personalInfo.email,
+        password: personalInfo.password || ""
+      });
+
+      // 2. Account created successfully. If it's a paid plan, handle payment.
       if (subscription.subscription_plan !== 'free') {
         if (!config.publicKey) {
           Swal.fire("Configuration Error", "Paystack public key is not set", "error");
-          handleNext(); // Still show welcome screen so they can try payment later
+          // User is still on the step, they can potentially fix it or we can't do much here
           return;
         }
 
-        initializePayment({
-          onSuccess: async (referenceData: any) => {
-            setProcessing(true);
-            try {
-              const { data, error } = await supabase.functions.invoke('verify-payment', {
-                body: {
-                  reference: referenceData.reference,
-                  planId: subscription.subscription_plan,
-                  billingCycle: subscription.billing_cycle,
-                  restaurantId: signupResult.restaurantId,
-                  userId: signupResult.userId
+        const handlePayment = () => {
+          initializePayment({
+            onSuccess: async (referenceData: any) => {
+              setProcessing(true);
+              try {
+                const { error } = await supabase.functions.invoke('verify-payment', {
+                  body: {
+                    reference: referenceData.reference,
+                    planId: subscription.subscription_plan,
+                    billingCycle: subscription.billing_cycle,
+                    restaurantId: signupResult.restaurantId,
+                    userId: signupResult.userId
+                  }
+                });
+                if (!error) {
+                  setPaymentComplete(true);
+                  handleNext(); // SUCCESS: Now move to Welcome screen
+                } else {
+                  throw error;
                 }
-              });
-              if (!error) {
-                setPaymentComplete(true);
-              } else {
-                throw error;
+              } catch (err) {
+                console.error("Payment verification failed", err);
+                setPaymentError("Could not verify your payment. Please contact support.");
+                handlePaymentFailure();
+              } finally {
+                setProcessing(false);
               }
-            } catch (err) {
-              console.error("Payment verification failed", err);
-              setPaymentError("Could not verify your payment. Please contact support.");
-            } finally {
-              setProcessing(false);
-              handleNext();
+            },
+            onClose: () => {
+              handlePaymentFailure();
             }
-          },
-          onClose: () => {
-            setPaymentError("Payment was not completed. You can refresh to try again.");
-            handleNext();
-          }
-        });
+          });
+        };
+
+        const handlePaymentFailure = () => {
+          Swal.fire({
+            title: "Payment Not Completed",
+            text: "Your account is created, but payment was not finished. Would you like to try again or explore our free plan?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Try Payment Again",
+            cancelButtonText: "Explore Free Plan",
+            reverseButtons: true,
+          }).then((result) => {
+            if (result.isConfirmed) {
+              handlePayment();
+            } else if (result.dismiss === Swal.DismissReason.cancel) {
+              // Switch to free plan
+              useAuthStore.setState((state) => ({
+                subscription: {
+                  ...state.defaultSubscription,
+                  subscription_plan: 'free',
+                  price: 0
+                }
+              }));
+              handleNext(); // Proceed to Welcome screen
+            }
+          });
+        };
+
+        handlePayment();
       } else {
-        handleNext();
+        // Free plan, proceed directly to Welcome screen
+        handleNext(); 
       }
     }
   };
@@ -124,7 +163,7 @@ const Checkout: React.FC = (props) => {
   const onSubmit = async () => {
     setProcessing(true);
     setPaymentError(null);
-    setSignupError(null); // Clear previous errors
+    setSignupError(null); 
     try {
       const { tempFiles } = useAuthStore.getState();
 
@@ -155,7 +194,22 @@ const Checkout: React.FC = (props) => {
     } catch (error: any) {
       console.error("Signup error:", error);
       setSignupError(error.message);
-      // Removed handleNext() so user stays on the form to fix errors
+      
+      Swal.fire({
+        title: "Account Creation Failed",
+        text: error.message || "We encountered an error while creating your account.",
+        icon: "error",
+        showCancelButton: true,
+        confirmButtonText: "Try Again",
+        cancelButtonText: "Start Over",
+        reverseButtons: true,
+      }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.cancel) {
+          useAuthStore.getState().clearRegistrationData();
+          window.location.reload();
+        }
+      });
+      
       return null;
     } finally {
       setProcessing(false);
@@ -329,126 +383,153 @@ const Checkout: React.FC = (props) => {
               ))}
             </Stepper>
 
-            {activeStep === steps.length ? (
-              <Stack spacing={2} useFlexGap sx={{ alignItems: "center", textAlign: "center", py: 4 }}>
-                <Typography variant="h1">
-                  {signupError ? "❌" : paymentError ? "⌛" : "🎉"}
-                </Typography>
-                <Typography variant="h5" fontWeight={700}>
-                  {signupError
-                    ? "Signup Failed"
-                    : paymentError
-                    ? "Account Ready!"
-                    : "Welcome to DineMate!"}
-                </Typography>
-                <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 480 }}>
-                  {signupError ? (
-                    <Box sx={{ color: "error.main" }}>
-                      We encountered an error while creating your account: {signupError}
-                    </Box>
-                  ) : subscription.subscription_plan === "free" || paymentComplete ? (
-                    <>
-                      Your account has been created successfully. We've sent a
-                      confirmation email to <strong>{personalInfo.email}</strong>.
-                      Please verify your email to get started.
-                    </>
-                  ) : (
-                    <>
-                      Your account has been created, but your payment is still pending. 
-                      Once you complete your payment, your restaurant plan will be activated. 
-                      {paymentError && <Box sx={{ color: 'error.main', mt: 1 }}>{paymentError}</Box>}
-                    </>
-                  )}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                  {signupError ? (
-                    <Button
-                      variant="contained"
-                      onClick={() => window.location.reload()}
-                      sx={{ width: { xs: "100%", sm: "auto" } }}
-                    >
-                      Try Again
-                    </Button>
-                  ) : (
-                    <>
-                      {!paymentComplete && subscription.subscription_plan !== "free" && (
+            {(() => {
+              const { clearRegistrationData, steps, activeStep: currentActiveStep } = useAuthStore.getState();
+              
+              // If user is on the success/error screen when mounting (e.g. they closed the tab),
+              // we should clear data so they aren't stuck on a stale screen if they return.
+              React.useEffect(() => {
+                const state = useAuthStore.getState();
+                if (state.activeStep >= state.steps.length) {
+                  state.clearRegistrationData();
+                }
+                // eslint-disable-next-line react-hooks/exhaustive-deps
+              }, []);
+
+              if (activeStep === steps.length) {
+                return (
+                  <Stack spacing={2} useFlexGap sx={{ alignItems: "center", textAlign: "center", py: 4 }}>
+                    <Typography variant="h1">
+                      {signupError ? "❌" : paymentError ? "⌛" : "🎉"}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={700}>
+                      {signupError
+                        ? "Signup Failed"
+                        : paymentError
+                        ? "Account Ready!"
+                        : "Welcome to DineMate!"}
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 480 }}>
+                      {signupError ? (
+                        <Box sx={{ color: "error.main" }}>
+                          We encountered an error while creating your account: {signupError}
+                        </Box>
+                      ) : subscription.subscription_plan === "free" || paymentComplete ? (
+                        <>
+                          Your account has been created successfully. We've sent a
+                          confirmation email to <strong>{personalInfo.email}</strong>.
+                          Please check your personal email and confirm your account creation to get started.
+                        </>
+                      ) : (
+                        <>
+                          Your account has been created, but your payment is still pending. 
+                          Once you complete your payment, your restaurant plan will be activated. 
+                          {paymentError && <Box sx={{ color: 'error.main', mt: 1 }}>{paymentError}</Box>}
+                        </>
+                      )}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                      {signupError ? (
                         <Button
                           variant="contained"
-                          onClick={() => window.location.reload()}
+                          onClick={() => {
+                            clearRegistrationData();
+                            window.location.reload();
+                          }}
                           sx={{ width: { xs: "100%", sm: "auto" } }}
                         >
-                          Try Payment Again
+                          Try Again
                         </Button>
+                      ) : (
+                        <>
+                          {!paymentComplete && subscription.subscription_plan !== "free" && (
+                            <Button
+                              variant="contained"
+                              onClick={() => {
+                                clearRegistrationData();
+                                window.location.reload();
+                              }}
+                              sx={{ width: { xs: "100%", sm: "auto" } }}
+                            >
+                              Try Payment Again
+                            </Button>
+                          )}
+                          <Button
+                            variant={paymentComplete || subscription.subscription_plan === "free" ? "contained" : "outlined"}
+                            onClick={() => {
+                              clearRegistrationData();
+                              navigate("/sign-in");
+                            }}
+                            sx={{ width: { xs: "100%", sm: "auto" } }}
+                          >
+                            Go to Sign In
+                          </Button>
+                        </>
                       )}
-                      <Button
-                        variant={paymentComplete || subscription.subscription_plan === "free" ? "contained" : "outlined"}
-                        onClick={() => navigate("/sign-in")}
-                        sx={{ width: { xs: "100%", sm: "auto" } }}
-                      >
-                        Go to Sign In
-                      </Button>
-                    </>
+                    </Box>
+                  </Stack>
+                );
+              }
+
+              return (
+                <Fragment>
+                  <AuthStepperContent step={activeStep} />
+                  {signupError && activeStep === steps.length - 1 && (
+                    <Typography color="error" variant="body2" sx={{ textAlign: "right", mt: 2, fontWeight: 500 }}>
+                      {signupError}
+                    </Typography>
                   )}
-                </Box>
-              </Stack>
-            ) : (
-              <Fragment>
-                <AuthStepperContent step={activeStep} />
-                {signupError && activeStep === steps.length - 1 && (
-                  <Typography color="error" variant="body2" sx={{ textAlign: "right", mt: 2, fontWeight: 500 }}>
-                    {signupError}
-                  </Typography>
-                )}
-                <Box
-                  sx={[
-                    {
-                      display: "flex",
-                      flexDirection: { xs: "column-reverse", sm: "row" },
-                      alignItems: "end",
-                      flexGrow: 1,
-                      gap: 1,
-                      pb: { xs: 12, sm: 0 },
-                      mt: { xs: 2, sm: 0 },
-                      mb: "60px",
-                    },
-                    activeStep !== 0
-                      ? { justifyContent: "space-between" }
-                      : { justifyContent: "flex-end" },
-                  ]}
-                >
-                  {activeStep !== 0 && (
-                    <Button
-                      startIcon={<ChevronLeftRoundedIcon />}
-                      onClick={handleBack}
-                      variant="text"
-                      sx={{ display: { xs: "none", sm: "flex" } }}
-                    >
-                      Previous
-                    </Button>
-                  )}
-                  {activeStep !== 0 && (
-                    <Button
-                      startIcon={<ChevronLeftRoundedIcon />}
-                      onClick={handleBack}
-                      variant="outlined"
-                      fullWidth
-                      sx={{ display: { xs: "flex", sm: "none" } }}
-                    >
-                      Previous
-                    </Button>
-                  )}
-                  <Button
-                    variant="contained"
-                    endIcon={processing ? <CircularProgress size={20} color="inherit" /> : <ChevronRightRoundedIcon />}
-                    onClick={onNext}
-                    disabled={processing}
-                    sx={{ width: { xs: "100%", sm: "fit-content" } }}
+                  <Box
+                    sx={[
+                      {
+                        display: "flex",
+                        flexDirection: { xs: "column-reverse", sm: "row" },
+                        alignItems: "end",
+                        flexGrow: 1,
+                        gap: 1,
+                        pb: { xs: 12, sm: 0 },
+                        mt: { xs: 2, sm: 0 },
+                        mb: "60px",
+                      },
+                      activeStep !== 0
+                        ? { justifyContent: "space-between" }
+                        : { justifyContent: "flex-end" },
+                    ]}
                   >
-                    {activeStep === steps.length - 1 ? (processing ? "Creating..." : "Create account") : "Next"}
-                  </Button>
-                </Box>
-              </Fragment>
-            )}
+                    {activeStep !== 0 && (
+                      <Button
+                        startIcon={<ChevronLeftRoundedIcon />}
+                        onClick={handleBack}
+                        variant="text"
+                        sx={{ display: { xs: "none", sm: "flex" } }}
+                      >
+                        Previous
+                      </Button>
+                    )}
+                    {activeStep !== 0 && (
+                      <Button
+                        startIcon={<ChevronLeftRoundedIcon />}
+                        onClick={handleBack}
+                        variant="outlined"
+                        fullWidth
+                        sx={{ display: { xs: "flex", sm: "none" } }}
+                      >
+                        Previous
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      endIcon={processing ? <CircularProgress size={20} color="inherit" /> : <ChevronRightRoundedIcon />}
+                      onClick={onNext}
+                      disabled={processing}
+                      sx={{ width: { xs: "100%", sm: "fit-content" } }}
+                    >
+                      {activeStep === steps.length - 1 ? (processing ? "Creating..." : "Create account") : "Next"}
+                    </Button>
+                  </Box>
+                </Fragment>
+              );
+            })()}
           </Box>
         </Grid>
       </Grid>

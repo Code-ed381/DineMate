@@ -13,6 +13,7 @@ import {
   Chip,
 } from "@mui/material";
 import { plans } from "../config/plans";
+import { supabase } from "../lib/supabase";
 
 import useAuthStore from "../lib/authStore";
 import useRestaurantStore from "../lib/restaurantStore";
@@ -29,23 +30,9 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
   const { selectedRestaurant } = useRestaurantStore();
   const { subscriptionPlan, fetchSubscriptions } = useSubscriptionStore();
   const currentPlanId = subscriptionPlan || "free";
-
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2Z3VrY2lqaGNtc2Zoenl3cm9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNDE1NDksImV4cCI6MjA3MDkxNzU0OX0.EP068h4rdMhq_EgMrLbN50VXN6K_TEAQTfdiLJNNj70";
-
   const handleUpgradeClick = async (planId: string) => {
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
-
-    const result = await Swal.fire({
-      title: `Upgrade to ${plan.name}?`,
-      text: `You are about to upgrade to the ${plan.name} plan for ₵${plan.monthly}/mo.`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Yes, pay with Paystack",
-      cancelButtonText: "Maybe later"
-    });
-
-    if (!result.isConfirmed) return;
 
     const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
     if (!publicKey) {
@@ -69,24 +56,17 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ open, onClose }) => {
         });
 
         try {
-          const res = await fetch("https://bvgukcijhcmsfhzywros.supabase.co/functions/v1/verify-payment", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "apikey": SUPABASE_ANON_KEY,
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabase.functions.invoke("verify-payment", {
+            body: {
               reference: response.reference,
               planId: plan.id,
               billingCycle: "monthly",
               restaurantId: selectedRestaurant?.id,
               userId: user?.id
-            })
+            }
           });
 
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Failed to verify payment");
+          if (error) throw new Error(error.message || "Failed to verify payment");
 
           if (selectedRestaurant) {
             await fetchSubscriptions();

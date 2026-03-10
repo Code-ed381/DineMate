@@ -240,6 +240,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleAddMeal: async () => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { name, description, price, category } = get();
     if (!name || !description || !price || !category) {
       Swal.fire("Error", "Please fill in all fields for the meal.", "error");
@@ -280,6 +285,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleAddDrink: async () => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { drink, price, categoryDrinks } = get();
     if (!drink || !price || !categoryDrinks) {
       Swal.fire("Error", "Please fill in all fields for the drink.", "error");
@@ -331,6 +341,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleSaveMeal: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { rowData } = get();
     try {
       const { error } = await supabase
@@ -357,6 +372,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleSaveDrink: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     const { rowData } = get();
     try {
       const { error } = await supabase
@@ -382,6 +402,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleDeleteMeal: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to revert this!",
@@ -409,6 +434,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   handleDeleteDrink: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to revert this!",
@@ -433,6 +463,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   addMenuItem: async (item, imageFile) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     try {
       const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
       if (!restaurantId) throw new Error("No restaurant selected");
@@ -491,6 +526,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   updateMenuItem: async (id, item, imageFile) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     try {
       let finalImageUrl = item.image_url;
 
@@ -543,6 +583,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   deleteMenuItem: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to revert this!",
@@ -568,6 +613,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   addCategory: async (name) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     try {
       const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
       if (!restaurantId) throw new Error("No restaurant selected");
@@ -587,6 +637,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   updateCategory: async (id, name) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("menu_categories")
@@ -604,6 +659,11 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
   },
 
   deleteCategory: async (id) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+      return;
+    }
     Swal.fire({
       title: "Are you sure?",
       text: "All items in this category will become uncategorized.",

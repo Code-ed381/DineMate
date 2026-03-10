@@ -17,11 +17,15 @@ import {
   useTheme,
   useMediaQuery,
   Pagination,
+  Menu,
+  MenuItem,
+  ListItemIcon,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
+import { Download, FileDownload, Print } from "@mui/icons-material";
 import useMenuItemsStore from "../../lib/menuItemsStore";
 import CategoryItem from "../../components/category";
 import AdminHeader from "../../components/admin-header";
@@ -36,6 +40,7 @@ import { useFeatureGate } from "../../hooks/useFeatureGate";
 import UpgradeModal from "../../components/UpgradeModal";
 import Swal from "sweetalert2";
 import { GridColDef } from "@mui/x-data-grid";
+import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
 
 const baseColumns: GridColDef[] = [
   {
@@ -177,6 +182,33 @@ const MenuItemsManagement: React.FC = () => {
 
   const { canUseFeature, isLimitReached, plan } = useFeatureGate();
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const handleExportCSV = () => {
+    if (!canUseFeature("canUseCsvExport")) {
+      handleExportClose();
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+      return;
+    }
+    const dataToExport = filteredMenuItems.map(item => ({
+        Name: item.name,
+        Description: item.description || 'N/A',
+        Category: item.category_name || 'Uncategorized',
+        Price: item.price,
+        Available: item.available ? 'Yes' : 'No',
+        Tags: (item.tags as string[] || []).join(', ')
+    }));
+    exportToCSV(dataToExport, "restaurant_menu_items");
+    handleExportClose();
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF();
+    handleExportClose();
+  };
 
   useEffect(() => {
     fetchMenuItems();
@@ -284,7 +316,32 @@ const MenuItemsManagement: React.FC = () => {
       <AdminHeader
         title="Menu Management"
         description="Manage your restaurant menu, track availability, and update reservations"
-      />
+      >
+        <Box>
+            <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={handleExportClick}
+                sx={{ borderRadius: 2 }}
+            >
+                Export
+            </Button>
+            <Menu
+                anchorEl={exportAnchorEl}
+                open={Boolean(exportAnchorEl)}
+                onClose={handleExportClose}
+            >
+                <MenuItem onClick={handleExportCSV}>
+                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                    Export CSV
+                </MenuItem>
+                <MenuItem onClick={handleExportPDF}>
+                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                    Print PDF (Browser)
+                </MenuItem>
+            </Menu>
+        </Box>
+      </AdminHeader>
 
       {/* Mobile: horizontal category chips */}
       {isMobile && (

@@ -1,13 +1,11 @@
 import { create } from "zustand";
 import { plans } from "../config/plans";
 import { supabase } from "./supabase";
-import { supabaseAdmin } from "./supabaseAdmin";
 import { persist } from "zustand/middleware";
 import Swal from "sweetalert2";
 import { isValidGhanaianPhone, GHANA_PHONE_ERROR_MESSAGE, toE164 } from "../utils/phoneValidation";
 import { database_logs } from "./logActivities";
 import { Session, User } from "@supabase/supabase-js";
-import useRestaurantStore from "./restaurantStore";
 import useBarStore from "./barStore";
 
 export interface PersonalInfo {
@@ -99,6 +97,7 @@ export interface AuthState {
   setConfirmPasswordErrorMessage: (value: string) => void;
   setLoading: (value: boolean) => void;
   getRestaurantMemberDetails: (restaurantId: string, userId: string) => Promise<any>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   resetPassword: (email: string, password: string) => Promise<any>;
   validateInputs: (email: string, password: string) => boolean;
   validateConfirmPassword: (password: string, confirmPassword: string) => boolean;
@@ -130,6 +129,7 @@ export interface AuthState {
   login: (navigate: any) => Promise<void>;
   resetAuth: () => void;
   insertRestaurant: (userId: string) => Promise<any>;
+  clearRegistrationData: () => void;
   // Added username field as it's used in login/resetAuth
   username: string;
   confirmPasswordError?: boolean;
@@ -142,14 +142,14 @@ export interface AuthState {
 
 const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
-      user: null,
-      session: null,
-      memberships: [],
-      currentMember: null,
+    (set: any, get: any) => ({
+      user: null as User | null,
+      session: null as Session | null,
+      memberships: [] as any[],
+      currentMember: null as any,
       username: "",
-      setMemberships: (memberships) => set({ memberships }),
-      setCurrentMember: (member) => set({ currentMember: member }),
+      setMemberships: (memberships: any[]) => set({ memberships }),
+      setCurrentMember: (member: any) => set({ currentMember: member }),
       refreshSession: async () => {
         const {
           data: { session },
@@ -174,7 +174,7 @@ const useAuthStore = create<AuthState>()(
         idType: "Ghana Card",
         idNumber: "",
         idDocumentUrl: "",
-      },
+      } as PersonalInfo,
       restaurantInfo: {
         name: "",
         description: "",
@@ -189,26 +189,26 @@ const useAuthStore = create<AuthState>()(
         website: "",
         logo: "",
         business_certificate_url: "",
-      },
+      } as RestaurantInfo,
       subscription: {
         subscription_plan: "free",
         price: 0,
         billing_cycle: "monthly",
         paystack_reference: "",
-      },
+      } as Subscription,
       defaultSubscription: {
         subscription_plan: "free",
         price: 0,
         billing_cycle: "monthly",
         paystack_reference: "",
-      },
+      } as Subscription,
       validationErrors: {},
       email: "",
       password: "",
       confirmPassword: "",
-      emailError: false,
+      emailError: false as boolean,
       emailErrorMessage: "",
-      passwordError: false,
+      passwordError: false as boolean,
       passwordErrorMessage: "",
       role: "waiter",
       employees: [],
@@ -271,6 +271,38 @@ const useAuthStore = create<AuthState>()(
         }
 
         return data;
+      },
+
+      changePassword: async (oldPassword, newPassword) => {
+        const currentUser = get().user;
+        if (!currentUser?.email) {
+          Swal.fire("Error", "No authenticated user found.", "error");
+          return false;
+        }
+
+        // 1. Verify old password by attempting to sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: currentUser.email,
+          password: oldPassword,
+        });
+
+        if (signInError) {
+          Swal.fire("Error", "Incorrect current password.", "error");
+          return false;
+        }
+
+        // 2. If successful, update the password
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (updateError) {
+          Swal.fire("Error", updateError.message, "error");
+          return false;
+        }
+
+        Swal.fire("Success", "Password updated successfully.", "success");
+        return true;
       },
 
       resetPassword: async (email, password) => {
@@ -350,17 +382,17 @@ const useAuthStore = create<AuthState>()(
       },
 
       updatePersonalInfo: (field, value) =>
-        set((state) => ({
+        set((state: AuthState) => ({
           personalInfo: { ...state.personalInfo, [field]: value },
         })),
 
       updateRestaurantInfo: (field, value) =>
-        set((state) => ({
+        set((state: AuthState) => ({
           restaurantInfo: { ...state.restaurantInfo, [field]: value },
         })),
 
       updateSubscription: (field, value) => {
-        set((state) => {
+        set((state: AuthState) => {
           if (value === "free") {
             return {
               subscription: state.defaultSubscription,
@@ -386,7 +418,7 @@ const useAuthStore = create<AuthState>()(
       },
 
       updateTempFile: (field, file) => {
-        set((state) => ({
+        set((state: AuthState) => ({
           tempFiles: { ...state.tempFiles, [field]: file },
         }));
       },
@@ -527,7 +559,9 @@ const useAuthStore = create<AuthState>()(
           return { success: false, errors };
         }
 
-        set((state) => ({ activeStep: state.activeStep + 1 }));
+        if (activeStep < get().steps.length - 1) {
+          set((state: AuthState) => ({ activeStep: state.activeStep + 1 }));
+        }
         return { success: true };
       },
 
@@ -564,39 +598,51 @@ const useAuthStore = create<AuthState>()(
         return data;
       },
 
-      updateUserAvatarAsAdmin: async (userId, avatarUrl) => {
-        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
-          userId,
-          {
-            user_metadata: { profileAvatar: avatarUrl },
-          }
-        );
+      updateUserAvatarAsAdmin: async (userId: string, avatarUrl: string): Promise<any> => {
+        const { default: useRestaurantStore } = await import("./restaurantStore");
+        const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+        if (!restaurantId) throw new Error("No restaurant selected");
 
-        if (error) throw error;
+        const { data, error } = await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "update-user",
+            restaurantId,
+            targetUserId: userId,
+            metadata: { profileAvatar: avatarUrl },
+          }
+        });
+
+        if (error) throw new Error(error.message || "Failed to update user avatar");
         return data;
       },
 
-      updateUserDetailsAsAdmin: async (userId, details) => {
+      updateUserDetailsAsAdmin: async (userId: string, details: any): Promise<any> => {
+        const { default: useRestaurantStore } = await import("./restaurantStore");
+        const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+        if (!restaurantId) throw new Error("No restaurant selected");
+
         const normalizedPhone = details.phone_number && details.phone_number.trim()
           ? toE164(details.phone_number)
           : details.phone_number || '';
 
-        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
-          userId,
-          {
-            user_metadata: {
+        const { data, error } = await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "update-user",
+            restaurantId,
+            targetUserId: userId,
+            metadata: {
               firstName: details.first_name,
               lastName: details.last_name,
               phone: normalizedPhone,
             },
           }
-        );
+        });
 
-        if (error) throw error;
+        if (error) throw new Error(error.message || "Failed to update user details");
         return data;
       },
 
-      signIn: async (email, password) => {
+      signIn: async (email: string, password: string): Promise<any> => {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -617,7 +663,7 @@ const useAuthStore = create<AuthState>()(
         return data;
       },
 
-      signUp: async (email, password, extraData = {}) => {
+      signUp: async (email: string, password: string, extraData: any = {}): Promise<any> => {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -640,10 +686,13 @@ const useAuthStore = create<AuthState>()(
       },
 
       signOut: async () => {
+        const { default: useRestaurantStore } = await import("./restaurantStore");
         await supabase.auth.signOut();
-        (useAuthStore as any).persist.clearStorage();
-        useAuthStore.setState({ user: null, session: null, email: "", password: "", username: "" });
-        (useRestaurantStore as any).persist.clearStorage();
+        // Since we are inside the store, we can use set() and access persist differently or just use the hook carefully
+        // But to fully break circularity, we shouldn't use useAuthStore here.
+        set({ user: null, session: null, email: "", password: "", username: "" });
+        
+        (useRestaurantStore as any).persist?.clearStorage();
         useRestaurantStore.setState({
           restaurants: [],
           selectedRestaurant: null,
@@ -738,7 +787,52 @@ const useAuthStore = create<AuthState>()(
         if (error) throw error;
         return data;
       },
-    }),
+
+      clearRegistrationData: () => {
+        set({
+          personalInfo: {
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone_number: "",
+            password: "",
+            confirmPassword: "",
+            profileAvatar: "",
+            idType: "Ghana Card",
+            idNumber: "",
+            idDocumentUrl: "",
+          },
+          restaurantInfo: {
+            name: "",
+            description: "",
+            address_line_1: "",
+            address_line_2: "",
+            city: "",
+            state: "",
+            zip_code: "",
+            country: "",
+            phone_number: "",
+            email: "",
+            website: "",
+            logo: "",
+            business_certificate_url: "",
+          },
+          subscription: {
+            subscription_plan: "free",
+            price: 0,
+            billing_cycle: "monthly",
+            paystack_reference: "",
+          },
+          activeStep: 0,
+          consent: false,
+          processing: false,
+          tempFiles: {},
+          paymentComplete: false,
+          paymentError: null,
+          validationErrors: {},
+        });
+      },
+    } as AuthState),
     {
       name: "auth-store",
       partialize: (state) => ({

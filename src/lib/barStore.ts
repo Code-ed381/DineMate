@@ -170,6 +170,12 @@ const useBarStore = create<BarState>()(
       },
 
       completeOTCPayment: async () => {
+        const role = useRestaurantStore.getState().role;
+        if (role !== "owner" && role !== "admin" && role !== "cashier") {
+          Swal.fire("Unauthorized", "You don't have permission to process payments.", "error");
+          return false;
+        }
+
         const { tabs, activeTab, cash, card, getTotal } = get();
         const activeTabObj = tabs[activeTab];
         if (!activeTabObj || activeTabObj.cart.length === 0) return false;

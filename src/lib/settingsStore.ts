@@ -247,6 +247,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateSetting: async (key, value) => {
+    const role = useRestaurantStore.getState().role;
+    if (role !== "owner" && role !== "admin") {
+      toast.error("Unauthorized: You don't have permission to change these settings.");
+      return;
+    }
     const { selectedRestaurant } = useRestaurantStore.getState();
     const restaurantId = selectedRestaurant?.id;
     if (!restaurantId) return;

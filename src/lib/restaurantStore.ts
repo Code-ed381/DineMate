@@ -20,12 +20,14 @@ export interface Restaurant {
     website?: string;
     logo?: string;
     business_certificate_url?: string;
+    status: 'active' | 'deactivated' | 'pending_deletion' | 'suspended';
+    scheduled_deletion_date?: string;
     created_at?: string;
 }
 
 export interface RestaurantMember {
     role: string;
-    status: string;
+    status: 'active' | 'deactivated' | 'pending_deletion' | 'suspended';
     restaurants: Restaurant;
 }
 
@@ -42,6 +44,10 @@ export interface RestaurantState {
     createRestaurant: (restaurant: Partial<Restaurant>) => Promise<string | null>;
     updateRestaurant: (id: string, restaurant: Partial<Restaurant>) => Promise<void>;
     deleteRestaurant: (id: string) => Promise<void>;
+    subscribeToCurrentRestaurant: () => void;
+    unsubscribeFromCurrentRestaurant: () => void;
+    subscribeToUserMemberships: () => void;
+    unsubscribeFromUserMemberships: () => void;
 }
 
 const useRestaurantStore = create<RestaurantState>()(
@@ -137,6 +143,11 @@ const useRestaurantStore = create<RestaurantState>()(
             },
     
             updateRestaurant: async (id, restaurant) => {
+                const role = get().role;
+                if (role !== 'owner' && role !== 'admin') {
+                    Swal.fire('Unauthorized', "You don't have permission to update restaurant details.", 'error');
+                    return;
+                }
                 try {
                     const { data, error } = await supabase
                         .from('restaurants')
@@ -154,6 +165,11 @@ const useRestaurantStore = create<RestaurantState>()(
             },
     
             deleteRestaurant: async (id) => {
+                const role = get().role;
+                if (role !== 'owner') {
+                    Swal.fire('Unauthorized', "Only the owner can delete a restaurant.", 'error');
+                    return;
+                }
                 try {
                     const { error } = await supabase
                         .from('restaurants')
@@ -165,6 +181,113 @@ const useRestaurantStore = create<RestaurantState>()(
                     set({ selectedRestaurant: null });
                 } catch (error) {
                     Swal.fire('Error', 'Failed to delete restaurant. Check your internet connection.', 'error');
+                }
+            },
+
+            subscribeToCurrentRestaurant: () => {
+                const { selectedRestaurant } = get();
+                if (!selectedRestaurant?.id) return;
+
+                const channel = supabase
+                    .channel(`restaurant_changes_${selectedRestaurant.id}`)
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'restaurants',
+                            filter: `id=eq.${selectedRestaurant.id}`,
+                        },
+                        (payload) => {
+                            if (payload.eventType === 'DELETE') {
+                                Swal.fire({
+                                    title: "Restaurant Deleted",
+                                    text: "This restaurant has been removed. You will be redirected.",
+                                    icon: "warning"
+                                });
+                                get().setSelectedRestaurant(null);
+                                return;
+                            }
+
+                            const newData = payload.new as Restaurant;
+                            if (newData.status === 'deactivated' || newData.status === 'pending_deletion') {
+                                Swal.fire({
+                                    title: "Access Revoked",
+                                    text: "This restaurant has been deactivated by the owner.",
+                                    icon: "error"
+                                });
+                                get().setSelectedRestaurant(null);
+                            } else {
+                                set({ selectedRestaurant: { ...get().selectedRestaurant, ...newData } as Restaurant });
+                            }
+                        }
+                    )
+                    .subscribe();
+
+                (window as any).restaurantChannel = channel;
+            },
+
+            unsubscribeFromCurrentRestaurant: () => {
+                if ((window as any).restaurantChannel) {
+                    supabase.removeChannel((window as any).restaurantChannel);
+                    (window as any).restaurantChannel = null;
+                }
+            },
+
+            subscribeToUserMemberships: () => {
+                const { user } = useAuthStore.getState();
+                if (!user?.id) return;
+
+                const channel = supabase
+                    .channel(`user_membership_changes_${user.id}`)
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'restaurant_members',
+                            filter: `user_id=eq.${user.id}`,
+                        },
+                        (payload) => {
+                            const { selectedRestaurant } = get();
+                            
+                            // Refresh restaurant list for the selection page
+                            get().getRestaurants();
+
+                            // Security Check: If it's for the current restaurant
+                            if (selectedRestaurant && (payload.old as any)?.restaurant_id === selectedRestaurant.id) {
+                                if (payload.eventType === 'DELETE') {
+                                    Swal.fire({
+                                        title: "Access Revoked",
+                                        text: "Your membership to this restaurant has been removed.",
+                                        icon: "error"
+                                    });
+                                    get().setSelectedRestaurant(null);
+                                } else if (payload.eventType === 'UPDATE') {
+                                    const update = payload.new as any;
+                                    if (update.status !== 'active') {
+                                        Swal.fire({
+                                            title: "Access Suspended",
+                                            text: "Your account status for this restaurant is no longer active.",
+                                            icon: "error"
+                                        });
+                                        get().setSelectedRestaurant(null);
+                                    } else {
+                                        set({ role: update.role });
+                                    }
+                                }
+                            }
+                        }
+                    )
+                    .subscribe();
+
+                (window as any).membershipChannel = channel;
+            },
+
+            unsubscribeFromUserMemberships: () => {
+                if ((window as any).membershipChannel) {
+                    supabase.removeChannel((window as any).membershipChannel);
+                    (window as any).membershipChannel = null;
                 }
             },
         }),

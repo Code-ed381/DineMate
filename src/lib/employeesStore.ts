@@ -77,6 +77,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     updateEmployeeDetailsAsAdmin: async (userId, details) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         try {
             const { error } = await supabase
             .from("restaurant_members")
@@ -97,6 +102,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     addEmployee: async ({ firstName, lastName, email, phone, role, avatarUrl }) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         try {
             // ─── Subscription limit check ───
             const { useSubscriptionStore } = await import('./subscriptionStore');
@@ -110,32 +120,37 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
             }
 
             const normalizedPhone = phone ? toE164(phone) : '';
-            // 1. Invite user via email (they set their own password)
-            const { supabaseAdmin } = await import('./supabaseAdmin');
-            
-            const { data: authData, error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-                data: {
-                    firstName: firstName,
-                    lastName: lastName,
-                    phone: normalizedPhone,
-                    profileAvatar: avatarUrl,
-                    role: 'employee'
-                },
-                redirectTo: `${window.location.origin}/#/onboarding`
+            // 1. Invite user via email using backend Edge Function
+            const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
+            if (!selectedRestaurant?.id) throw new Error("No restaurant selected");
+
+            const { data: authData, error: authError } = await supabase.functions.invoke("admin-actions", {
+                body: {
+                    action: "invite-user",
+                    restaurantId: selectedRestaurant.id,
+                    email: email,
+                    metadata: {
+                        firstName: firstName,
+                        lastName: lastName,
+                        phone: normalizedPhone,
+                        profileAvatar: avatarUrl,
+                        role: 'employee'
+                    }
+                }
             });
 
-            if (authError) throw authError;
-
-            if (!authData.user) throw new Error("Failed to invite user");
+            if (authError || !authData?.success) throw new Error(authError?.message || "Failed to invite user");
+            
+            const user = authData.data.user;
+            if (!user) throw new Error("Failed to retrieve invited user details");
 
             // 2. Add to restaurant_members
-            const selectedRestaurant = useRestaurantStore.getState().selectedRestaurant;
             if (!selectedRestaurant?.id) throw new Error("No restaurant selected");
 
             const { error: memberError } = await supabase
                 .from('restaurant_members')
                 .insert([{
-                    user_id: authData.user.id,
+                    user_id: user.id,
                     restaurant_id: selectedRestaurant.id,
                     role: role,
                     status: 'pending',
@@ -184,6 +199,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleEditRole: async (employee) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         const { value: role } = await Swal.fire({
             title: `Update role of ${employee.name}`,
             input: "select",
@@ -235,6 +255,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleUpdateStatus: async (member) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         const newStatus = member.status === 'active' ? 'suspended' : 'active';
         const title = member.status === 'active' 
             ? `Are you sure you want to suspend ${member.name}?`
@@ -289,6 +314,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleSave: async (id) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         const { rowData } = get();
         try {
             const { error } = await supabase
@@ -315,6 +345,11 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
     },
 
     handleDelete: async (employee) => {
+        const roleState = useRestaurantStore.getState().role;
+        if (roleState !== "owner" && roleState !== "admin") {
+            Swal.fire("Unauthorized", "You don't have permission to perform this action.", "error");
+            return;
+        }
         Swal.fire({
             title: `Are you sure you want to delete ${employee.name}?`,
             text: "You won't be able to revert this!",
