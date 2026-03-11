@@ -168,6 +168,14 @@ export const menuService = {
     if (error) throw error;
   },
 
+  async updateOrderItem(orderItemId: string, updates: Partial<OrderItem>): Promise<void> {
+    const { error } = await supabase
+      .from("order_items")
+      .update(updates)
+      .eq("id", orderItemId);
+    if (error) throw error;
+  },
+
   async upsertOrderItem(item: Partial<OrderItem>, selectedModifiers?: any[]): Promise<OrderItem | null> {
     const { data, error } = await supabase
       .from("order_items")

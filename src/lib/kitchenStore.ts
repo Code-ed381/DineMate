@@ -517,6 +517,14 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
 
                 if (error) throw error;
 
+                // Also delete the order_item so it disappears from the waiter portal
+                const { error: orderError } = await supabase
+                  .from("order_items")
+                  .delete()
+                  .eq("id", task.order_item_id);
+
+                if (orderError) throw orderError;
+
                 Swal.fire({
                   title: "Deleted!",
                   text: "Task has been removed.",
@@ -555,6 +563,15 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
               .eq("id", task.kitchen_task_id);
 
             if (error) handleError(error as Error);
+
+            // Sync order_item status to ready
+            await supabase
+              .from("order_items")
+              .update({
+                status: "ready",
+                updated_at: new_date,
+              })
+              .eq("id", task.order_item_id);
 
             // Send notification to the waiter
             const { selectedRestaurant } = useRestaurantStore.getState();
@@ -601,7 +618,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
 
                  if (targetWaiterId && selectedRestaurant?.id) {
                      console.log(`🚀 Sending notification to waiter: ${targetWaiterId}`);
-                     const result = await notificationService.sendUserNotification(selectedRestaurant.id, user?.id || "", {
+                     const result = await notificationService.sendOrderNotification(selectedRestaurant.id, user?.id || "", {
                          title: "Order Ready",
                          message: `Table ${task.table_number}: ${task.menu_item_name} (x${task.quantity}) is Ready`,
                          priority: "high",
@@ -651,6 +668,16 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
               })
               .eq("id", task.kitchen_task_id);
             if (error) handleError(error as Error);
+
+            // Sync order_item status to served
+            await supabase
+              .from("order_items")
+              .update({
+                status: "served",
+                updated_at: new Date(),
+              })
+              .eq("id", task.order_item_id);
+
             get().handleFetchReadyMeals();
             get().handleFetchServedMeals();
           }

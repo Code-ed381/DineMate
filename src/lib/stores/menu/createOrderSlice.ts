@@ -431,7 +431,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
                 title: "New Order",
                 message: `Table ${tableNum}: ${orderItem.name} (x1)`,
                 priority: "high",
-                roles: itemType === 'drink' ? ["barman", "bartender"] : ["chef", "kitchen"]
+                roles: itemType === 'drink' ? ["bartender"] : ["chef"]
               }).catch(e => console.error(e));
             }
           });
@@ -472,7 +472,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
       });
       get().recalculateTotals();
 
-      await menuService.upsertOrderItem({ id: item.order_item_id || item.id, quantity: newQuantity, sum_price: newSum });
+      await menuService.updateOrderItem((item.order_item_id || item.id) as string, { quantity: newQuantity, sum_price: newSum });
 
       if ((itemType === 'food' || itemType === 'drink') && item.is_started !== false) {
         if (action === "increase") {

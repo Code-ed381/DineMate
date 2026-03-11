@@ -11,6 +11,7 @@ import Kitchen from "./pages/kitchen";
 import Profile from "./pages/profile";
 import SignIn from "./pages/auth/signIn";
 import SignUp from "./pages/auth/signUp";
+import ConfirmInvitation from "./pages/auth/confirmInvitation";
 import TableManagement from "./pages/admin/tables-management";
 import ProtectedRoute from "./pages/auth/components/ProtectedRoute";
 import Settings from "./pages/settings";
@@ -35,6 +36,7 @@ const App: React.FC = () => {
           <Route index element={<Index />} />
           <Route path="sign-up" element={<SignUp />} />
           <Route path="sign-in" element={<SignIn />} />
+          <Route path="confirm" element={<ConfirmInvitation />} />
           <Route
             path="restaurant-selection"
             element={
@@ -45,7 +47,10 @@ const App: React.FC = () => {
           />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="onboarding" element={<Onboarding />} />
-          <Route path="guest/call/:restaurantId/:tableId" element={<GuestCall />} />
+          <Route
+            path="guest/call/:restaurantId/:tableId"
+            element={<GuestCall />}
+          />
         </Route>
         <Route
           path="/app/"

@@ -36,7 +36,32 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, restaurantId, targetUserId, email, metadata } = body;
+    const { action, restaurantId, targetUserId, email, metadata, userId } = body;
+
+    // ── Self-activation: employees activating their own membership ──
+    // This runs BEFORE the owner/admin check since the caller is the employee
+    if (action === "activate-member") {
+      if (!userId) throw new Error("userId is required for activate-member.");
+
+      // SECURITY: Only allow users to activate their OWN membership
+      if (userId !== user.id) {
+        throw new Error("Unauthorized: You can only activate your own membership.");
+      }
+
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from("restaurant_members")
+        .update({ status: "active" })
+        .eq("user_id", userId)
+        .eq("status", "pending")
+        .select();
+
+      if (updateError) throw updateError;
+
+      return new Response(
+        JSON.stringify({ success: true, data: updated }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!action || !restaurantId) {
         throw new Error("Missing required parameters: action or restaurantId");

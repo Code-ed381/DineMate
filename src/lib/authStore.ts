@@ -356,20 +356,61 @@ const useAuthStore = create<AuthState>()(
       validateConfirmPassword: (password, confirmPassword) => {
         let isValid = true;
 
-        if (password.length < 6) {
+        // Reset errors
+        set({ 
+          passwordError: false, 
+          passwordErrorMessage: "",
+          confirmPasswordError: false, 
+          confirmPasswordErrorMessage: "" 
+        });
+
+        // Length validation
+        if (password.length < 8) {
           set({
             passwordError: true,
-            passwordErrorMessage: "Password must be at least 6 characters long.",
+            passwordErrorMessage: "Password must be at least 8 characters long.",
           });
           isValid = false;
-        } else if (password !== confirmPassword) {
+        }
+        // Uppercase letter validation
+        else if (!/[A-Z]/.test(password)) {
+          set({
+            passwordError: true,
+            passwordErrorMessage: "Password must contain at least one uppercase letter.",
+          });
+          isValid = false;
+        }
+        // Lowercase letter validation
+        else if (!/[a-z]/.test(password)) {
+          set({
+            passwordError: true,
+            passwordErrorMessage: "Password must contain at least one lowercase letter.",
+          });
+          isValid = false;
+        }
+        // Number validation
+        else if (!/\d/.test(password)) {
+          set({
+            passwordError: true,
+            passwordErrorMessage: "Password must contain at least one number.",
+          });
+          isValid = false;
+        }
+        // Special character validation
+        else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+          set({
+            passwordError: true,
+            passwordErrorMessage: "Password must contain at least one special character.",
+          });
+          isValid = false;
+        }
+        // Password match validation
+        else if (password !== confirmPassword) {
           set({
             confirmPasswordError: true,
             confirmPasswordErrorMessage: "Passwords do not match.",
           });
           isValid = false;
-        } else {
-          set({ confirmPasswordError: false, confirmPasswordErrorMessage: "" });
         }
 
         return isValid;

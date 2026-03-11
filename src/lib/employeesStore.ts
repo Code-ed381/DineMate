@@ -197,7 +197,7 @@ const useEmployeesStore = create<EmployeesState>()((set, get) => ({
             await useAuditStore.getState().logAction({
                 action: 'create_employee',
                 entity_type: 'employee',
-                entity_id: authData.user.id,
+                entity_id: user.id,
                 details: { name: `${firstName} ${lastName}`, role, email }
             });
 

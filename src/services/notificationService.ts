@@ -84,7 +84,8 @@ class NotificationService {
       await supabase.from("user_notifications").insert(userNotifications);
       return { success: true, notification };
     } catch (error) {
-      console.error("Error sending role notification:", error);
+      console.error("🚨 Error sending role notification:", error);
+      // We return the error rather than throwing to avoid crashing the app, but we log the full details
       return { success: false, error };
     }
   }
@@ -118,6 +119,39 @@ class NotificationService {
       return { success: true, notification };
     } catch (error) {
        console.error("Error sending user notification:", error);
+       return { success: false, error };
+    }
+  }
+
+  async sendOrderNotification(restaurantId: string, senderId: string, { title, message, userIds, priority = "normal" }: NotificationPayload & { userIds: string[] }) {
+    try {
+      const { data: notification, error: notifError } = await supabase
+        .from("notifications")
+        .insert({
+          restaurant_id: restaurantId,
+          title,
+          message,
+          type: "order", // Explicitly set type to 'order'
+          priority,
+          target_type: "user",
+          target_user_ids: userIds,
+          sender_id: senderId,
+        })
+        .select()
+        .single();
+
+      if (notifError) throw notifError;
+
+      const userNotifications = userIds.map((userId) => ({
+        notification_id: notification.id,
+        user_id: userId,
+        restaurant_id: restaurantId,
+      }));
+
+      await supabase.from("user_notifications").insert(userNotifications);
+      return { success: true, notification };
+    } catch (error) {
+       console.error("Error sending order notification:", error);
        return { success: false, error };
     }
   }

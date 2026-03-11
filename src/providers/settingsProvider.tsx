@@ -15,11 +15,15 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { selectedRestaurant } = useRestaurantStore();
   const restaurantId = selectedRestaurant?.id;
-  const { fetchSettings, settings, updateSetting, getSetting } = useSettingsStore();
+  const { fetchSettings, settings, updateSetting, getSetting, subscribeToSettings, unsubscribeFromSettings } = useSettingsStore();
 
   useEffect(() => {
-    if (restaurantId) fetchSettings(restaurantId);
-  }, [restaurantId, fetchSettings]);
+    if (restaurantId) {
+      fetchSettings(restaurantId);
+      subscribeToSettings(restaurantId);
+    }
+    return () => unsubscribeFromSettings();
+  }, [restaurantId, fetchSettings, subscribeToSettings, unsubscribeFromSettings]);
 
   return (
     <SettingsContext.Provider value={{ settings: settings || {}, updateSetting, getSetting, restaurantId }}>

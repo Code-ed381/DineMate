@@ -49,6 +49,7 @@ import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
 import SalesBarChart from "./components/sales-data-chart";
 import RevenueLineChartCard from "./components/revenue-line-chart-card";
 import { formatCurrency } from "../../utils/currency";
+import { useSettings } from "../../providers/settingsProvider";
 
 // ----- Helper Components -----
 interface StatCardProps {
@@ -129,11 +130,14 @@ const WaiterDashboard: React.FC = () => {
     setCurrentOrder,
     setCurrentOrderItems,
   } = useMenuStore();
+  const { settings } = useSettings();
+  const tableSettings = (settings as any).table_settings || {};
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "floor">("grid");
-  const { tables, getTables, updateTablePosition } = useTablesStore();
   const { canAccess } = useFeatureGate();
-
+  const [viewMode, setViewMode] = useState<"grid" | "floor">(
+    (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
+  );
+  const { tables, getTables, updateTablePosition } = useTablesStore();
   
   const getItemStatusBreakdown = (itemId: string) => {
     // If no kitchen tasks loaded yet, return null
@@ -242,6 +246,14 @@ const WaiterDashboard: React.FC = () => {
       unsubscribeFromOrderItems();
     };
   }, [getActiveSessionByRestaurant, fetchSalesData, getTables, subscribeToSessions, unsubscribeFromSessions, subscribeToOrderItems, unsubscribeFromOrderItems]);
+
+  useEffect(() => {
+    if (tableSettings.default_view_mode) {
+      setViewMode(
+        (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
+      );
+    }
+  }, [tableSettings.default_view_mode, canAccess]);
 
   // ---- Derived Insights ----
   const totalRevenue = useMemo(

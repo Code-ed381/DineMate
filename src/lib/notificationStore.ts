@@ -441,22 +441,22 @@ function playNotificationSound(priority: string) {
 
 // Notification type categories
 const PAYMENT_TYPES = ["payment"];
-const SYSTEM_TYPES = ["general", "system", "complaint", "user"];
+const SYSTEM_TYPES = ["general", "system", "complaint", "user", "order", "role"];
 
 function shouldShowToast(notificationType: string, userRole: string | null, metadata?: any): boolean {
   if (!userRole) return true;
   const role = userRole.toLowerCase();
   const isComplaint = metadata?.is_complaint === true;
   
-  // Owners and admins: only system-level notifications + complaints
+  // Owners and admins: system-level + orders + complaints
   if (role === "owner" || role === "admin") {
     return isComplaint || SYSTEM_TYPES.includes(notificationType);
   }
-  // Cashier: only payment notifications + system
+  // Cashier: only payment notifications + system + orders
   if (role === "cashier") {
     return PAYMENT_TYPES.includes(notificationType) || SYSTEM_TYPES.includes(notificationType);
   }
-  // Waiter, chef, bartender, kitchen: show order + system notifications
+  // Waiter, chef, bartender, kitchen: show everything
   return true;
 }
 

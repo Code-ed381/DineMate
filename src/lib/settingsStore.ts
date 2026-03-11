@@ -216,9 +216,12 @@ export interface AppSettings {
 interface SettingsState {
   settings: AppSettings;
   loading: boolean;
+  settingsChannel: any;
   fetchSettings: (restaurantId: string) => Promise<void>;
   updateSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => Promise<void>;
   getSetting: <K extends keyof AppSettings>(key: K) => AppSettings[K] | undefined;
+  subscribeToSettings: (restaurantId: string) => void;
+  unsubscribeFromSettings: () => void;
 }
 
 // Keep track of timeout IDs for debouncing
@@ -227,6 +230,7 @@ const debounceTimers: Record<string, NodeJS.Timeout> = {};
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: {},
   loading: false,
+  settingsChannel: null,
 
   fetchSettings: async (restaurantId) => {
     set({ loading: true });
@@ -287,5 +291,46 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   getSetting: (key) => {
     return get().settings[key];
+  },
+
+  subscribeToSettings: (restaurantId: string) => {
+    const oldChannel = get().settingsChannel;
+    if (oldChannel) {
+      supabase.removeChannel(oldChannel);
+    }
+
+    const channel = supabase
+      .channel(`restaurant-settings-${restaurantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'restaurant_settings',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        () => {
+          // Re-fetch all settings when any setting row changes
+          get().fetchSettings(restaurantId);
+        }
+      )
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Subscribed to restaurant settings changes');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Settings subscription error');
+        }
+      });
+
+    set({ settingsChannel: channel });
+  },
+
+  unsubscribeFromSettings: () => {
+    const channel = get().settingsChannel;
+    if (channel) {
+      supabase.removeChannel(channel);
+      set({ settingsChannel: null });
+    }
   },
 }));

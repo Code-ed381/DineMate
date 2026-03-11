@@ -91,19 +91,15 @@ const NotificationList: React.FC<NotificationListProps> = ({
   const {
     fetchNotifications,
     markAsRead,
-    subscribeToNotifications,
-    unsubscribe,
     requestPermission,
   } = useNotificationStore();
 
   useEffect(() => {
     if (open) {
       fetchNotifications();
-      subscribeToNotifications();
       requestPermission();
     }
-    return () => unsubscribe();
-  }, [open, subscribeToNotifications, fetchNotifications, requestPermission, unsubscribe]);
+  }, [open, fetchNotifications, requestPermission]);
 
   const isComplaint = (n: any) => n.notification?.metadata?.is_complaint === true;
 

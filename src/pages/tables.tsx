@@ -66,7 +66,9 @@ const TableManagement: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "floor">(tableSettings.default_view_mode || "grid");
+  const [viewMode, setViewMode] = useState<"grid" | "floor">(
+    (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
+  );
   const {
     tables,
     handleStatusChange,
@@ -139,9 +141,11 @@ const TableManagement: React.FC = () => {
   // Sync default view mode once settings finish loading
   useEffect(() => {
     if (tableSettings.default_view_mode) {
-      setViewMode(tableSettings.default_view_mode);
+      setViewMode(
+        (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
+      );
     }
-  }, [tableSettings.default_view_mode]);
+  }, [tableSettings.default_view_mode, canAccess]);
 
   const handleTransferClick = async (table: any) => {
     if (!user?.id || !selectedRestaurant?.id) return;
