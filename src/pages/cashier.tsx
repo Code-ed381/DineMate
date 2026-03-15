@@ -162,15 +162,18 @@ const CashierDashboard: React.FC = () => {
   const handleExportClose = () => setExportAnchorEl(null);
 
   const getExportData = () => {
-    return closedSessions.map((session) => ({
-      "Date": new Date(session.closed_at).toLocaleDateString(),
-      "Time": new Date(session.closed_at).toLocaleTimeString(),
-      "Order ID": `ORD-${session.order_id}`,
-      "Table": session.table_number || "OTC",
-      [`Total (${currencySymbol})`]: formatCashInput(session.order_total || session.total),
-      "Payment Method": session.payment_method || "N/A",
-      "Discount": session.discount ? `${session.discount}%` : "0%",
-    }));
+    return closedSessions.map((session) => {
+      const closedAt = session.closed_at ? new Date(session.closed_at) : new Date();
+      return {
+        "Date": closedAt.toLocaleDateString(),
+        "Time": closedAt.toLocaleTimeString(),
+        "Order ID": `ORD-${session.order_id}`,
+        "Table": session.table_number || "OTC",
+        [`Total (${currencySymbol})`]: formatCashInput(session.order_total || session.total),
+        "Payment Method": session.payment_method || "N/A",
+        "Discount": session.discount ? `${session.discount}%` : "0%",
+      };
+    });
   };
 
   const handleExportCSV = () => { handleExportClose(); exportToCSV(getExportData(), `transactions_${new Date().toISOString().split("T")[0]}`); };
