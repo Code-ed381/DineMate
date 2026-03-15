@@ -29,12 +29,12 @@ const KpiCard: React.FC<KpiCardProps> = ({ icon, title, value, note }) => {
   return (
     <Card sx={{ borderRadius: 2, height: "100%", minHeight: 100 }} elevation={1}>
       <CardContent sx={{ p: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
           {icon}
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>{value}</Typography>
-            {note && <Typography variant="caption" color="text.secondary">{note}</Typography>}
+          <Box sx={{ flex: 1, minWidth: '100px' }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>{title}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: { xs: '1rem', sm: '1.25rem' }, wordBreak: 'break-all' }}>{value}</Typography>
+            {note && <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{note}</Typography>}
           </Box>
         </Stack>
       </CardContent>
@@ -58,10 +58,10 @@ const KpiDashboard: React.FC<KpiDashboardProps> = ({ allSessions }) => {
 
   return (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={3}><KpiCard icon={<CompactIcon><TrendingUp /></CompactIcon>} title="Total Sales" value={`${currencySymbol}${totals.sum.toFixed(2)}`} note={`Count: ${totals.count}`} /></Grid>
-      <Grid item xs={12} sm={6} md={3}><KpiCard icon={<CompactIcon><ReceiptLong /></CompactIcon>} title="Transactions" value={totals.count} note={`Avg: ${currencySymbol}${totals.avg.toFixed(2)}`} /></Grid>
-      <Grid item xs={12} sm={6} md={3}><KpiCard icon={<CompactIcon><AttachMoney /></CompactIcon>} title="Avg Order" value={`${currencySymbol}${totals.avg.toFixed(2)}`} /></Grid>
-      <Grid item xs={12} sm={6} md={3}><KpiCard icon={<CompactIcon><Cancel /></CompactIcon>} title="Refunds" value={totals.refunds} note="Please review" /></Grid>
+      <Grid item xs={6} sm={6} md={3}><KpiCard icon={<CompactIcon><TrendingUp /></CompactIcon>} title="Total Sales" value={`${currencySymbol}${totals.sum.toFixed(2)}`} note={`Count: ${totals.count}`} /></Grid>
+      <Grid item xs={6} sm={6} md={3}><KpiCard icon={<CompactIcon><ReceiptLong /></CompactIcon>} title="Transactions" value={totals.count} note={`Avg: ${currencySymbol}${totals.avg.toFixed(2)}`} /></Grid>
+      <Grid item xs={6} sm={6} md={3}><KpiCard icon={<CompactIcon><AttachMoney /></CompactIcon>} title="Avg Order" value={`${currencySymbol}${totals.avg.toFixed(2)}`} /></Grid>
+      <Grid item xs={6} sm={6} md={3}><KpiCard icon={<CompactIcon><Cancel /></CompactIcon>} title="Refunds" value={totals.refunds} note="Please review" /></Grid>
     </Grid>
   );
 };

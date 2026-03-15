@@ -21,6 +21,7 @@ import {
   MenuItem,
   ListItemIcon,
   useMediaQuery,
+  Fab,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -56,13 +57,12 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import DashboardHeader from "./components/dashboard-header";
 import EmptyState from "../../components/empty-state";
 import { useAnalyticsStore } from "../../lib/analyticsStore";
 import useRestaurantStore from "../../lib/restaurantStore";
 import useNotificationStore from "../../lib/notificationStore";
 import { formatCurrency } from "../../utils/currency";
-import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
+import { exportToCSV, exportToPDF, exportToExcel, exportToTXT } from "../../utils/exportUtils";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -127,33 +127,49 @@ const AdminDashboard: React.FC = () => {
     return <Info color="info" />;
   };
 
-  const handleExportClick = (event: React.MouseEvent<HTMLElement>) => {
-    setExportAnchorEl(event.currentTarget);
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canAccess("canUseCsvExport")) {
+      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data.", "info"));
+      return;
+    }
+    setExportAnchorEl(e.currentTarget);
   };
 
   const handleExportClose = () => {
     setExportAnchorEl(null);
   };
 
+  const getExportData = () => {
+    return revenueData.map(item => ({
+        Time: item.time,
+        Revenue: item.revenue
+    }));
+  };
+
   const handleExportCSV = () => {
-    if (!canAccess("canUseCsvExport")) {
-      handleExportClose();
-      import("sweetalert2").then(m => m.default.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info"));
-      return;
-    }
-    exportToCSV(revenueData, `revenue_data_${timeRange}`);
+    exportToCSV(getExportData(), `revenue_data_${timeRange}`);
+    handleExportClose();
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(getExportData(), `revenue_data_${timeRange}`);
+    handleExportClose();
+  };
+
+  const handleExportTXT = () => {
+    exportToTXT(getExportData(), `revenue_data_${timeRange}`);
     handleExportClose();
   };
 
   const handleExportPDF = () => {
-    exportToPDF();
+    exportToPDF(getExportData(), `revenue_data_${timeRange}`, "Revenue Trends Overview");
     handleExportClose();
   };
 
   return (
-    <Box sx={{ p: 3, minHeight: "100vh" }}>
+    <Box sx={{ p: { xs: 1, md: 2 }, minHeight: "100vh" }}>
       {/* KPI Cards - Now First Row */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={2} sx={{ mb: { xs: 1.5, md: 3 } }}>
         {[
           {
             title: "Total Revenue",
@@ -184,7 +200,7 @@ const AdminDashboard: React.FC = () => {
             subtitle: "Best seller"
           },
         ].map((item, i) => (
-          <Grid item xs={12} sm={6} md={3} key={i}>
+          <Grid item xs={6} sm={6} md={3} key={i}>
             <Card
               sx={{
                 borderRadius: 3,
@@ -216,32 +232,42 @@ const AdminDashboard: React.FC = () => {
       </Grid>
 
       {/* Controls - Now Second Row */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: 3 }}>
-        <Box>
-            <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={<Download />}
-                onClick={handleExportClick}
-                fullWidth={isMobile}
-            >
-                Export
-            </Button>
-            <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={handleExportClose}
-            >
-                <MenuItem onClick={handleExportCSV}>
-                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                    Export Data (CSV)
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                    Print Dashboard (PDF)
-                </MenuItem>
-            </Menu>
-        </Box>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mb: { xs: 1.5, md: 3 } }}>
+        {!isMobile && (
+          <Box>
+              <Button 
+                  variant="contained" 
+                  color="primary" 
+                  startIcon={<Download />}
+                  onClick={handleExportClick}
+                  fullWidth={isMobile}
+              >
+                  Export
+              </Button>
+              <Menu
+                  anchorEl={exportAnchorEl}
+                  open={Boolean(exportAnchorEl)}
+                  onClose={handleExportClose}
+              >
+                  <MenuItem onClick={handleExportCSV}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Data (CSV)
+                  </MenuItem>
+                  <MenuItem onClick={handleExportExcel}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Excel (XLSX)
+                  </MenuItem>
+                  <MenuItem onClick={handleExportTXT}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Plain Text (TXT)
+                  </MenuItem>
+                  <MenuItem onClick={handleExportPDF}>
+                      <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                      Export PDF (Table)
+                  </MenuItem>
+              </Menu>
+          </Box>
+        )}
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', sm: 'auto' } }}>
             <ToggleButtonGroup
               value={timeRange}
@@ -396,7 +422,7 @@ const AdminDashboard: React.FC = () => {
                     notifications.slice(0, 5).map((n) => (
                         <React.Fragment key={n.id}>
                             <ListItem alignItems="flex-start">
-                            <Box sx={{ mr: 2, mt: 0.5 }}>
+                            <Box sx={{ mb: { xs: 1.5, md: 2 }, mt: 0.5 }}>
                                 {getNotificationIcon(n.notification?.priority || 'normal', n.notification?.type || 'info')}
                             </Box>
                             <ListItemText
@@ -442,7 +468,7 @@ const AdminDashboard: React.FC = () => {
         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
             Quick Actions
         </Typography>
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
             {[
             { label: "Manage Staff", icon: <Group />, desc: "Add or edit staff members", link: "/app/employees" },
             { label: "Manage Menu", icon: <RestaurantMenu />, desc: "Update menu items and categories", link: "/app/menu-items-management" },
@@ -464,7 +490,7 @@ const AdminDashboard: React.FC = () => {
                     navigate(item.link);
                 }}
                 sx={{
-                    p: 2,
+                    mb: { xs: 1.5, md: 2 }, 
                     borderRadius: 3,
                     display: 'flex',
                     alignItems: 'center',
@@ -495,6 +521,22 @@ const AdminDashboard: React.FC = () => {
             ))}
         </Grid>
       </Box>
+      {/* Mobile Export FAB */}
+      {isMobile && (
+        <Fab
+          color="primary"
+          aria-label="export"
+          onClick={handleExportClick}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 1100,
+          }}
+        >
+          <Download />
+        </Fab>
+      )}
     </Box>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   Box,
   Grid,
@@ -19,6 +19,7 @@ import {
   CircularProgress,
   Button,
   IconButton,
+  alpha,
 } from "@mui/material";
 import {
   TableBar,
@@ -43,13 +44,13 @@ import useMenuStore from "../../lib/menuStore";
 import useTablesStore from "../../lib/tablesStore";
 import FloorPlan from "../../components/FloorPlan";
 import { useFeatureGate } from "../../hooks/useFeatureGate";
-import DashboardHeader from "./components/dashboard-header";
 import WaiterDashboardSkeleton from "./components/skeletons/waiter-dashboard-skeleton";
 import { formatDateTimeWithSuffix } from "../../utils/format-datetime";
 import SalesBarChart from "./components/sales-data-chart";
 import RevenueLineChartCard from "./components/revenue-line-chart-card";
 import { formatCurrency } from "../../utils/currency";
 import { useSettings } from "../../providers/settingsProvider";
+import OrdersAwaitingPayment from "../../components/active-orders-view";
 
 // ----- Helper Components -----
 interface StatCardProps {
@@ -93,6 +94,7 @@ const StatusChip: React.FC<StatusChipProps> = ({ status }) => {
     billed: { label: "Bill Printed", color: "primary", variant: "filled" },
     open: { label: "In Session", color: "success", variant: "filled" },
     closed: { label: "Session Closed", color: "error", variant: "outlined" },
+    close: { label: "Session Closed", color: "error", variant: "outlined" },
     pending: { label: "Pending", color: "warning", variant: "outlined" },
     ready: { label: "Ready", color: "success", variant: "outlined" },
     cooking: { label: "Cooking", color: "secondary", variant: "outlined" },
@@ -129,7 +131,24 @@ const WaiterDashboard: React.FC = () => {
     repeatRound,
     setCurrentOrder,
     setCurrentOrderItems,
+    setChosenTable,
   } = useMenuStore();
+
+  const {
+    tables,
+    getTables,
+    updateTablePosition,
+    getSessionsOverview,
+    sessionsOverview,
+    selectedSession,
+    setSelectedSession,
+  } = useTablesStore();
+  
+  const sessionsForOverview = useMemo(() =>
+    assignedTables.filter((t: any) => t.session_status === "billed"),
+    [assignedTables]
+  );
+
   const { settings } = useSettings();
   const tableSettings = (settings as any).table_settings || {};
   const [searchTerm, setSearchTerm] = useState("");
@@ -137,7 +156,7 @@ const WaiterDashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<"grid" | "floor">(
     (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
   );
-  const { tables, getTables, updateTablePosition } = useTablesStore();
+  const isInitialModeSet = useRef(false);
   
   const getItemStatusBreakdown = (itemId: string) => {
     // If no kitchen tasks loaded yet, return null
@@ -248,10 +267,11 @@ const WaiterDashboard: React.FC = () => {
   }, [getActiveSessionByRestaurant, fetchSalesData, getTables, subscribeToSessions, unsubscribeFromSessions, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
   useEffect(() => {
-    if (tableSettings.default_view_mode) {
+    if (tableSettings.default_view_mode && !isInitialModeSet.current) {
       setViewMode(
         (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
       );
+      isInitialModeSet.current = true;
     }
   }, [tableSettings.default_view_mode, canAccess]);
 
@@ -275,9 +295,11 @@ const WaiterDashboard: React.FC = () => {
     let result = assignedTables;
 
     if (statusFilter !== "all") {
-      result = result.filter(
-        (t: any) => t.session_status?.toLowerCase() === statusFilter
-      );
+      result = result.filter((t: any) => {
+        const status = t.session_status?.toLowerCase();
+        const normalizedStatus = status === "close" ? "closed" : status;
+        return normalizedStatus === statusFilter;
+      });
     }
 
     if (searchTerm) {
@@ -290,16 +312,17 @@ const WaiterDashboard: React.FC = () => {
   }, [assignedTables, searchTerm, statusFilter]);
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
       {loadingActiveSessionByRestaurant ? (
         <WaiterDashboardSkeleton />
       ) : (
         <>
-          <DashboardHeader
+{/* <DashboardHeader
             title="Waiter Dashboard"
             description="Track tables, monitor active orders, and manage sessions in real-time."
             background="linear-gradient(135deg,rgb(5, 146, 165) 0%, rgb(224, 21, 140) 100%)"
             color="#fff"
+            compact={true}
             action={
               <Button
                 variant="contained"
@@ -317,7 +340,7 @@ const WaiterDashboard: React.FC = () => {
                 Performance Insights
               </Button>
             }
-          />
+          /> */}
 
           {/* ---- Top Stats ---- */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -359,124 +382,114 @@ const WaiterDashboard: React.FC = () => {
           </Grid>
 
           {/* ---- Performance Charts ---- */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: "100%" }}>
+          <Grid container spacing={2} sx={{ mb: 4 }} alignItems="stretch">
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ 
+                borderRadius: 2, 
+                boxShadow: 'none', 
+                border: '1px solid', 
+                borderColor: 'divider',
+                height: { lg: 400 },
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
                 <CardHeader
-                  title={
-                    <Typography variant="subtitle1">
-                      Sales Performance
-                    </Typography>
-                  }
+                  title={<Typography variant="subtitle2" fontWeight={700}>Sales Performance</Typography>}
                   subheader="Last 7 Days"
-                  avatar={<BarChartTwoToneIcon color="primary" />}
+                  avatar={<Avatar sx={{ bgcolor: alpha('#1976d2', 0.1), color: '#1976d2', width: 32, height: 32 }}><BarChartTwoToneIcon sx={{ fontSize: 20 }} /></Avatar>}
                   sx={{ pb: 0 }}
                 />
                 <CardContent
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    p: { xs: 1.5, sm: 2 },
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      width: "100%",
-                    }}
-                  >
-                    {loadingChart ? (
-                      <CircularProgress />
-                    ) : (
+                  {loadingChart ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+                      <CircularProgress size={30} />
+                    </Box>
+                  ) : (
+                    <Box sx={{ flex: 1, minHeight: 0 }}>
                       <SalesBarChart orders={assignedTables} />
-                    )}
-                  </Box>
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6}>
-              <RevenueLineChartCard orders={assignedTables} />
+            <Grid item xs={12} lg={6}>
+              <OrdersAwaitingPayment 
+                activeSessions={sessionsForOverview} 
+                setSelectedSession={(session: any) => {
+                  const table = tables.find((t: any) => t.table_number.toString() === session.table_number?.toString());
+                  if (table) setChosenTable(table);
+                }} 
+                sx={{ height: { lg: 400 } }}
+              />
             </Grid>
           </Grid>
 
+          {/* ---- Revenue Trend Section ---- */}
+          <Box sx={{ mb: 4, '& .MuiPaper-root': { borderRadius: 2, boxShadow: 'none', border: '1px solid', borderColor: 'divider' } }}>
+            <RevenueLineChartCard orders={assignedTables} />
+          </Box>
+
           {/* ---- Filters ---- */}
+
           <Stack
             direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            alignItems={{ xs: "stretch", md: "center" }}
-            justifyContent="space-between"
-            sx={{ mb: 3 }}
+            spacing={{ xs: 2, md: 3 }}
+            alignItems="center"
+            sx={{ mb: 4, width: '100%' }}
           >
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              value={statusFilter}
-              onChange={(_e, value) => value && setStatusFilter(value)}
-              sx={{
-                flex: { md: "0 1 auto" },
-                "& .MuiToggleButton-root": {
-                  px: { xs: 1.5, sm: 3 },
-                  py: 1,
-                  fontWeight: 600,
-                  borderRadius: 2,
-                  textTransform: "capitalize",
-                  fontSize: { xs: '0.8rem', md: '0.875rem' }
-                },
-              }}
-            >
-              <ToggleButton value="all">All</ToggleButton>
-              <ToggleButton value="open">Open</ToggleButton>
-              <ToggleButton value="billed">Billed</ToggleButton>
-              <ToggleButton value="closed">Closed</ToggleButton>
-            </ToggleButtonGroup>
+            <Box sx={{ flex: 1, width: '100%' }}>
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                size="small"
+                value={statusFilter}
+                onChange={(_e, value) => value && setStatusFilter(value)}
+                sx={{
+                  "& .MuiToggleButton-root": {
+                    py: 1,
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    textTransform: "capitalize",
+                    fontSize: { xs: '0.75rem', md: '0.85rem' }
+                  },
+                }}
+              >
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="open">Open</ToggleButton>
+                <ToggleButton value="billed">Billed</ToggleButton>
+                <ToggleButton value="closed">Closed</ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
 
-            <ToggleButtonGroup
-              exclusive
-              value={viewMode}
-              onChange={(_e, value) => {
-                if (value === "floor" && !canAccess("canUseFloorPlan")) {
-                  import("sweetalert2").then((m) => m.default.fire({
-                    title: "Upgrade Required",
-                    text: "Please upgrade your plan to access the Floor Plan view.",
-                    icon: "info",
-                    confirmButtonText: "Got it"
-                  }));
-                  return;
-                }
-                if (value) setViewMode(value);
-              }}
-              sx={{
-                "& .MuiToggleButton-root": {
-                  px: 2,
-                  py: 1,
-                  fontWeight: 600,
-                  borderRadius: 2,
-                },
-              }}
-            >
-              <ToggleButton value="grid">
-                <GridViewIcon sx={{ mr: 1 }} /> Grid
-              </ToggleButton>
-              <ToggleButton value="floor">
-                <MapIcon sx={{ mr: 1 }} /> Floor Plan
-              </ToggleButton>
-            </ToggleButtonGroup>
+            {/* Spacer to push search field to the right while sharing space */}
+            <Box sx={{ flex: { xs: 0, md: 1 }, display: { xs: 'none', md: 'block' } }} />
 
-            <TextField
-              placeholder="Search table..."
-              fullWidth
-              sx={{ maxWidth: { md: 300 } }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <Box sx={{ flex: 1, width: '100%' }}>
+              <TextField
+                placeholder="Search tables..."
+                size="small"
+                fullWidth
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search color="primary" sx={{ fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: 2, bgcolor: 'background.paper' }
+                }}
+              />
+            </Box>
           </Stack>
 
           {/* ---- Table Sessions ---- */}

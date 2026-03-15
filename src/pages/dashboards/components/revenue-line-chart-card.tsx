@@ -20,16 +20,18 @@ const RevenueLineChartCard: React.FC<RevenueLineChartCardProps> = ({ orders = []
       <CardContent>
         {orders?.length > 0 ? (
           <>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis />
-                <Tooltip formatter={(val: any) => `₵${val.toFixed(2)}`} />
-                <Line type="monotone" dataKey="revenue" stroke="#1976d2" strokeWidth={3} dot={{ r: 5, stroke: "#1976d2", strokeWidth: 2, fill: "#fff" }} />
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="time" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  formatter={(val: any) => [`₵${val.toFixed(2)}`, "Revenue"]} 
+                />
+                <Line type="monotone" dataKey="revenue" stroke="#1976d2" strokeWidth={2} dot={{ r: 3, fill: "#1976d2" }} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Tracks order totals as they come in throughout the day</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center', opacity: 0.7 }}>Revenue fluctuations over time</Typography>
           </>
         ) : (
           <EmptyState 

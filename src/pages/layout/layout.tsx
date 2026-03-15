@@ -752,7 +752,7 @@ const Layout: React.FC = () => {
             {settings?.general?.show_breadcrumb && (
               <Box sx={{ 
                 px: 3, 
-                py: 1, 
+                py: { xs: 0.5, md: 1 }, 
                 borderBottom: `1px solid ${alpha(theme.palette.divider, 0.05)}`, 
                 bgcolor: alpha(theme.palette.background.paper, 0.4),
                 backdropFilter: 'blur(10px)'
@@ -776,7 +776,7 @@ const Layout: React.FC = () => {
               </Box>
             )}
 
-            <Box sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
+            <Box sx={{ flexGrow: 1, p: { xs: 0, md: 3 } }}>
               {gs.enable_page_transitions !== false ? (
               <AnimatePresence mode="wait">
                 <motion.div

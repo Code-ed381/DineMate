@@ -8,13 +8,33 @@ import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import dayjs from "dayjs";
 
+/**
+ * Helper to check if ALL sibling tasks for an order_item have reached a target status (or beyond)
+ * status order: pending < preparing < ready < served
+ */
+async function shouldSyncOrderItemStatus(orderItemId: string, targetStatus: string): Promise<boolean> {
+  const statusOrder = ["pending", "preparing", "ready", "served"];
+  const targetIdx = statusOrder.indexOf(targetStatus);
+  
+  const { data: siblings } = await supabase
+    .from("kitchen_tasks")
+    .select("status")
+    .eq("order_item_id", orderItemId);
+    
+  if (!siblings || siblings.length === 0) return true;
+  
+  // ALL siblings must be at targetStatus or beyond
+  return siblings.every(s => statusOrder.indexOf(s.status) >= targetIdx);
+}
+
 interface BarTask {
   kitchen_task_id: string; // Changed from task_id
   menu_item_id: string;
   menu_item_name: string;
   task_number: number;
   quantity: number; // Changed from order_item_quantity
-  order_item_status: string; // Changed from task_status
+  status: string; // Individual task status (pending, preparing, etc)
+  order_item_status: string; // Parent order_item status
   order_item_id: string;
   order_id: string;
   table_number: string;
@@ -24,10 +44,13 @@ interface BarTask {
   waiter_avatar?: string;
   menu_item_preparation_time?: number;
   task_created_at: string;
+  task_updated_at?: string;
+  task_completed_at?: string;
+  order_item_updated_at?: string;
   updated_at?: string;
   completed_at?: string;
   menu_item_image_url?: string;
-  notes?: string;
+  notes?: string; // Add notes field
   modifier_names?: { name: string }[];
   recipe?: string | null;
 }
@@ -58,6 +81,8 @@ interface Tab {
   id: number;
   name: string;
   cart: CartItem[];
+  db_session_id?: string;
+  db_order_id?: string;
 }
 
 interface Category {
@@ -72,13 +97,14 @@ interface BarState {
   orderItemsLoading: boolean;
   orderItems: BarTask[];
   pendingOrders: BarTask[];
+  preparingOrders: BarTask[];
   readyOrders: BarTask[];
   servedOrders: BarTask[];
   categories: Category[];
   selectedCategory: string;
   searchQuery: string;
   tabs: Tab[];
-  activeTab: number;
+  activeTab: string | number;
   orderItemsChannel: RealtimeChannel | null;
   dailyDrinkTasks: BarTask[];
   loadingDailyTasks: boolean;
@@ -94,15 +120,15 @@ interface BarState {
   setBarOptionSelected: (value: string) => void;
   setSelectedCategory: (value: string) => void;
   setSearchQuery: (value: string) => void;
-  setActiveTab: (index: number) => void;
+  setActiveTab: (id: string | number) => void;
   subscribeToOrderItems: () => void;
   unsubscribeFromOrderItems: () => void;
   setTabs: (updater: any) => void;
   getActiveCart: () => CartItem[];
   getTotal: () => number;
-  addNewTab: () => void;
-  addToCart: (drink: any) => void;
-  removeFromCart: (id: string) => void;
+  addNewTab: () => Promise<void>;
+  addToCart: (drink: any) => Promise<void>;
+  removeFromCart: (id: string) => Promise<void>;
   handleFetchItems: () => Promise<void>;
   handleFetchOrderItems: (options?: { silent?: boolean }) => Promise<void>;
   handleFetchDailyDrinkTasks: (options?: { silent?: boolean }) => Promise<void>;
@@ -114,11 +140,13 @@ interface BarState {
   formatCashInput: (amount: string | number) => string;
   completeOTCPayment: () => Promise<boolean>;
   resetBarState: () => void;
-  updateQuantity: (id: string, delta: number) => void;
+  updateQuantity: (id: string, delta: number) => Promise<void>;
+  isCreatingTab: boolean;
   recentOTCOrders: any[];
   tip: string;
   setTip: (value: string) => void;
   handleVoidOTCOrder: (orderId: string) => Promise<void>;
+  handleRemoveTab: (tabId: string | number) => Promise<boolean>;
   taxAmount: string;
 }
 
@@ -131,6 +159,7 @@ const useBarStore = create<BarState>()(
       orderItemsLoading: false,
       orderItems: [],
       pendingOrders: [],
+      preparingOrders: [],
       readyOrders: [],
       servedOrders: [],
       categories: [],
@@ -156,7 +185,6 @@ const useBarStore = create<BarState>()(
       setBarOptionSelected: (value) => set({ barOptionSelected: value }),
       setSelectedCategory: (value) => set({ selectedCategory: value }),
       setSearchQuery: (value) => set({ searchQuery: value }),
-      setActiveTab: (index) => set({ activeTab: index }),
       setActiveStep: (step) => set({ activeStep: step }),
       setCash: (value) => set({ cash: value }),
       setCard: (value) => set({ card: value }),
@@ -171,13 +199,13 @@ const useBarStore = create<BarState>()(
 
       completeOTCPayment: async () => {
         const role = useRestaurantStore.getState().role;
-        if (role !== "owner" && role !== "admin" && role !== "cashier") {
+        if (role !== "owner" && role !== "admin" && role !== "cashier" && role !== "bartender") {
           Swal.fire("Unauthorized", "You don't have permission to process payments.", "error");
           return false;
         }
 
         const { tabs, activeTab, cash, card, getTotal } = get();
-        const activeTabObj = tabs[activeTab];
+        const activeTabObj = tabs.find(t => String(t.id) === String(activeTab));
         if (!activeTabObj || activeTabObj.cart.length === 0) return false;
 
         const { selectedRestaurant } = useRestaurantStore.getState();
@@ -202,35 +230,39 @@ const useBarStore = create<BarState>()(
         set({ isProcessingPayment: true });
 
         try {
-          // 1. Create a "walk-in" session if no table exists
-          // For now, we'll try to insert without table_id if allowed, or we might need a dummy table
-          const { data: session, error: sessionError } = await supabase
+          // 1. Use the existing session and order
+          if (!activeTabObj.db_session_id || !activeTabObj.db_order_id) {
+            throw new Error("Missing database records for this tab");
+          }
+
+          const sessionId = activeTabObj.db_session_id;
+          const orderId = activeTabObj.db_order_id;
+
+          // Finalize session
+          const { error: sessionError } = await supabase
             .from("table_sessions")
-            .insert({
-              restaurant_id: restaurantId,
-              waiter_id: userId,
+            .update({
               status: "close",
               closed_at: new Date().toISOString(),
+              payment_method: cashValue >= total ? "cash" : "card", // Simplified
             })
-            .select()
-            .single();
+            .eq("id", sessionId);
 
           if (sessionError) throw sessionError;
 
           const tipValue = parseFloat(get().tip) || 0;
+          const taxAmount = parseFloat(get().taxAmount) || 0;
 
-          // 2. Create Order
-          const { data: order, error: orderError } = await supabase
+          // 2. Finalize Order
+          const { error: orderError } = await supabase
             .from("orders")
-            .insert({
-              session_id: session.id,
-              restaurant_id: restaurantId,
-              total: total + (parseFloat(get().taxAmount) || 0), // Assuming tax is added
+            .update({
+              total: total + taxAmount,
               tip: tipValue,
               status: "served",
+              updated_at: new Date().toISOString(),
             })
-            .select()
-            .single();
+            .eq("id", orderId);
 
           if (orderError) throw orderError;
 
@@ -239,10 +271,10 @@ const useBarStore = create<BarState>()(
             .from("payments")
             .insert({
               payment_type: "order",
-              order_id: order.id,
+              order_id: orderId,
               restaurant_id: restaurantId,
               cashier_id: userId, // Bartender acting as cashier
-              amount: total + (parseFloat(get().taxAmount) || 0),
+              amount: total + taxAmount,
               method: cashValue >= total ? "cash" : "card",
               status: "completed",
               reference: null
@@ -252,23 +284,14 @@ const useBarStore = create<BarState>()(
              console.error("Bar OTC Ledger recording failed:", paymentError);
           }
 
-          // 3. Create Order Items
-          const orderItemsData = activeTabObj.cart.map((item) => ({
-            order_id: order.id,
-            menu_item_id: item.id,
-            quantity: item.qty,
-            unit_price: item.price,
-            sum_price: item.price * item.qty,
-            status: "served",
-            type: "drink",
-            prepared_by: userId,  
-            completed_at: new Date().toISOString(), 
-            
-          }));
-
+          // 3. Mark all Order Items as "served"
           const { error: itemsError } = await supabase
             .from("order_items")
-            .insert(orderItemsData);
+            .update({
+              status: "served",
+              completed_at: new Date().toISOString(),
+            })
+            .eq("order_id", orderId);
 
           if (itemsError) throw itemsError;
 
@@ -284,14 +307,17 @@ const useBarStore = create<BarState>()(
             icon: "success",
           });
 
+          const { tabs, activeTab } = get();
+          const newTabs = tabs.filter((t) => String(t.id) !== String(activeTab));
+          
           set((state) => ({
-            tabs: state.tabs.filter((_, idx) => idx !== activeTab),
-            activeTab: 0,
+            tabs: newTabs,
+            activeTab: newTabs.length > 0 ? newTabs[0].id : 0,
             activeStep: 0,
             cash: "",
             card: "",
             tip: "",
-            recentOTCOrders: [{ ...order, items: orderItemsData }, ...state.recentOTCOrders].slice(0, 10),
+            recentOTCOrders: [{ id: orderId, items: activeTabObj.cart, total: total + taxAmount }, ...state.recentOTCOrders].slice(0, 10),
           }));
 
           return true;
@@ -319,8 +345,37 @@ const useBarStore = create<BarState>()(
             "postgres_changes",
             { event: "*", schema: "public", table: "kitchen_tasks" },
             () => {
-              get().handleFetchOrderItems({ silent: true }); // Refresh the main list
+              get().handleFetchOrderItems({ silent: true });
               get().handleFetchDailyDrinkTasks({ silent: true });
+            }
+          )
+          .on(
+            "postgres_changes",
+            { 
+              event: "UPDATE", 
+              schema: "public", 
+              table: "table_sessions",
+              filter: `restaurant_id=eq.${restaurantId}`
+            },
+            (payload) => {
+              // If a session is closed (e.g. by cashier), remove from local tabs
+              if (payload.new.status === "close") {
+                set((state) => {
+                  const newTabs = state.tabs.filter(tab => tab.db_session_id !== payload.new.id);
+                  let newActiveTab = state.activeTab;
+                  
+                  // If the active tab was removed, switch to the first one available
+                  const wasActive = state.tabs.find(t => t.id === state.activeTab)?.db_session_id === payload.new.id;
+                  if (wasActive) {
+                    newActiveTab = newTabs.length > 0 ? newTabs[0].id : 0;
+                  }
+                  
+                  return {
+                    tabs: newTabs,
+                    activeTab: newActiveTab
+                  };
+                });
+              }
             }
           )
           .subscribe();
@@ -341,9 +396,12 @@ const useBarStore = create<BarState>()(
           tabs: typeof updater === "function" ? updater(state.tabs) : updater,
         })),
 
+      setActiveTab: (id) => set({ activeTab: id, activeStep: 0 }),
+
       getActiveCart: () => {
         const { tabs, activeTab } = get();
-        return tabs[activeTab]?.cart || [];
+        const tab = tabs.find(t => String(t.id) === String(activeTab));
+        return tab?.cart || [];
       },
 
       getTotal: () => {
@@ -351,48 +409,151 @@ const useBarStore = create<BarState>()(
         return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
       },
 
-      addNewTab: () =>
-        set((state) => {
-          const newId = Date.now();
-          return {
-            tabs: [
-              ...state.tabs,
-              {
-                id: newId,
-                name: `Customer ${state.tabs.length + 1}`,
-                cart: [],
-              },
-            ],
-            activeTab: state.tabs.length,
-          };
-        }),
+      isCreatingTab: false,
+      addNewTab: async () => {
+        const { selectedRestaurant } = useRestaurantStore.getState();
+        const { user } = useAuthStore.getState();
+        const restaurantId = selectedRestaurant?.id;
+        const userId = user?.id;
 
-      addToCart: (drink) =>
+        if (!restaurantId || !userId) return;
+
+        set({ isCreatingTab: true });
+        try {
+          // 1. Create a "walk-in" session in DB (status open)
+          const { data: session, error: sessionError } = await supabase
+            .from("table_sessions")
+            .insert({
+              restaurant_id: restaurantId,
+              waiter_id: userId,
+              status: "open",
+            })
+            .select()
+            .single();
+
+          if (sessionError) throw sessionError;
+
+          // 2. Create Order in DB (linked to session)
+          const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .insert({
+              session_id: session.id,
+              restaurant_id: restaurantId,
+              total: 0,
+              status: "pending",
+            })
+            .select()
+            .single();
+
+          if (orderError) throw orderError;
+
+          set((state) => {
+            const newTab: Tab = {
+              id: Date.now(),
+              name: `Customer ${state.tabs.length + 1}`,
+              cart: [],
+              db_session_id: session.id,
+              db_order_id: order.id,
+            };
+            return {
+              tabs: [...state.tabs, newTab],
+              activeTab: newTab.id,
+            };
+          });
+        } catch (error) {
+          console.error("Error creating new OTC tab in DB:", error);
+          handleError(error as Error);
+        } finally {
+          set({ isCreatingTab: false });
+        }
+      },
+
+      addToCart: async (drink) => {
+        const { tabs, activeTab } = get();
+        const tab = tabs.find(t => String(t.id) === String(activeTab));
+        if (!tab || !tab.db_order_id) return;
+
+        // 1. Update Local State
         set((state) => ({
-          tabs: state.tabs.map((tab, idx) =>
-            idx === state.activeTab
+          tabs: state.tabs.map((t) =>
+            String(t.id) === String(activeTab)
               ? {
-                  ...tab,
-                  cart: tab.cart.some((item) => item.id === drink.id)
-                    ? tab.cart.map((item) =>
+                  ...t,
+                  cart: t.cart.some((item) => item.id === drink.id)
+                    ? t.cart.map((item) =>
                         item.id === drink.id
                           ? { ...item, qty: item.qty + 1 }
                           : item
                       )
-                    : [...tab.cart, { ...drink, qty: 1 }],
+                    : [...t.cart, { ...drink, qty: 1 }],
                 }
-              : tab
+              : t
           ),
-        })),
+        }));
 
-      removeFromCart: (id) =>
+        // 2. Sync to DB
+        try {
+          const { tabs, activeTab } = get();
+          const updatedTab = tabs.find(t => String(t.id) === String(activeTab));
+          if (!updatedTab) return;
+          const drinkInCart = updatedTab.cart.find((i: any) => i.id === drink.id);
+          if (!drinkInCart) return;
+
+          // Update/Insert order item record
+          const { error: itemError } = await supabase
+            .from("order_items")
+            .upsert({
+              order_id: tab.db_order_id,
+              menu_item_id: drink.id,
+              quantity: drinkInCart.qty,
+              unit_price: drink.price,
+              sum_price: drink.price * drinkInCart.qty,
+              status: "pending",
+              type: "drink",
+            }, { onConflict: "order_id,menu_item_id" });
+
+          if (itemError) throw itemError;
+
+          // Update order total
+          await supabase
+            .from("orders")
+            .update({ total: get().getTotal() })
+            .eq("id", tab.db_order_id);
+        } catch (error) {
+          console.error("Error syncing cart to DB:", error);
+        }
+      },
+
+      removeFromCart: async (id) => {
+        const { tabs, activeTab } = get();
+        const tab = tabs.find(t => String(t.id) === String(activeTab));
+        if (!tab || !tab.db_order_id) return;
+
+        // 1. Update Local
         set((state) => ({
-          tabs: state.tabs.map((tab, idx) =>
-            idx === state.activeTab
-              ? { ...tab, cart: tab.cart.filter((item) => item.id !== id) }
-              : tab
+          tabs: state.tabs.map((t) =>
+            String(t.id) === String(activeTab)
+              ? { ...t, cart: t.cart.filter((item) => item.id !== id) }
+              : t
           ),
-        })),
+        }));
+
+        // 2. Sync to DB
+        try {
+          await supabase
+            .from("order_items")
+            .delete()
+            .eq("order_id", tab.db_order_id)
+            .eq("menu_item_id", id);
+
+          await supabase
+            .from("orders")
+            .update({ total: get().getTotal() })
+            .eq("id", tab.db_order_id);
+        } catch (error) {
+          console.error("Error removing item from DB:", error);
+        }
+      },
 
       handleFetchItems: async () => {
         set({ loadingItems: true });
@@ -463,9 +624,20 @@ const useBarStore = create<BarState>()(
           let waiterMap: Record<string, any> = {};
           const uniqueWaiterIds = Array.from(allWaiterIds);
           if (uniqueWaiterIds.length > 0) {
-            const { data: waiters } = await supabase.from("users").select("user_id, first_name, last_name, avatar_url").in("user_id", uniqueWaiterIds);
+            const { data: waiters } = await supabase.from("users_secure_view").select(`
+              id,
+              raw_user_meta_data->>'firstName' as camel_first,
+              raw_user_meta_data->>'lastName' as camel_last,
+              raw_user_meta_data->>'first_name' as snake_first,
+              raw_user_meta_data->>'last_name' as snake_last,
+              raw_user_meta_data->>'avatarUrl' as avatar
+            `).in("id", uniqueWaiterIds);
             waiters?.forEach((w: any) => {
-               waiterMap[w.user_id] = { first_name: w.first_name, last_name: w.last_name, avatar: w.avatar_url };
+               waiterMap[w.id] = { 
+                 first_name: w.camel_first || w.snake_first, 
+                 last_name: w.camel_last || w.snake_last, 
+                 avatar: w.avatar 
+               };
             });
           }
 
@@ -491,10 +663,12 @@ const useBarStore = create<BarState>()(
             return { 
               ...task, 
               waiter_id: finalWaiterId,
-              waiter_first_name: waiter.first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
-              waiter_last_name: waiter.last_name || "",
-              waiter_avatar: waiter.avatar,
-              modifier_names: modMap[task.order_item_id] || []
+              waiter_first_name: waiter.first_name || task.waiter_first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
+              waiter_last_name: waiter.last_name || task.waiter_last_name || "",
+              waiter_avatar: waiter.avatar || task.waiter_avatar,
+              modifier_names: modMap[task.order_item_id] || [],
+              updated_at: task.task_updated_at || task.order_item_updated_at,
+              completed_at: task.task_completed_at,
             };
           });
 
@@ -510,9 +684,10 @@ const useBarStore = create<BarState>()(
 
           set({ 
             orderItems: tasksWithNumbers, 
-            pendingOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'pending' || t.order_item_status?.toLowerCase() === 'preparing'),
-            readyOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'ready'),
-            servedOrders: tasksWithNumbers.filter(t => t.order_item_status?.toLowerCase() === 'served'),
+            pendingOrders: tasksWithNumbers.filter(t => (t.status || t.order_item_status)?.toLowerCase() === 'pending'),
+            preparingOrders: tasksWithNumbers.filter(t => (t.status || t.order_item_status)?.toLowerCase() === 'preparing'),
+            readyOrders: tasksWithNumbers.filter(t => (t.status || t.order_item_status)?.toLowerCase() === 'ready'),
+            servedOrders: tasksWithNumbers.filter(t => (t.status || t.order_item_status)?.toLowerCase() === 'served'),
             orderItemsLoading: false 
           });
         } catch (error) {
@@ -540,7 +715,12 @@ const useBarStore = create<BarState>()(
             .gte("task_created_at", today.toISOString());
 
           if (error) throw error;
-          set({ dailyDrinkTasks: (data as BarTask[]) || [], loadingDailyTasks: false });
+          const mapped = (data || []).map((t: any) => ({
+            ...t,
+            updated_at: t.task_updated_at || t.order_item_updated_at,
+            completed_at: t.task_completed_at
+          }));
+          set({ dailyDrinkTasks: mapped as BarTask[], loadingDailyTasks: false });
         } catch (error) {
           console.error("Error fetching daily drink tasks:", error);
           set({ loadingDailyTasks: false });
@@ -622,15 +802,17 @@ const useBarStore = create<BarState>()(
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
 
-                // Also update the order_item status so waiters see current status (Task 2.2)
-                await supabase
-                  .from("order_items")
-                  .update({
-                    status: "preparing",
-                    updated_at: new Date().toISOString(),
-                    prepared_by: userId,
-                  })
-                  .eq("id", drink.order_item_id);
+                // Only update parent order_item status if all siblings are at least 'preparing'
+                if (await shouldSyncOrderItemStatus(drink.order_item_id, "preparing")) {
+                  await supabase
+                    .from("order_items")
+                    .update({
+                      status: "preparing",
+                      updated_at: new Date().toISOString(),
+                      prepared_by: userId,
+                    })
+                    .eq("id", drink.order_item_id);
+                }
 
                 get().handleFetchOrderItems({ silent: true });
               }
@@ -687,15 +869,17 @@ const useBarStore = create<BarState>()(
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
 
-                // Update the order_item status (Task 2.4)
-                await supabase
-                  .from("order_items")
-                  .update({
-                    status: "ready",
-                    updated_at: new Date().toISOString(),
-                    completed_at: new Date().toISOString(),
-                  })
-                  .eq("id", drink.order_item_id);
+                // Only update parent order_item status if all siblings are at least 'ready'
+                if (await shouldSyncOrderItemStatus(drink.order_item_id, "ready")) {
+                  await supabase
+                    .from("order_items")
+                    .update({
+                      status: "ready",
+                      updated_at: new Date().toISOString(),
+                      completed_at: new Date().toISOString(),
+                    })
+                    .eq("id", drink.order_item_id);
+                }
 
                 get().handleFetchOrderItems({ silent: true });
 
@@ -757,9 +941,21 @@ const useBarStore = create<BarState>()(
               try {
                 const { error } = await supabase
                   .from("kitchen_tasks")
-                  .update({ status: "served", updated_at: new Date().toISOString() })
+                  .update({ 
+                    status: "served", 
+                    updated_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString()
+                  })
                   .eq("id", drink.kitchen_task_id);
                 if (error) handleError(error);
+
+                // Only update parent order_item status if all siblings are 'served'
+                if (await shouldSyncOrderItemStatus(drink.order_item_id, "served")) {
+                  await supabase
+                    .from("order_items")
+                    .update({ status: "served", updated_at: new Date().toISOString() })
+                    .eq("id", drink.order_item_id);
+                }
                 
                 // Update Stock (Task 4.1)
                 if (drink.menu_item_id) {
@@ -787,6 +983,7 @@ const useBarStore = create<BarState>()(
           orderItemsLoading: false,
           orderItems: [],
           pendingOrders: [],
+          preparingOrders: [],
           readyOrders: [],
           servedOrders: [],
           categories: [],
@@ -806,23 +1003,67 @@ const useBarStore = create<BarState>()(
         });
       },
 
-      updateQuantity: (id, delta) =>
-        set((state) => {
-          const newTabs = [...state.tabs];
-          const activeCart = newTabs[state.activeTab].cart;
-          const itemIndex = activeCart.findIndex((i: any) => i.id === id);
+      updateQuantity: async (id, delta) => {
+        const { tabs, activeTab } = get();
+        const tab = tabs.find(t => String(t.id) === String(activeTab));
+        if (!tab || !tab.db_order_id) return;
 
-          if (itemIndex > -1) {
-            const newQty = activeCart[itemIndex].qty + delta;
-            if (newQty > 0) {
-              activeCart[itemIndex].qty = newQty;
-            } else {
-              activeCart.splice(itemIndex, 1);
+        // 1. Update Local
+        set((state) => {
+          const activeTabId = state.activeTab;
+          const newTabs = state.tabs.map((t) => {
+            if (String(t.id) === String(activeTabId)) {
+                const activeCart = [...t.cart];
+                const itemIndex = activeCart.findIndex((i: any) => i.id === id);
+                if (itemIndex > -1) {
+                    const newQty = activeCart[itemIndex].qty + delta;
+                    if (newQty > 0) {
+                        activeCart[itemIndex] = { ...activeCart[itemIndex], qty: newQty };
+                    } else {
+                        activeCart.splice(itemIndex, 1);
+                    }
+                }
+                return { ...t, cart: activeCart };
             }
-          }
+            return t;
+          });
 
           return { tabs: newTabs };
-        }),
+        });
+
+        // 2. Sync to DB
+        try {
+          const { tabs, activeTab } = get();
+          const updatedTab = tabs.find(t => String(t.id) === String(activeTab));
+          if (!updatedTab) return;
+          const drinkInCart = updatedTab.cart.find((i: any) => i.id === id);
+
+          if (drinkInCart) {
+            await supabase
+              .from("order_items")
+              .upsert({
+                order_id: tab.db_order_id,
+                menu_item_id: id,
+                quantity: drinkInCart.qty,
+                sum_price: drinkInCart.price * drinkInCart.qty,
+              }, { onConflict: "order_id,menu_item_id" });
+          } else {
+            // Item was removed
+            await supabase
+              .from("order_items")
+              .delete()
+              .eq("order_id", tab.db_order_id)
+              .eq("menu_item_id", id);
+          }
+
+          await supabase
+            .from("orders")
+            .update({ total: get().getTotal() })
+            .eq("id", tab.db_order_id);
+        } catch (error) {
+          console.error("Error updating quantity in DB:", error);
+        }
+      },
 
       handleVoidOTCOrder: async (orderId) => {
         const result = await Swal.fire({
@@ -853,6 +1094,43 @@ const useBarStore = create<BarState>()(
             recentOTCOrders: state.recentOTCOrders.filter((o) => o.id !== orderId),
           }));
         }
+      },
+
+      handleRemoveTab: async (tabId) => {
+        const { tabs, activeTab } = get();
+        const tabToRemove = tabs.find(t => String(t.id) === String(tabId));
+        
+        if (!tabToRemove) return false;
+
+        // If it has a database session/order, delete them (since items must be 0)
+        if (tabToRemove.db_session_id || tabToRemove.db_order_id) {
+          try {
+            // Delete order first (child) then session
+            if (tabToRemove.db_order_id) {
+              await supabase.from("orders").delete().eq("id", tabToRemove.db_order_id);
+            }
+            if (tabToRemove.db_session_id) {
+              await supabase.from("table_sessions").delete().eq("id", tabToRemove.db_session_id);
+            }
+          } catch (error) {
+            console.error("Cleanup failed during tab removal:", error);
+          }
+        }
+
+        const newTabs = tabs.filter((tab) => String(tab.id) !== String(tabId));
+        let newActiveTab = activeTab;
+        
+        // If the removed tab was the active one, pick a new one
+        if (String(activeTab) === String(tabId)) {
+          newActiveTab = newTabs.length > 0 ? newTabs[0].id : 0;
+        }
+
+        set({
+          tabs: newTabs,
+          activeTab: newActiveTab
+        });
+
+        return true;
       },
     }),
     {

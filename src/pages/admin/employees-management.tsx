@@ -20,7 +20,8 @@ import {
   Pagination,
   Menu,
   MenuItem,
-  ListItemIcon
+  ListItemIcon,
+  Fab,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -45,7 +46,7 @@ import { useFeatureGate } from "../../hooks/useFeatureGate";
 import UpgradeModal from "../../components/UpgradeModal";
 import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
-import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
+import { exportToCSV, exportToPDF, exportToExcel, exportToTXT } from "../../utils/exportUtils";
 import dayjs from "dayjs";
 
 interface EmployeeRow {
@@ -76,7 +77,7 @@ const EmployeeManagement: React.FC = () => {
   const cardsPerPage = Number(_ed.cards_per_page) || 8;
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const { canUseFeature, isLimitReached, plan, canAccess } = useFeatureGate();
   const { settings } = useSettings();
   const ep = (settings as any)?.employee_permissions || {};
   const ed = (settings as any)?.employee_defaults || {};
@@ -88,29 +89,43 @@ const EmployeeManagement: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
-  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
-  const handleExportClose = () => setExportAnchorEl(null);
-
-  const handleExportCSV = () => {
-    if (!canUseFeature("canUseCsvExport")) {
-      handleExportClose();
-      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canAccess("canUseCsvExport")) {
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data.", "info");
       return;
     }
-    const dataToExport = filteredEmployees.map(emp => ({
-        Name: `${emp.first_name} ${emp.last_name}`,
-        Email: emp.email,
-        Phone: emp.phone || 'N/A',
-        Role: emp.role,
-        Status: emp.status,
-        Joined: dayjs(emp.created_at).format('YYYY-MM-DD')
+    setExportAnchorEl(e.currentTarget);
+  };
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const getExportData = () => {
+    return filteredEmployees.map(emp => ({
+        "Name": `${emp.first_name} ${emp.last_name}`,
+        "Email": emp.email,
+        "Phone": emp.phone || 'N/A',
+        "Role": emp.role,
+        "Status": emp.status,
+        "Joined": emp.created_at ? dayjs(emp.created_at).format('YYYY-MM-DD') : 'N/A'
     }));
-    exportToCSV(dataToExport, "restaurant_employees");
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(getExportData(), "restaurant_employees");
+    handleExportClose();
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(getExportData(), "restaurant_employees");
+    handleExportClose();
+  };
+
+  const handleExportTXT = () => {
+    exportToTXT(getExportData(), "restaurant_employees");
     handleExportClose();
   };
 
   const handleExportPDF = () => {
-    exportToPDF();
+    exportToPDF(getExportData(), "restaurant_employees", "Restaurant Employees Overview");
     handleExportClose();
   };
 
@@ -132,7 +147,7 @@ const EmployeeManagement: React.FC = () => {
 
     if (ep.admin_delete_edit_employee === false && storeRole !== 'owner') return;
 
-    if (!canUseFeature("Edit Employees")) {
+    if (!canAccess("canManageEmployees")) {
         Swal.fire("Upgrade Required", "Please upgrade to a pro plan to edit employees.", "info");
         return;
     }
@@ -263,35 +278,45 @@ const EmployeeManagement: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1, md: 2 } }}>
       <AdminHeader
-        title="Employee Management"
-        description="Manage your restaurant staff, track roles, and update details"
+        title={isMobile ? "" : "Employee Management"}
+        description={isMobile ? "" : "Manage your restaurant staff, track roles, and update details"}
       >
-        <Box>
-            <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExportClick}
-                sx={{ borderRadius: 2 }}
-            >
-                Export
-            </Button>
-            <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={handleExportClose}
-            >
-                <MenuItem onClick={handleExportCSV}>
-                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                    Export CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                    Print PDF (Browser)
-                </MenuItem>
-            </Menu>
-        </Box>
+        {!isMobile && (
+          <Box>
+              <Button
+                  variant="outlined"
+                  startIcon={<Download />}
+                  onClick={handleExportClick}
+                  sx={{ borderRadius: 2 }}
+              >
+                  Export
+              </Button>
+              <Menu
+                  anchorEl={exportAnchorEl}
+                  open={Boolean(exportAnchorEl)}
+                  onClose={handleExportClose}
+              >
+                  <MenuItem onClick={handleExportCSV}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export CSV
+                  </MenuItem>
+                  <MenuItem onClick={handleExportExcel}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Excel
+                  </MenuItem>
+                  <MenuItem onClick={handleExportTXT}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export TXT
+                  </MenuItem>
+                  <MenuItem onClick={handleExportPDF}>
+                      <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                      Export PDF (Table)
+                  </MenuItem>
+              </Menu>
+          </Box>
+        )}
       </AdminHeader>
 
        <Box sx={{ 
@@ -299,7 +324,7 @@ const EmployeeManagement: React.FC = () => {
           flexDirection: isMobile ? "column" : "row",
           justifyContent: "space-between", 
           gap: 2,
-          mb: 2 
+          mb: { xs: 1.5, md: 2 } 
         }}>
           {ed.show_employee_search !== false && (
           <TextField
@@ -468,6 +493,23 @@ const EmployeeManagement: React.FC = () => {
          open={openUpgradeModal} 
          onClose={() => setOpenUpgradeModal(false)} 
        />
+
+        {/* Mobile Export FAB */}
+        {isMobile && (
+          <Fab
+            color="primary"
+            aria-label="export"
+            onClick={handleExportClick}
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              left: 24,
+              zIndex: 1100,
+            }}
+          >
+            <Download />
+          </Fab>
+        )}
     </Box>
   );
 };

@@ -29,14 +29,15 @@ const BartenderPanel: React.FC = () => {
   }, [handleFetchItems]);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 1.5, md: 3 } }}>
       <BigOptionButtons
         enableDineIn={bs.enable_dine_in ?? true}
         enableTakeaway={bs.enable_takeaway ?? true}
       />
-      
-      {barOptionSelected === "dine_in" && (bs.enable_dine_in ?? true) && <BartenderDineInPanel />}
-      {barOptionSelected === "takeaway" && (bs.enable_takeaway ?? true) && <OTCTabs />}
+      <Box sx={{ mt: { xs: 2.5, md: 2 } }}>
+        {barOptionSelected === "dine_in" && (bs.enable_dine_in ?? true) && <BartenderDineInPanel />}
+        {barOptionSelected === "takeaway" && (bs.enable_takeaway ?? true) && <OTCTabs />}
+      </Box>
     </Box>
   );
 };

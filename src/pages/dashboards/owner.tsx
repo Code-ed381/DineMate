@@ -20,6 +20,12 @@ import {
   List,
   ListItem,
   useMediaQuery,
+  IconButton,
+  Tooltip,
+  MenuItem,
+  FormControl,
+  Select,
+  InputLabel,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -40,7 +46,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   AreaChart,
   Area,
@@ -50,7 +56,6 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import { useAnalyticsStore } from "../../lib/analyticsStore";
-import DashboardHeader from "./components/dashboard-header";
 import EmptyState from "../../components/empty-state";
 import useRestaurantStore from "../../lib/restaurantStore";
 import { formatCurrency, getCurrencySymbol } from "../../utils/currency";
@@ -70,9 +75,10 @@ const EnhancedOwnerDashboard: React.FC = () => {
   const showStats = dashSettings?.show_order_stats !== false;
   const showActions = dashSettings?.show_quick_actions !== false;
 
-  const [timeRange, setTimeRange] = useState(dashSettings?.default_landing_tab === "sales" ? "month" : "week");
+  const [timeRange, setTimeRange] = useState("today");
   const [selectedMetric, setSelectedMetric] = useState<"revenue" | "orders">("revenue");
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const { selectedRestaurant } = useRestaurantStore();
@@ -83,24 +89,45 @@ const EnhancedOwnerDashboard: React.FC = () => {
     categoryData,
     staffPerformance,
     fetchDashboardData,
-    loading
+    loading,
+    hasFetched
   } = useAnalyticsStore();
+
+  const [showPulse, setShowPulse] = useState(false);
+
+  const refreshData = async (manual = false) => {
+    if (!selectedRestaurant?.id) return;
+    setIsRefreshing(true);
+    // Trigger pulse animation
+    setShowPulse(true);
+    try {
+      await fetchDashboardData(selectedRestaurant.id, timeRange);
+      setLastUpdate(new Date());
+    } finally {
+      // Keep animation for at least 1s
+      setTimeout(() => {
+        setIsRefreshing(false);
+        // Fade out pulse slightly after refresh finishes
+        setTimeout(() => setShowPulse(false), 800);
+      }, 1000);
+    }
+  };
 
   useEffect(() => {
     if (selectedRestaurant?.id) {
-      fetchDashboardData(selectedRestaurant.id, timeRange);
-      setLastUpdate(new Date());
+      refreshData(false); // Initial load without toast unless user wants it
     }
   }, [selectedRestaurant?.id, timeRange, fetchDashboardData]);
 
   useEffect(() => {
     if (!autoRefresh || !selectedRestaurant?.id) return;
+    // Immediate refresh when live is turned on
+    refreshData(true);
     const interval = setInterval(() => {
-      fetchDashboardData(selectedRestaurant.id, timeRange);
-      setLastUpdate(new Date());
+      refreshData(false);
     }, 30000); // 30 seconds for real data refresh
     return () => clearInterval(interval);
-  }, [autoRefresh, selectedRestaurant?.id, timeRange, fetchDashboardData]);
+  }, [autoRefresh, selectedRestaurant?.id]);
 
   const COLORS = [
     theme.palette.primary.main,
@@ -110,36 +137,12 @@ const EnhancedOwnerDashboard: React.FC = () => {
     theme.palette.success.main,
   ];
 
-  if (loading) {
-    return (
-       <Box sx={{ width: '100%', p: isCompact ? 1.5 : 3 }}>
-        <Stack direction="row" spacing={2} sx={{ mb: 4 }} justifyContent="space-between">
-            <Skeleton variant="text" sx={{ fontSize: '2rem' }} width={200} />
-            <Skeleton variant="rounded" width={300} height={40} />
-        </Stack>
-        <Grid container spacing={isCompact ? 1.5 : 3} sx={{ mb: 3 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Grid item xs={12} sm={6} md={3} key={i}>
-              <Skeleton variant="rounded" height={120} />
-            </Grid>
-          ))}
-        </Grid>
-        <Grid container spacing={isCompact ? 1.5 : 3}>
-            <Grid item xs={12} md={8}>
-                <Skeleton variant="rounded" height={300} />
-            </Grid>
-            <Grid item xs={12} md={4}>
-                <Skeleton variant="rounded" height={300} />
-            </Grid>
-        </Grid>
-       </Box>
-    );
-  }
+  // Removed the skeleton block to avoid jarring UI shifts as per user request
 
   return (
-    <Box sx={{ p: isCompact ? 1.5 : 3 }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* Header */}
-      <Box sx={{ mb: isCompact ? 2 : 4 }}>
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           justifyContent="space-between"
@@ -147,7 +150,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
           spacing={2}
           mb={isCompact ? 1 : 2}
         >
-          <Box>
+          <Box sx={{ display: { xs: 'none', md: 'block' } }}>
             <Typography variant="h4" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
               Owner Dashboard
             </Typography>
@@ -157,47 +160,172 @@ const EnhancedOwnerDashboard: React.FC = () => {
           </Box>
           {showActions && (
             <Stack
-              direction={{ xs: "column", sm: "row" }}
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
               spacing={1}
-              sx={{ width: { xs: '100%', sm: 'auto' } }}
+              sx={{ width: '100%', mt: { xs: 1, md: 0 } }}
             >
-              <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-                <Button
-                  variant={autoRefresh ? "contained" : "outlined"}
-                  startIcon={<Refresh />}
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  size="small"
-                  fullWidth={isMobile}
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Select
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  sx={{ 
+                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    '& .MuiSelect-select': {
+                      py: 1,
+                      px: { xs: 1.5, sm: 2 }
+                    }
+                  }}
                 >
-                  {autoRefresh ? "Live" : "Paused"}
-                </Button>
-                <Button variant="outlined" startIcon={<GetApp />} size="small" fullWidth={isMobile}>
-                  Export
-                </Button>
+                  <MenuItem value="today">Today</MenuItem>
+                  <MenuItem value="yesterday">Yesterday</MenuItem>
+                  <MenuItem value="week">Last 7 Days</MenuItem>
+                  <MenuItem value="month">Last 30 Days</MenuItem>
+                  <MenuItem value="year">Full Year</MenuItem>
+                </Select>
+              </FormControl>
+
+              <Stack direction="column" alignItems={{ xs: "flex-end", md: "flex-end" }} spacing={0.5}>
+                <Stack direction="row" spacing={1}>
+                  {isMobile ? (
+                    <>
+                      <Tooltip title={autoRefresh ? "Live - Click to Pause" : "Paused - Click to Resume"}>
+                        <IconButton
+                          onClick={() => {
+                            const newState = !autoRefresh;
+                            setAutoRefresh(newState);
+                            if (newState) refreshData(true);
+                          }}
+                          size="small"
+                          sx={{ 
+                          border: '1px solid', 
+                          borderColor: autoRefresh ? 'primary.main' : 'divider',
+                          bgcolor: autoRefresh ? 'primary.main' : 'background.paper',
+                          color: autoRefresh ? 'primary.contrastText' : 'text.secondary',
+                          position: 'relative',
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            top: -4,
+                            left: -4,
+                            right: -4,
+                            bottom: -4,
+                            borderRadius: '50%',
+                            border: `2px solid ${theme.palette.primary.main}`,
+                            opacity: 0,
+                            animation: showPulse ? 'pulseFade 1.5s ease-out' : 'none',
+                          },
+                          '@keyframes pulseFade': {
+                            '0%': { transform: 'scale(0.8)', opacity: 0 },
+                            '40%': { transform: 'scale(1.1)', opacity: 0.6 },
+                            '100%': { transform: 'scale(1.4)', opacity: 0 },
+                          },
+                          '&:hover': {
+                            bgcolor: autoRefresh ? 'primary.dark' : alpha(theme.palette.primary.main, 0.04),
+                            borderColor: autoRefresh ? 'primary.dark' : 'divider',
+                          },
+                          width: 36,
+                          height: 36,
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        >
+                          <Refresh 
+                            sx={{ 
+                              fontSize: 20,
+                              animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                              '@keyframes spin': {
+                                '0%': { transform: 'rotate(0deg)' },
+                                '100%': { transform: 'rotate(360deg)' },
+                              }
+                            }} 
+                          />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Export Report">
+                        <IconButton 
+                          size="small"
+                          sx={{ 
+                            border: '1px solid', 
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper'
+                          }}
+                        >
+                          <GetApp sx={{ fontSize: 20 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant={autoRefresh ? "contained" : "outlined"}
+                        startIcon={<Refresh sx={{ 
+                          animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                          '@keyframes spin': {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' },
+                          }
+                        }} />}
+                        onClick={() => {
+                          const newState = !autoRefresh;
+                          setAutoRefresh(newState);
+                          if (newState) refreshData(true);
+                        }}
+                        size="small"
+                        sx={{
+                          position: 'relative',
+                          '&::after': {
+                            content: '""',
+                            position: 'absolute',
+                            top: -5,
+                            left: -5,
+                            right: -5,
+                            bottom: -5,
+                            borderRadius: 'inherit',
+                            border: `2px solid ${theme.palette.primary.main}`,
+                            opacity: 0,
+                            animation: showPulse ? 'pulseFadeRect 1.5s ease-out' : 'none',
+                          },
+                          '@keyframes pulseFadeRect': {
+                            '0%': { transform: 'scaleX(0.95) scaleY(0.85)', opacity: 0 },
+                            '40%': { transform: 'scaleX(1.05) scaleY(1.1)', opacity: 0.5 },
+                            '100%': { transform: 'scaleX(1.15) scaleY(1.3)', opacity: 0 },
+                          }
+                        }}
+                      >
+                        {autoRefresh ? "Live" : "Paused"}
+                      </Button>
+                      <Button 
+                        variant="outlined" 
+                        startIcon={<GetApp />} 
+                        size="small"
+                      >
+                        Export
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.8, display: { xs: 'none', md: 'block' } }}>
+                  Last updated: {lastUpdate.toLocaleTimeString()}
+                </Typography>
               </Stack>
-              <ToggleButtonGroup
-                value={timeRange}
-                exclusive
-                onChange={(_e, v) => v && setTimeRange(v)}
-                size="small"
-                fullWidth
-              >
-                <ToggleButton value="today">Today</ToggleButton>
-                <ToggleButton value="week">Week</ToggleButton>
-                <ToggleButton value="month">Month</ToggleButton>
-              </ToggleButtonGroup>
             </Stack>
           )}
         </Stack>
-        <Typography variant="caption" color="text.secondary">
-          Last updated: {lastUpdate.toLocaleTimeString()}
-        </Typography>
+        {/* Mobile-only Last Updated */}
+        <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'flex-end', mt: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.8 }}>
+            Last updated: {lastUpdate.toLocaleTimeString()}
+          </Typography>
+        </Box>
       </Box>
 
       {/* KPI Cards */}
-      <Grid container spacing={isCompact ? 1.5 : 3} mb={isCompact ? 2 : 3}>
+      <Grid container spacing={2} mb={isCompact ? 2 : 3}>
         {showRevenue && (
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={6} sm={6} md={3}>
             <MetricCard
               title="Total Revenue"
               value={formatCurrency(kpis.revenue.current)}
@@ -209,7 +337,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
         )}
         {showStats && (
           <>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <MetricCard
                 title="Orders Completed"
                 value={kpis.orders.current}
@@ -218,7 +346,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
                 color="success"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <MetricCard
                 title="Avg Order Value"
                 value={formatCurrency(kpis.avgOrderValue.current)}
@@ -227,7 +355,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
                 color="secondary"
               />
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <MetricCard
                 title="Active Staff"
                 value={staffPerformance.length}
@@ -243,30 +371,32 @@ const EnhancedOwnerDashboard: React.FC = () => {
       {showStats && (
         <>
           {/* Charts Row */}
-          <Grid container spacing={isCompact ? 1.5 : 3} mb={isCompact ? 2 : 3}>
+          <Grid container spacing={2} mb={isCompact ? 2 : 3}>
             {/* Revenue Chart */}
             <Grid item xs={12} lg={8}>
-              <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+              <Card sx={{ height: { xs: 400, md: 450 }, display: "flex", flexDirection: "column" }}>
                 <CardContent
                   sx={{
                     flex: 1,
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
+                    p: { xs: 2, sm: 3 }
                   }}
                 >
                   <Stack
-                    direction="row"
+                    direction={{ xs: "column", sm: "row" }}
                     justifyContent="space-between"
-                    alignItems="center"
+                    alignItems={{ xs: "flex-start", sm: "center" }}
+                    spacing={{ xs: 1.5, sm: 0 }}
                     mb={2}
                     flexShrink={0}
                   >
                     <Box>
-                      <Typography variant="h6" fontWeight={700}>
+                      <Typography variant="h6" fontWeight={700} sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                         Order Trends
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                         Performance over the selected period
                       </Typography>
                     </Box>
@@ -275,6 +405,10 @@ const EnhancedOwnerDashboard: React.FC = () => {
                       exclusive
                       onChange={(_e, v) => v && setSelectedMetric(v)}
                       size="small"
+                      sx={{ 
+                        alignSelf: { xs: 'stretch', sm: 'auto' },
+                        '& .MuiToggleButton-root': { flex: { xs: 1, sm: 'initial' } }
+                      }}
                     >
                       <ToggleButton value="revenue">Revenue</ToggleButton>
                       <ToggleButton value="orders">Orders</ToggleButton>
@@ -311,9 +445,16 @@ const EnhancedOwnerDashboard: React.FC = () => {
                           <XAxis
                             dataKey="time"
                             stroke={theme.palette.text.secondary}
+                            fontSize={12}
+                            tick={{ fontSize: isMobile ? 10 : 12 }}
                           />
-                          <YAxis stroke={theme.palette.text.secondary} />
-                          <Tooltip />
+                          <YAxis 
+                            stroke={theme.palette.text.secondary} 
+                            fontSize={12}
+                            tick={{ fontSize: isMobile ? 10 : 12 }}
+                            width={isMobile ? 35 : 60}
+                          />
+                          <RechartsTooltip />
                           <Area
                             type="monotone"
                             dataKey={selectedMetric}
@@ -337,24 +478,25 @@ const EnhancedOwnerDashboard: React.FC = () => {
 
             {/* Category Pie */}
             <Grid item xs={12} lg={4}>
-              <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>
+              <Card sx={{ height: { xs: 400, md: 450 }, display: "flex", flexDirection: "column" }}>
                 <CardContent
                   sx={{
                     flex: 1,
                     display: "flex",
                     flexDirection: "column",
                     overflow: "hidden",
+                    p: { xs: 2, sm: 3 }
                   }}
                 >
                   <Box flexShrink={0} mb={2}>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
+                    <Typography variant="h6" fontWeight={700} gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                       Category Mix
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       Items distribution
                     </Typography>
                   </Box>
-                  <Box sx={{ height: 240, flexShrink: 0 }}>
+                  <Box sx={{ height: { xs: 200, sm: 240 }, flexShrink: 0 }}>
                     {categoryData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -374,7 +516,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
                               />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <RechartsTooltip />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -419,7 +561,7 @@ const EnhancedOwnerDashboard: React.FC = () => {
           </Grid>
 
           {/* Performance Grid */}
-          <Grid container spacing={isCompact ? 1.5 : 3} mb={isCompact ? 2 : 3}>
+          <Grid container spacing={2} mb={isCompact ? 2 : 3}>
             {/* Top Items */}
             <Grid item xs={12} md={6}>
               <Card sx={{ height: 450, display: "flex", flexDirection: "column" }}>

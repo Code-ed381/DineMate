@@ -69,7 +69,7 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
 
       set({
         assignedTablesLoaded: true,
-        assignedTables: (data || []).map((s: any) => ({ ...s, table_number: s.table_number?.toString() } as unknown as Order)).filter((s: any) => s.session_status !== "close"),
+        assignedTables: (data || []).map((s: any) => ({ ...s, table_number: s.table_number?.toString() } as unknown as Order)),
         activeSeesionByRestaurantLoaded: true,
       });
     } catch (error) {
@@ -87,6 +87,7 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
         .from("waiter_orders_overview")
         .select("*")
         .eq("table_number", tableNumber)
+        .neq("session_status", "close")
         .maybeSingle();
 
       if (error) throw error;
@@ -202,6 +203,8 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
       .channel(`waiter-sessions-${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "table_sessions", filter: `restaurant_id=eq.${restaurantId}` }, () => {
           get().getActiveSessionByRestaurant();
+          // Also refresh TablesStore so the session list updates
+          useTablesStore.getState().getSessionsOverview();
           const chosen = get().chosenTable;
           if (chosen) get().filterActiveSessionByTableNumber(chosen);
       })

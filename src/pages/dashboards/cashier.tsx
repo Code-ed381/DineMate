@@ -5,6 +5,7 @@ import {
 } from "@mui/material";
 
 import useCashierStore from "../../lib/cashierStore";
+import useRestaurantStore from "../../lib/restaurantStore";
 import TransactionHistory from "./components/transaction-histroy";
 import PaymentBreakdownChart from "./components/payment-breakdown";
 import SalesTrendChart from "./components/sales-trend-chart";
@@ -21,12 +22,13 @@ const CashierReports: React.FC<CashierReportsProps> = () => {
   const {
       activeSeesionByRestaurantLoaded,
       fetchReportSessions,
-      allSessions,
+      closedSessions,
   } = useCashierStore();
+  const { selectedRestaurant } = useRestaurantStore();
 
   useEffect(() => {
     fetchReportSessions();
-  }, [fetchReportSessions]);
+  }, [fetchReportSessions, selectedRestaurant?.id]);
 
   return (
     <>
@@ -42,21 +44,21 @@ const CashierReports: React.FC<CashierReportsProps> = () => {
         /> */}
 
         {/* KPIs + Charts */}
-        <KpiDashboard allSessions={allSessions}/>
+        <KpiDashboard allSessions={closedSessions}/>
 
         {/* Charts */}
-        <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={12} md={8}>
-            <SalesTrendChart allSessions={allSessions}/>
+            <SalesTrendChart allSessions={closedSessions}/>
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <PaymentBreakdownChart allSessions={allSessions}/>
+            <PaymentBreakdownChart allSessions={closedSessions}/>
           </Grid>
 
           {/* Transaction Table */}
           <Grid item xs={12}>
-            <TransactionHistory allSessions={allSessions} />
+            <TransactionHistory allSessions={closedSessions} />
           </Grid>
         </Grid>
           </Box>

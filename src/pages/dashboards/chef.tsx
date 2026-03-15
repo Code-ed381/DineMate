@@ -13,7 +13,6 @@ import { Timer, Block as BlockIcon } from "@mui/icons-material";
 import UpdateTwoToneIcon from "@mui/icons-material/UpdateTwoTone";
 import AlarmOnTwoToneIcon from "@mui/icons-material/AlarmOnTwoTone";
 import RoomServiceTwoToneIcon from "@mui/icons-material/RoomServiceTwoTone";
-import DashboardHeader from "./components/dashboard-header";
 import OrderHistoryTable from "./components/order-history-panel";
 import useKitchenStore from "../../lib/kitchenStore";
 import OrdersBarChart from "./components/orders-bar-chart";
@@ -32,27 +31,27 @@ interface SmallStatProps {
 
 const SmallStat: React.FC<SmallStatProps> = ({ icon, label, value, accent }) => {
   return (
-    <Card sx={{ borderRadius: 2, height: "100%" }} elevation={1}>
-      <CardContent>
-        <Stack direction="row" spacing={2} alignItems="center">
+    <Card sx={{ borderRadius: 2, height: "100%", boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+      <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+        <Stack direction="row" spacing={{ xs: 1, md: 2 }} alignItems="center">
           <Avatar
             sx={(theme) => ({
               bgcolor: accent ?? theme.palette.primary.main,
-              width: 48,
-              height: 48,
+              width: { xs: 40, md: 48 },
+              height: { xs: 40, md: 48 },
               color: theme.palette.getContrastText(
                 accent ?? theme.palette.primary.main
               ),
             })}
           >
-            {React.cloneElement(icon as React.ReactElement<any>, { sx: { fontSize: 28 } })}
+            {React.cloneElement(icon as React.ReactElement<any>, { sx: { fontSize: { xs: 20, md: 28 } } })}
           </Avatar>
 
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2, mb: 0.5, fontWeight: 600 }}>
               {label}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
               {value}
             </Typography>
           </Box>
@@ -133,18 +132,12 @@ const ChefDashboard: React.FC = () => {
       {isLoading ? (
         <ChefDashboardProSkeleton />
       ) : (
-        <Box sx={{ p: isCompact ? 1.5 : { xs: 2, md: 3 } }}>
-          <DashboardHeader
-            title="Chef Dashboard"
-            description="Here’s a quick summary of your restaurant’s performance today."
-            background="linear-gradient(135deg,#ff6b6b 0%, #ffb74d 100%)"
-            color="#fff"
-          />
+        <Box sx={{ p: { xs: 2, md: 3 } }}>
 
           {showStats && (
             <>
               {/* KPI strip */}
-              <Grid container spacing={2} sx={{ mb: isCompact ? 1.5 : 3, mt: isCompact ? 1 : 0 }}>
+              <Grid container spacing={1.5} sx={{ mb: isCompact ? 1.5 : 2.5 }}>
                 <Grid item xs={6} sm={6} md={3}>
                   <SmallStat
                     icon={<Timer />}

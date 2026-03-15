@@ -50,14 +50,15 @@ const BigOptionButtons: React.FC<BigOptionButtonsProps> = ({
     <RadioGroup value={barOptionSelected} onChange={handleChange}>
       <Grid container spacing={2}>
         {options.map((opt) => (
-          <Grid item xs={12} sm={6} key={opt.id}>
+          <Grid item xs={6} sm={6} key={opt.id}>
             <Card
               variant="outlined"
               sx={{
                 height: "100%",
                 borderRadius: 3,
                 boxShadow: barOptionSelected === opt.id ? 4 : 1,
-                borderColor: barOptionSelected === opt.id ? "primary.main" : "divider",
+                borderColor:
+                  barOptionSelected === opt.id ? "primary.main" : "divider",
               }}
             >
               <CardActionArea
@@ -68,15 +69,23 @@ const BigOptionButtons: React.FC<BigOptionButtonsProps> = ({
                   sx={{
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center",
-                    p: 3,
+                    p: { xs: 1.5, md: 3 },
                   }}
                 >
-                  <Box>
-                    <Typography variant="h6" fontWeight="bold">
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body1" fontWeight="bold" noWrap>
                       {opt.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
                       {opt.description}
                     </Typography>
                   </Box>

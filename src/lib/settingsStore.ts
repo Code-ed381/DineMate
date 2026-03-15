@@ -101,6 +101,11 @@ export interface CashierSettings {
   show_revenue_stats?: boolean;
   show_audit_stats?: boolean;
   enable_csv_export?: boolean;
+  // Audit Logs Metric Categories
+  show_staff_metrics?: boolean;
+  show_menu_metrics?: boolean;
+  show_operational_metrics?: boolean;
+  show_financial_metrics?: boolean;
 }
 
 export interface BarSettings {
@@ -178,6 +183,8 @@ export interface ReportSettings {
   show_balance_column?: boolean;
   show_cash_column?: boolean;
   show_card_column?: boolean;
+  show_momo_column?: boolean;
+  show_online_column?: boolean;
   // Access Control
   cashiers_view_audit?: boolean;
 }
@@ -319,7 +326,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           console.log('✅ Subscribed to restaurant settings changes');
         }
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Settings subscription error');
+          console.error('❌ Settings subscription error. Retrying in 5s...');
+          setTimeout(() => {
+            get().subscribeToSettings(restaurantId);
+          }, 5000);
+        }
+        if (status === 'TIMED_OUT') {
+           console.warn('🕒 Settings subscription timed out. Retrying...');
+           get().subscribeToSettings(restaurantId);
         }
       });
 

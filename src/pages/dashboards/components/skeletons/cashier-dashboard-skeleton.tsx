@@ -7,7 +7,7 @@ export default function CashierReportsProSkeleton() {
       <Box sx={{ mb: 3 }}><Skeleton variant="text" width={240} height={40} /><Skeleton variant="text" width={400} height={28} /></Box>
       <Grid container spacing={3}>
         {[1, 2, 3, 4].map((i) => (
-          <Grid item xs={12} md={3} key={i}>
+          <Grid item xs={6} sm={6} md={3} key={i}>
             <Card sx={{ borderRadius: 2, p: 2 }}>
               <Skeleton variant="circular" width={40} height={40} />
               <Skeleton variant="text" width="60%" height={28} sx={{ mt: 2 }} /><Skeleton variant="text" width="40%" height={22} /><Skeleton variant="text" width="30%" height={18} />

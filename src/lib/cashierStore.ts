@@ -4,6 +4,7 @@ import useRestaurantStore from "./restaurantStore";
 import { supabase } from "./supabase";
 import { handleError } from "../components/Error";
 import Swal from "sweetalert2";
+import { menuService } from "../services/menuService";
 
 interface CashierSession {
   session_id: string;
@@ -13,6 +14,7 @@ interface CashierSession {
   table_number: number | string;
   order_total: number;
   session_status: string;
+  is_otc_order?: boolean;
   [key: string]: any;
 }
 
@@ -36,6 +38,12 @@ interface CashierState {
   detailedOrderItems: any[];
   loadingDetailedOrderItems: boolean;
   sessionsChannel: any | null;
+  historyFilters: {
+    startDate: string;
+    endDate: string;
+    searchQuery: string;
+  };
+  isFetchingHistory: boolean;
 
   setProceedToPayment: (value: boolean) => void;
   setSelected: (value: string) => void;
@@ -54,6 +62,7 @@ interface CashierState {
   formatCashInput: (amount: string | number) => string;
   fetchReportSessions: () => Promise<void>;
   fetchDetailedReportItems: (options?: { startDate?: string; endDate?: string }) => Promise<void>;
+  setHistoryFilters: (filters: Partial<{ startDate: string; endDate: string; searchQuery: string }>) => void;
 }
 
 const useCashierStore = create<CashierState>()(
@@ -78,6 +87,19 @@ const useCashierStore = create<CashierState>()(
       detailedOrderItems: [],
       loadingDetailedOrderItems: false,
       sessionsChannel: null,
+      historyFilters: {
+        startDate: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        searchQuery: "",
+      },
+      isFetchingHistory: false,
+
+      setHistoryFilters: (filters) => {
+        set((state) => ({
+          historyFilters: { ...state.historyFilters, ...filters }
+        }));
+        get().fetchReportSessions();
+      },
 
       setProceedToPayment: (value: boolean) => {
         set({ proceedToPayment: value });
@@ -152,8 +174,19 @@ const useCashierStore = create<CashierState>()(
               table: "table_sessions",
               filter: `restaurant_id=eq.${restaurantId}`,
             },
-            () => {
+            (payload: any) => {
               get().getActiveSessionByRestaurant(true);
+              
+              const { selectedSession } = get();
+              
+              // Handle DELETE or status change to close
+              const isDelete = payload.eventType === 'DELETE';
+              const isClosed = payload.new && payload.new.status === "close";
+              const targetId = isDelete ? payload.old.id : payload.new.id;
+
+              if (targetId === selectedSession?.session_id && (isDelete || isClosed)) {
+                set({ selectedSession: null, selectedOrderItems: [] });
+              }
             }
           )
           .on(
@@ -164,8 +197,38 @@ const useCashierStore = create<CashierState>()(
               table: "orders",
               filter: `restaurant_id=eq.${restaurantId}`,
             },
-            () => {
+            (payload: any) => {
               get().getActiveSessionByRestaurant(true);
+
+              const { selectedSession } = get();
+              // If the currently selected order was deleted, clear it
+              if (payload.eventType === 'DELETE' && payload.old.id === selectedSession?.order_id) {
+                set({ selectedSession: null, selectedOrderItems: [] });
+                return;
+              }
+
+              // If the order total changed (e.g. item deleted/added elsewhere), refresh items
+              if (payload.eventType === 'UPDATE' && selectedSession && payload.new.id === selectedSession.order_id) {
+                get().handleFetchOrderItems(selectedSession.order_id);
+              }
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "order_items",
+            },
+            (payload: any) => {
+              const { selectedSession } = get();
+              if (!selectedSession) return;
+
+              // Check if the modified order_item belongs to the active session's order
+              const orderId = payload.new?.order_id || payload.old?.order_id;
+              if (orderId && String(orderId) === String(selectedSession.order_id)) {
+                get().handleFetchOrderItems(selectedSession.order_id);
+              }
             }
           )
           .subscribe();
@@ -186,7 +249,6 @@ const useCashierStore = create<CashierState>()(
         const selectedRestaurantId = selectedRestaurant?.id;
 
         if (!selectedRestaurantId) {
-          console.error("No restaurant selected");
           return;
         }
 
@@ -198,7 +260,8 @@ const useCashierStore = create<CashierState>()(
           let { data: cashier_orders_overview, error } = await supabase
             .from("cashier_orders_overview")
             .select("*")
-            .eq("restaurant_id", selectedRestaurantId);
+            .eq("restaurant_id", selectedRestaurantId)
+            .order("order_id", { ascending: true });
 
           if (error) throw error;
 
@@ -226,13 +289,21 @@ const useCashierStore = create<CashierState>()(
 
           const sessions = rawSessions.map((session: any) => {
             const orderData = orderDataMap[session.order_id];
+            
+            // Determine if this is an OTC order (no table_id or table_number is null/undefined)
+            const isOTCOrder = !session.table_id || !session.table_number || session.table_number === null;
+            const tableDisplay = isOTCOrder ? "OTC" : session.table_number;
+            
             return { 
               ...session, 
               // Prefer actual total from orders table, fallback to view
               order_total: orderData ? orderData.total : (session.order_total || 0),
               // Prefer payment_method from orders table
               payment_method: orderData ? orderData.payment_method : session.payment_method,
-              discount: orderData ? orderData.discount : 0
+              discount: orderData ? orderData.discount : 0,
+              // Override table number display for OTC orders
+              table_number: tableDisplay,
+              is_otc_order: isOTCOrder
             };
           }) as CashierSession[];
 
@@ -251,8 +322,8 @@ const useCashierStore = create<CashierState>()(
             activeSeesionByRestaurantLoaded: true,
           });
         } catch (error) {
-          console.error(error);
           handleError(error as Error);
+          set({ activeSeesionByRestaurantLoaded: true });
         } finally {
           set({
             loadingActiveSessionByRestaurant: false,
@@ -301,7 +372,6 @@ const useCashierStore = create<CashierState>()(
                 waitersMap[w.user_id] = w;
               });
             } catch (e) {
-              console.warn("Could not fetch waiter details due to permissions:", e);
             }
           }
 
@@ -323,19 +393,9 @@ const useCashierStore = create<CashierState>()(
 
           set({ selectedOrderItems: items });
 
-          // Synchronize total to the database orders table, accounting for any existing discount
-          const calculatedSubtotal = items.reduce(
-            (sum: number, item: any) => sum + (parseFloat(item.sum_price) || 0), 
-            0
-          );
-          const currentDiscount = get().selectedSession?.discount || 0;
-          const finalTotal = calculatedSubtotal * (1 - (parseFloat(currentDiscount.toString()) || 0) / 100);
-          
-          await supabase.from("orders").update({ total: finalTotal }).eq("id", orderId);
 
           return items;
         } catch (error) {
-          console.error("Error fetching order items:", error);
           handleError(error as Error);
           return [];
         } finally {
@@ -350,7 +410,25 @@ const useCashierStore = create<CashierState>()(
           return;
         }
         
-        const { paymentMethod, selectedOrderItems, discount } = get();
+        const { paymentMethod, selectedOrderItems, discount, cashAmount, cardAmount, momoAmount } = get();
+        
+        // CHECK FOR UNSERVED ITEMS (Only for Waiter Orders)
+        const selectedSession = get().selectedSession;
+        if (selectedSession && !selectedSession.is_otc_order) {
+          try {
+            const hasUnserved = await menuService.hasUnservedItems(sessionId);
+            if (hasUnserved) {
+              Swal.fire({
+                icon: "warning",
+                title: "Unserved Items",
+                text: "This table has items that haven't been served yet. Please ensure all items are served before processing payment.",
+              });
+              return;
+            }
+          } catch (err) {
+          }
+        }
+
         set({ isProcessingPayment: true });
 
         const discountPercent = parseFloat(discount) || 0;
@@ -365,7 +443,7 @@ const useCashierStore = create<CashierState>()(
         try {
           const { error: sessionError } = await supabase
             .from("table_sessions")
-            .update({ status: "close", closed_at: new Date() })
+            .update({ status: "close", closed_at: new Date(), payment_method: paymentMethod })
             .eq("id", sessionId);
 
           if (sessionError) throw sessionError;
@@ -376,7 +454,10 @@ const useCashierStore = create<CashierState>()(
               status: "served",
               total: finalTotal,
               payment_method: paymentMethod,
-              discount: discountPercent
+              discount: discountPercent,
+              amount_cash: parseFloat(cashAmount) || 0,
+              amount_card: parseFloat(cardAmount) || 0,
+              amount_momo: parseFloat(momoAmount) || 0
             })
             .eq("id", orderId);
 
@@ -400,7 +481,6 @@ const useCashierStore = create<CashierState>()(
             });
 
           if (paymentError) {
-             console.error("Ledger recording failed:", paymentError);
           }
 
           // If tableId is null (like in OTC), skipping the table update
@@ -435,6 +515,19 @@ const useCashierStore = create<CashierState>()(
         if (!selectedSession) return;
 
         try {
+          // CHECK FOR UNSERVED ITEMS (Only for Waiter Orders)
+          if (selectedSession && !selectedSession.is_otc_order) {
+            const hasUnserved = await menuService.hasUnservedItems(selectedSession.session_id);
+            if (hasUnserved) {
+              Swal.fire({
+                icon: "warning",
+                title: "Unserved Items",
+                text: "This table has items that haven't been served yet. Please ensure all items are served before printing the bill.",
+              });
+              return;
+            }
+          }
+
           const { error } = await supabase
             .from("table_sessions")
             .update({ status: "billed" })
@@ -454,23 +547,43 @@ const useCashierStore = create<CashierState>()(
 
         if (!selectedRestaurantId) return;
 
-        set({ loadingActiveSessionByRestaurant: true, activeSeesionByRestaurantLoaded: false });
+        set({ isFetchingHistory: true });
 
         try {
-          // Fetch the last 30 days of data for the report
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-          const { data: rawSessions, error } = await supabase
+          const { startDate, endDate, searchQuery } = get().historyFilters;
+          
+          let query = supabase
             .from("cashier_orders_overview")
             .select("*")
             .eq("restaurant_id", selectedRestaurantId)
-            .gte("opened_at", thirtyDaysAgo.toISOString())
-            .order("opened_at", { ascending: false });
+            .eq("session_status", "close");
+
+          if (startDate) {
+            query = query.gte("closed_at", `${startDate}T00:00:00`);
+          }
+          if (endDate) {
+            query = query.lte("closed_at", `${endDate}T23:59:59`);
+          }
+
+          // Sort by closure date (most recent first)
+          query = query.order("closed_at", { ascending: false });
+
+          const { data: rawSessions, error } = await query;
 
           if (error) throw error;
 
-          const orderIds = (rawSessions || []).map((s: any) => s.order_id).filter(Boolean);
+          let filteredSessions = rawSessions || [];
+
+          // Client-side search for better flexibility with Order ID and Table
+          if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            filteredSessions = filteredSessions.filter((s: any) => 
+              s.order_id?.toString().toLowerCase().includes(lowerQuery) ||
+              s.table_number?.toString().toLowerCase().includes(lowerQuery)
+            );
+          }
+
+          const orderIds = filteredSessions.map((s: any) => s.order_id).filter(Boolean);
 
           let orderDataMap: Record<string, { total: number, payment_method: string, discount: number }> = {};
           if (orderIds.length > 0) {
@@ -490,39 +603,39 @@ const useCashierStore = create<CashierState>()(
             }
           }
 
-          const sessions = (rawSessions || []).map((session: any) => {
+          const sessions = filteredSessions.map((session: any) => {
             const orderData = orderDataMap[session.order_id];
+            
+            const isOTCOrder = !session.table_id || !session.table_number || session.table_number === null;
+            const tableDisplay = isOTCOrder ? "OTC" : session.table_number;
+            
             return { 
               ...session, 
               order_total: orderData ? orderData.total : (session.order_total || 0),
               payment_method: orderData ? orderData.payment_method : session.payment_method,
-              discount: orderData ? orderData.discount : 0
+              discount: orderData ? orderData.discount : 0,
+              // Override table number display for OTC orders
+              table_number: tableDisplay,
+              is_otc_order: isOTCOrder
             };
           });
 
           set({
-            allSessions: sessions,
+            closedSessions: sessions,
             activeSeesionByRestaurantLoaded: true,
           });
         } catch (error) {
-          console.error("Error fetching report sessions:", error);
           handleError(error as Error);
-          set({ allSessions: [], activeSeesionByRestaurantLoaded: true });
+          set({ closedSessions: [], activeSeesionByRestaurantLoaded: true });
         } finally {
-          set({ loadingActiveSessionByRestaurant: false });
+          set({ isFetchingHistory: false });
         }
       },
 
       fetchDetailedReportItems: async (options = {}) => {
         const { selectedRestaurant } = useRestaurantStore.getState();
         const restaurantId = selectedRestaurant?.id;
-        
-        console.log("🔍 Detailed Report Fetch - Start", { restaurantId, options });
-        
-        if (!restaurantId) {
-          console.error("❌ Detailed Report Fetch - No Restaurant ID");
-          return;
-        }
+        if (!restaurantId) return;
 
         set({ loadingDetailedOrderItems: true });
 
@@ -540,15 +653,12 @@ const useCashierStore = create<CashierState>()(
           const { data: orderOverview, error: orderError } = await orderQuery;
 
           if (orderError) {
-            console.error("❌ Detailed Report Fetch - Order Overview Error:", orderError);
             throw orderError;
           }
 
           const orderIds = (orderOverview || []).map(o => o.order_id).filter(Boolean);
-          console.log(`📡 Detailed Report Fetch - Found ${orderIds.length} orders to fetch items for`);
 
           if (orderIds.length === 0) {
-            console.warn("⚠️ Detailed Report Fetch - No orders found for the given criteria");
             set({ detailedOrderItems: [], loadingDetailedOrderItems: false });
             return;
           }
@@ -561,7 +671,6 @@ const useCashierStore = create<CashierState>()(
             .order("created_at", { ascending: false });
           
           if (itemsError) {
-            console.error("❌ Detailed Report Fetch - Items Error:", itemsError);
             throw itemsError;
           }
 
@@ -576,26 +685,80 @@ const useCashierStore = create<CashierState>()(
             menuItems?.forEach(mi => menuItemsMap[mi.id] = mi);
           }
 
-          const waiterIds = Array.from(new Set((orderItems || []).map((i: any) => i.prepared_by).filter(Boolean)));
-          let waitersMap: Record<string, any> = {};
-          if (waiterIds.length > 0) {
-            try {
-              const { data: waiters } = await supabase
-                .from("restaurant_members_with_users")
-                .select("user_id, first_name, last_name, avatar_url")
-                .in("user_id", waiterIds);
-              waiters?.forEach(w => waitersMap[w.user_id] = w);
-            } catch (e) {
-              console.warn("Could not fetch waiter details for report:", e);
+          // Get order session IDs to fetch waiter information
+          const itemOrderIds = Array.from(new Set((orderItems || []).map((i: any) => i.order_id).filter(Boolean)));
+          let waiterMap: Record<string, any> = {};
+          let preparerMap: Record<string, any> = {};
+          
+          if (itemOrderIds.length > 0) {
+            // Fetch orders to get session information
+            const { data: orders } = await supabase
+              .from("orders")
+              .select("id, session_id")
+              .in("id", itemOrderIds);
+            
+            const sessionIds = Array.from(new Set((orders || []).map((o: any) => o.session_id).filter(Boolean)));
+            
+            if (sessionIds.length > 0) {
+              // Fetch table sessions to get waiter IDs
+              const { data: sessions } = await supabase
+                .from("table_sessions")
+                .select("id, waiter_id")
+                .in("id", sessionIds);
+              
+              const waiterIds = Array.from(new Set((sessions || []).map((s: any) => s.waiter_id).filter(Boolean)));
+              
+              if (waiterIds.length > 0) {
+                // Fetch waiter information from users_secure_view
+                const { data: waiters } = await supabase
+                  .from("users_secure_view")
+                  .select("id, raw_user_meta_data")
+                  .in("id", waiterIds);
+                
+                waiters?.forEach(w => waiterMap[w.id] = w);
+                
+                // Create session to waiter mapping
+                const sessionToWaiterMap: Record<string, string> = {};
+                sessions?.forEach(s => {
+                  if (s.waiter_id) sessionToWaiterMap[s.id] = s.waiter_id;
+                });
+                
+                // Create order to waiter mapping
+                const orderToWaiterMap: Record<string, any> = {};
+                orders?.forEach(o => {
+                  const waiterId = sessionToWaiterMap[o.session_id];
+                  if (waiterId && waiterMap[waiterId]) {
+                    orderToWaiterMap[o.id] = waiterMap[waiterId];
+                  }
+                });
+                
+                // Store waiter info by order ID
+                Object.assign(waiterMap, orderToWaiterMap);
+              }
             }
           }
+          
+          // Fetch preparer information (who prepared the items)
+          const preparerIds = Array.from(new Set((orderItems || []).map((i: any) => i.prepared_by).filter(Boolean)));
+          if (preparerIds.length > 0) {
+            const { data: preparers } = await supabase
+              .from("users_secure_view")
+              .select("id, raw_user_meta_data")
+              .in("id", preparerIds);
+            preparers?.forEach(p => preparerMap[p.id] = p);
+          }
 
-          console.log(`✅ Detailed Report Fetch - Data Received (${orderItems?.length || 0} items)`);
 
           // Process data to flatten it and ensure all expected fields exist for DataGrid
           const processedData = (orderItems as any[]).map(item => {
             const menuItem = menuItemsMap[item.menu_item_id];
-            const waiter = waitersMap[item.prepared_by];
+            const waiter = waiterMap[item.order_id]; // Waiter is mapped by order_id
+            const preparer = preparerMap[item.prepared_by]; // Preparer is mapped by user_id
+            
+            // Extract metadata from raw_user_meta_data
+            const waiterMeta = waiter?.raw_user_meta_data || {};
+            const preparerMeta = preparer?.raw_user_meta_data || {};
+            
             return {
               ...item,
               order_item_id: item.id, // CRITICAL: Fix for DataGrid unique ID error
@@ -606,22 +769,20 @@ const useCashierStore = create<CashierState>()(
               // Status and Pricing
               status: item.status || "ordered",
               sum_price: parseFloat(item.sum_price) || 0,
-              // Waiter info
-              waiter_first_name: waiter?.first_name || "System",
-              waiter_last_name: waiter?.last_name || "",
-              waiter_avatar_url: waiter?.avatar_url,
-              // Preparer info (fallback to waiter for now if no separate preparer info)
-              preparer_first_name: waiter?.first_name || (item.status === 'served' ? "Ready" : "In Progress"),
-              preparer_last_name: waiter?.last_name || "",
-              preparer_avatar_url: waiter?.avatar_url,
+              // Waiter info (who took the order)
+              waiter_first_name: waiterMeta.firstName || "System",
+              waiter_last_name: waiterMeta.lastName || "",
+              waiter_avatar: waiterMeta.avatarUrl,
+              // Preparer info (who prepared the item)
+              preparer_first_name: preparerMeta.firstName || (item.status === 'served' ? "Not assigned" : "In Progress"),
+              preparer_last_name: preparerMeta.lastName || "",
+              preparer_avatar: preparerMeta.avatarUrl,
             };
           });
 
-          console.log("📊 Detailed Report Fetch - Processed Data:", processedData);
 
           set({ detailedOrderItems: processedData, loadingDetailedOrderItems: false });
         } catch (error) {
-          console.error("❌ Detailed Report Fetch - Catch Error:", error);
           set({ loadingDetailedOrderItems: false, detailedOrderItems: [] });
         }
       },

@@ -21,6 +21,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  Fab,
 } from "@mui/material";
 import {
   Search,
@@ -54,7 +55,7 @@ import { useSubscriptionStore } from "../../lib/subscriptionStore";
 import { useSubscription } from "../../providers/subscriptionProvider";
 import useRestaurantStore from "../../lib/restaurantStore";
 import { useSettings } from "../../providers/settingsProvider";
-import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
+import { exportToCSV, exportToPDF, exportToExcel, exportToTXT } from "../../utils/exportUtils";
 
 const statusColors: Record<string, { color: any; icon: any }> = {
   available: { color: "success", icon: CheckCircleIcon },
@@ -76,32 +77,46 @@ const TableManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<any>(null);
-  const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const { canUseFeature, isLimitReached, plan, canAccess } = useFeatureGate();
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
-  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
-  const handleExportClose = () => setExportAnchorEl(null);
-
-  const handleExportCSV = () => {
-    if (!canUseFeature("canUseCsvExport")) {
-      handleExportClose();
-      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canAccess("canUseCsvExport")) {
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data.", "info");
       return;
     }
-    const dataToExport = filteredTables.map(table => ({
-        TableNumber: table.table_number,
-        Capacity: table.capacity,
-        Location: table.location || 'Main Hall',
-        Status: table.effective_status || table.table_status || 'available',
-        Description: table.description || 'N/A'
+    setExportAnchorEl(e.currentTarget);
+  };
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const getExportData = () => {
+    return filteredTables.map(table => ({
+        "Table Number": table.table_number,
+        "Capacity": table.capacity,
+        "Location": table.location || 'Main Hall',
+        "Status": table.effective_status || table.table_status || 'available',
+        "Description": table.description || 'N/A'
     }));
-    exportToCSV(dataToExport, "restaurant_tables");
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(getExportData(), "restaurant_tables");
+    handleExportClose();
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(getExportData(), "restaurant_tables");
+    handleExportClose();
+  };
+
+  const handleExportTXT = () => {
+    exportToTXT(getExportData(), "restaurant_tables");
     handleExportClose();
   };
 
   const handleExportPDF = () => {
-    exportToPDF();
+    exportToPDF(getExportData(), "restaurant_tables", "Restaurant Tables Overview");
     handleExportClose();
   };
   
@@ -137,7 +152,7 @@ const TableManagement: React.FC = () => {
   }, [tables]);
 
   const handleEditTable = (table: any) => {
-    if (!canUseFeature("Manage Tables")) {
+    if (!canAccess("canManageTables")) {
         Swal.fire("Upgrade Required", "Please upgrade your plan to manage tables.", "info");
         return;
     }
@@ -214,55 +229,68 @@ const TableManagement: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: 2 }}>
-      <AdminHeader title="Table Management" description="Manage your restaurant tables">
-        <Box>
-            <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExportClick}
-                sx={{ borderRadius: 2 }}
-            >
-                Export
-            </Button>
-            <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={handleExportClose}
-            >
-                <MenuItem onClick={handleExportCSV}>
-                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                    Export CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                    Print PDF (Browser)
-                </MenuItem>
-            </Menu>
-        </Box>
+    <Box sx={{ p: { xs: 1, md: 2 } }}>
+      <AdminHeader 
+        title={isMobile ? "" : "Table Management"} 
+        description={isMobile ? "" : "Manage your restaurant tables"}
+      >
+        {!isMobile && (
+          <Box>
+              <Button
+                  variant="outlined"
+                  startIcon={<Download />}
+                  onClick={handleExportClick}
+                  sx={{ borderRadius: 2 }}
+              >
+                  Export
+              </Button>
+              <Menu
+                  anchorEl={exportAnchorEl}
+                  open={Boolean(exportAnchorEl)}
+                  onClose={handleExportClose}
+              >
+                  <MenuItem onClick={handleExportCSV}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export CSV
+                  </MenuItem>
+                  <MenuItem onClick={handleExportExcel}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Excel
+                  </MenuItem>
+                  <MenuItem onClick={handleExportTXT}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export TXT
+                  </MenuItem>
+                  <MenuItem onClick={handleExportPDF}>
+                      <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                      Export PDF (Table)
+                  </MenuItem>
+              </Menu>
+          </Box>
+        )}
       </AdminHeader>
 
       {tableSettings.show_table_stats !== false && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={6} sm={6} md={3}>
             <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'primary.light', color: 'primary.contrastText' }}>
               <Avatar sx={{ bgcolor: "white", color: "primary.main", mr: 2 }}><TableRestaurant /></Avatar>
               <Box><Typography variant="h4" fontWeight="bold">{tableStats.total}</Typography><Typography variant="body2" fontWeight="bold">Total Tables</Typography></Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={6} sm={6} md={3}>
             <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'success.light', color: 'success.contrastText' }}>
               <Avatar sx={{ bgcolor: "white", color: "success.main", mr: 2 }}><CheckCircleIcon /></Avatar>
               <Box><Typography variant="h4" fontWeight="bold">{tableStats.available}</Typography><Typography variant="body2" fontWeight="bold">Available</Typography></Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={6} sm={6} md={3}>
             <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'error.light', color: 'error.contrastText' }}>
               <Avatar sx={{ bgcolor: "white", color: "error.main", mr: 2 }}><RestaurantIcon /></Avatar>
               <Box><Typography variant="h4" fontWeight="bold">{tableStats.occupied}</Typography><Typography variant="body2" fontWeight="bold">Occupied</Typography></Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={6} sm={6} md={3}>
             <Paper sx={{ p: 2, display: "flex", alignItems: "center", bgcolor: 'warning.light', color: 'warning.contrastText' }}>
               <Avatar sx={{ bgcolor: "white", color: "warning.main", mr: 2 }}><EventSeatIcon /></Avatar>
               <Box><Typography variant="h4" fontWeight="bold">{tableStats.reserved}</Typography><Typography variant="body2" fontWeight="bold">Reserved</Typography></Box>
@@ -276,7 +304,8 @@ const TableManagement: React.FC = () => {
         flexDirection: isMobile ? "column" : "row",
         justifyContent: "space-between", 
         gap: 2,
-        mb: 2 
+          mb: { xs: 1.5, md: 2 }
+ 
       }}>
         <TextField
           size="small"
@@ -362,6 +391,23 @@ const TableManagement: React.FC = () => {
         open={openUpgradeModal} 
         onClose={() => setOpenUpgradeModal(false)} 
       />
+
+      {/* Mobile Export FAB */}
+      {isMobile && (
+        <Fab
+          color="primary"
+          aria-label="export"
+          onClick={handleExportClick}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 1100,
+          }}
+        >
+          <Download />
+        </Fab>
+      )}
     </Box>
   );
 };

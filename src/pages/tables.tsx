@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -23,6 +23,8 @@ import {
   TableBody,
   CircularProgress,
   Divider,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import {
   Search,
@@ -60,6 +62,8 @@ const statusColors: Record<string, any> = {
 };
 
 const TableManagement: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { settings } = useSettings();
   const { canAccess } = useFeatureGate();
   const tableSettings = (settings as any).table_settings || {};
@@ -69,6 +73,7 @@ const TableManagement: React.FC = () => {
   const [viewMode, setViewMode] = useState<"grid" | "floor">(
     (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
   );
+  const isInitialModeSet = useRef(false);
   const {
     tables,
     handleStatusChange,
@@ -138,12 +143,13 @@ const TableManagement: React.FC = () => {
     return () => unsubscribeFromTables();
   }, [getTables, getSessionsOverview, subscribeToTables, unsubscribeFromTables]);
 
-  // Sync default view mode once settings finish loading
+  // Sync default view mode once settings finish loading, but only once
   useEffect(() => {
-    if (tableSettings.default_view_mode) {
+    if (tableSettings.default_view_mode && !isInitialModeSet.current) {
       setViewMode(
         (tableSettings.default_view_mode === "floor" && canAccess("canUseFloorPlan")) ? "floor" : "grid"
       );
+      isInitialModeSet.current = true;
     }
   }, [tableSettings.default_view_mode, canAccess]);
 
@@ -188,20 +194,50 @@ const TableManagement: React.FC = () => {
         <Box>
           {tableSettings.show_table_stats !== false && (
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "primary.main", mr: 2 }}><TableRestaurant /></Avatar><Box><Typography variant="h6">{tableStats.total}</Typography><Typography variant="body2" color="text.secondary">Total Tables</Typography></Box></Paper></Grid>
-              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "success.main", mr: 2 }}><EventSeat /></Avatar><Box><Typography variant="h6">{tableStats.available}</Typography><Typography variant="body2" color="text.secondary">Available</Typography></Box></Paper></Grid>
-              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "error.main", mr: 2 }}><LocalDining /></Avatar><Box><Typography variant="h6">{tableStats.occupied}</Typography><Typography variant="body2" color="text.secondary">Occupied</Typography></Box></Paper></Grid>
-              <Grid item xs={12} sm={6} md={3}><Paper sx={{ p: 2, display: "flex", alignItems: "center" }}><Avatar sx={{ bgcolor: "warning.main", mr: 2 }}><LockClock /></Avatar><Box><Typography variant="h6">{tableStats.reserved}</Typography><Typography variant="body2" color="text.secondary">Reserved</Typography></Box></Paper></Grid>
+              <Grid item xs={6} sm={6} md={3}>
+                <Paper sx={{ p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center" }}>
+                  <Avatar sx={{ bgcolor: "primary.main", mr: { xs: 1.5, sm: 2 }, width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 } }}><TableRestaurant sx={{ fontSize: { xs: 20, sm: 24 } }} /></Avatar>
+                  <Box><Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, lineHeight: 1.2 }}>{tableStats.total}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Total Tables</Typography></Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={6} md={3}>
+                <Paper sx={{ p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center" }}>
+                  <Avatar sx={{ bgcolor: "success.main", mr: { xs: 1.5, sm: 2 }, width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 } }}><EventSeat sx={{ fontSize: { xs: 20, sm: 24 } }} /></Avatar>
+                  <Box><Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, lineHeight: 1.2 }}>{tableStats.available}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Available</Typography></Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={6} md={3}>
+                <Paper sx={{ p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center" }}>
+                  <Avatar sx={{ bgcolor: "error.main", mr: { xs: 1.5, sm: 2 }, width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 } }}><LocalDining sx={{ fontSize: { xs: 20, sm: 24 } }} /></Avatar>
+                  <Box><Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, lineHeight: 1.2 }}>{tableStats.occupied}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Occupied</Typography></Box>
+                </Paper>
+              </Grid>
+              <Grid item xs={6} sm={6} md={3}>
+                <Paper sx={{ p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center" }}>
+                  <Avatar sx={{ bgcolor: "warning.main", mr: { xs: 1.5, sm: 2 }, width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 } }}><LockClock sx={{ fontSize: { xs: 20, sm: 24 } }} /></Avatar>
+                  <Box><Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, lineHeight: 1.2 }}>{tableStats.reserved}</Typography><Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Reserved</Typography></Box>
+                </Paper>
+              </Grid>
             </Grid>
           )}
 
-          <Grid container spacing={2} mb={4} alignItems="center" justifyContent="space-between">
-            <Grid item xs={12} md="auto">
+          <Grid container spacing={2} mb={3} alignItems="center">
+            <Grid item xs={12} sm={12} lg={4}>
               <ToggleButtonGroup
                 exclusive
-                size="large"
+                size="small"
                 value={statusFilter}
                 onChange={(_, value) => value && setStatusFilter(value)}
+                sx={{ 
+                  width: '100%', 
+                  display: 'flex',
+                  '& .MuiToggleButton-root': { 
+                    flex: 1, 
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    px: { xs: 1, sm: 2 }
+                  } 
+                }}
               >
                 <ToggleButton value="all">All</ToggleButton>
                 <ToggleButton value="available">Available</ToggleButton>
@@ -209,11 +245,12 @@ const TableManagement: React.FC = () => {
                 <ToggleButton value="reserved">Reserved</ToggleButton>
               </ToggleButtonGroup>
             </Grid>
-            {tableSettings.show_floor_plan !== false && (
-              <Grid item xs={12} md="auto">
+            
+            {(tableSettings.show_floor_plan !== false || !isMobile) && (
+              <Grid item xs={12} sm={6} lg={4}>
                 <ToggleButtonGroup
                   exclusive
-                  size="large"
+                  size="small"
                   value={viewMode}
                   onChange={(_, value) => {
                     if (value === "floor" && !canAccess("canUseFloorPlan")) {
@@ -227,23 +264,35 @@ const TableManagement: React.FC = () => {
                     }
                     if (value) setViewMode(value);
                   }}
+                  sx={{ 
+                    width: '100%', 
+                    display: 'flex',
+                    '& .MuiToggleButton-root': { 
+                      flex: 1, 
+                      fontWeight: 'bold' 
+                    } 
+                  }}
                 >
                   <ToggleButton value="grid" aria-label="grid view">
-                    <GridViewIcon sx={{ mr: 1 }} /> Grid
+                    <GridViewIcon sx={{ mr: 1, fontSize: 20 }} /> Grid
                   </ToggleButton>
                   <ToggleButton value="floor" aria-label="floor plan">
-                    <MapIcon sx={{ mr: 1 }} /> Floor Plan
+                    <MapIcon sx={{ mr: 1, fontSize: 20 }} /> Floor Plan
                   </ToggleButton>
                 </ToggleButtonGroup>
               </Grid>
             )}
-            <Grid item xs={12} md={6}>
+
+            <Grid item xs={12} sm={Boolean(tableSettings.show_floor_plan !== false || !isMobile) ? 6 : 12} lg={4}>
               <TextField
                 fullWidth size="small"
                 placeholder="Search tables..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><Search /></InputAdornment>) }}
+                InputProps={{ 
+                  startAdornment: (<InputAdornment position="start"><Search fontSize="small" /></InputAdornment>),
+                  sx: { borderRadius: 2 } 
+                }}
               />
             </Grid>
           </Grid>

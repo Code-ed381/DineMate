@@ -20,6 +20,7 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
+  Fab,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -40,7 +41,7 @@ import { useFeatureGate } from "../../hooks/useFeatureGate";
 import UpgradeModal from "../../components/UpgradeModal";
 import Swal from "sweetalert2";
 import { GridColDef } from "@mui/x-data-grid";
-import { exportToCSV, exportToPDF } from "../../utils/exportUtils";
+import { exportToCSV, exportToPDF, exportToExcel, exportToTXT } from "../../utils/exportUtils";
 
 const baseColumns: GridColDef[] = [
   {
@@ -180,33 +181,47 @@ const MenuItemsManagement: React.FC = () => {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
 
-  const { canUseFeature, isLimitReached, plan } = useFeatureGate();
+  const { canUseFeature, isLimitReached, plan, canAccess } = useFeatureGate();
   const [openUpgradeModal, setOpenUpgradeModal] = useState(false);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
-  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => setExportAnchorEl(e.currentTarget);
-  const handleExportClose = () => setExportAnchorEl(null);
-
-  const handleExportCSV = () => {
-    if (!canUseFeature("canUseCsvExport")) {
-      handleExportClose();
-      Swal.fire("Upgrade Required", "Please upgrade your plan to export data to CSV.", "info");
+  const handleExportClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canAccess("canUseCsvExport")) {
+      Swal.fire("Upgrade Required", "Please upgrade your plan to export data.", "info");
       return;
     }
-    const dataToExport = filteredMenuItems.map(item => ({
-        Name: item.name,
-        Description: item.description || 'N/A',
-        Category: item.category_name || 'Uncategorized',
-        Price: item.price,
-        Available: item.available ? 'Yes' : 'No',
-        Tags: (item.tags as string[] || []).join(', ')
+    setExportAnchorEl(e.currentTarget);
+  };
+  const handleExportClose = () => setExportAnchorEl(null);
+
+  const getExportData = () => {
+    return filteredMenuItems.map(item => ({
+        "Name": item.name,
+        "Description": item.description || 'N/A',
+        "Category": item.category_name || 'Uncategorized',
+        "Price": item.price,
+        "Available": item.available ? 'Yes' : 'No',
+        "Tags": (item.tags as string[] || []).join(', ')
     }));
-    exportToCSV(dataToExport, "restaurant_menu_items");
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(getExportData(), "restaurant_menu_items");
+    handleExportClose();
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(getExportData(), "restaurant_menu_items");
+    handleExportClose();
+  };
+
+  const handleExportTXT = () => {
+    exportToTXT(getExportData(), "restaurant_menu_items");
     handleExportClose();
   };
 
   const handleExportPDF = () => {
-    exportToPDF();
+    exportToPDF(getExportData(), "restaurant_menu_items", "Restaurant Menu Items Overview");
     handleExportClose();
   };
 
@@ -234,7 +249,7 @@ const MenuItemsManagement: React.FC = () => {
   };
 
   const handleEditItem = (item: any) => {
-    if (!canUseFeature("Add Menu Items")) {
+    if (!canAccess("canManageMenu")) {
       Swal.fire("Upgrade Required", "Please upgrade your plan to edit menu items.", "info");
       return;
     }
@@ -312,40 +327,50 @@ const MenuItemsManagement: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1, md: 2 } }}>
       <AdminHeader
-        title="Menu Management"
-        description="Manage your restaurant menu, track availability, and update reservations"
+        title={isMobile ? "" : "Menu Management"}
+        description={isMobile ? "" : "Manage your restaurant menu, track availability, and update reservations"}
       >
-        <Box>
-            <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExportClick}
-                sx={{ borderRadius: 2 }}
-            >
-                Export
-            </Button>
-            <Menu
-                anchorEl={exportAnchorEl}
-                open={Boolean(exportAnchorEl)}
-                onClose={handleExportClose}
-            >
-                <MenuItem onClick={handleExportCSV}>
-                    <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                    Export CSV
-                </MenuItem>
-                <MenuItem onClick={handleExportPDF}>
-                    <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                    Print PDF (Browser)
-                </MenuItem>
-            </Menu>
-        </Box>
+        {!isMobile && (
+          <Box>
+              <Button
+                  variant="outlined"
+                  startIcon={<Download />}
+                  onClick={handleExportClick}
+                  sx={{ borderRadius: 2 }}
+              >
+                  Export
+              </Button>
+              <Menu
+                  anchorEl={exportAnchorEl}
+                  open={Boolean(exportAnchorEl)}
+                  onClose={handleExportClose}
+              >
+                  <MenuItem onClick={handleExportCSV}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export CSV
+                  </MenuItem>
+                  <MenuItem onClick={handleExportExcel}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export Excel
+                  </MenuItem>
+                  <MenuItem onClick={handleExportTXT}>
+                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+                      Export TXT
+                  </MenuItem>
+                  <MenuItem onClick={handleExportPDF}>
+                      <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+                      Export PDF (Table)
+                  </MenuItem>
+              </Menu>
+          </Box>
+        )}
       </AdminHeader>
 
       {/* Mobile: horizontal category chips */}
       {isMobile && (
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: { xs: 1.5, md: 2 } }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
             <Typography variant="subtitle1" fontWeight="bold">Categories</Typography>
             <IconButton size="small" onClick={handleAddCategory}><AddIcon /></IconButton>
@@ -533,6 +558,23 @@ const MenuItemsManagement: React.FC = () => {
         open={openUpgradeModal} 
         onClose={() => setOpenUpgradeModal(false)} 
       />
+
+      {/* Mobile Export FAB */}
+      {isMobile && (
+        <Fab
+          color="primary"
+          aria-label="export"
+          onClick={handleExportClick}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 1100,
+          }}
+        >
+          <Download />
+        </Fab>
+      )}
     </Box>
   );
 };

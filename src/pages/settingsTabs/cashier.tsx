@@ -23,7 +23,10 @@ const CashierSettingsPanel: React.FC = () => {
 
   const cs = (settings as any).cashier_settings || {};
 
-  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
+  const handleToggle = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    key: string,
+  ) => {
     updateSetting("cashier_settings", { ...cs, [key]: e.target.checked });
   };
 
@@ -31,7 +34,10 @@ const CashierSettingsPanel: React.FC = () => {
     updateSetting("cashier_settings", { ...cs, [key]: e.target.value });
   };
 
-  const handleNumber = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
+  const handleNumber = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    key: string,
+  ) => {
     const val = parseInt(e.target.value, 10);
     updateSetting("cashier_settings", { ...cs, [key]: isNaN(val) ? 0 : val });
   };
@@ -46,14 +52,20 @@ const CashierSettingsPanel: React.FC = () => {
         Cashier Settings
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Control payment methods, discounts, receipts, and display options for the cashier system.
+        Control payment methods, discounts, receipts, and display options for
+        the cashier system.
       </Typography>
 
       <Stack spacing={3}>
         {/* Section 1: Payment Methods */}
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary.main">
+            <Typography
+              variant="subtitle1"
+              fontWeight="bold"
+              gutterBottom
+              color="primary.main"
+            >
               Payment Methods
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -61,23 +73,53 @@ const CashierSettingsPanel: React.FC = () => {
             </Typography>
             <Stack>
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_cash ?? true} onChange={(e) => handleToggle(e, "enable_cash")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_cash ?? true}
+                    onChange={(e) => handleToggle(e, "enable_cash")}
+                  />
+                }
                 label="Enable Cash Payments"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_card ?? true} onChange={(e) => handleToggle(e, "enable_card")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_card ?? true}
+                    onChange={(e) => handleToggle(e, "enable_card")}
+                  />
+                }
                 label="Enable Card Payments"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_momo ?? true} onChange={(e) => handleToggle(e, "enable_momo")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_momo ?? true}
+                    onChange={(e) => handleToggle(e, "enable_momo")}
+                  />
+                }
                 label="Enable MoMo Payments"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_card_cash ?? true} onChange={(e) => handleToggle(e, "enable_card_cash")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_card_cash ?? true}
+                    onChange={(e) => handleToggle(e, "enable_card_cash")}
+                  />
+                }
                 label="Enable Card + Cash Split"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_online ?? true} onChange={(e) => handleToggle(e, "enable_online")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_online ?? true}
+                    onChange={(e) => handleToggle(e, "enable_online")}
+                  />
+                }
                 label="Enable Online Payments"
               />
             </Stack>
@@ -95,11 +137,21 @@ const CashierSettingsPanel: React.FC = () => {
                 size="small"
                 onChange={(e) => handleSelect(e, "default_payment_method")}
               >
-                {(cs.enable_cash ?? true) && <MenuItem value="cash">Cash</MenuItem>}
-                {(cs.enable_card ?? true) && <MenuItem value="card">Card</MenuItem>}
-                {(cs.enable_momo ?? true) && <MenuItem value="momo">MoMo</MenuItem>}
-                {(cs.enable_card_cash ?? true) && <MenuItem value="card+cash">Card + Cash</MenuItem>}
-                {(cs.enable_online ?? true) && <MenuItem value="online">Online</MenuItem>}
+                {(cs.enable_cash ?? true) && (
+                  <MenuItem value="cash">Cash</MenuItem>
+                )}
+                {(cs.enable_card ?? true) && (
+                  <MenuItem value="card">Card</MenuItem>
+                )}
+                {(cs.enable_momo ?? true) && (
+                  <MenuItem value="momo">MoMo</MenuItem>
+                )}
+                {(cs.enable_card_cash ?? true) && (
+                  <MenuItem value="card+cash">Card + Cash</MenuItem>
+                )}
+                {(cs.enable_online ?? true) && (
+                  <MenuItem value="online">Online</MenuItem>
+                )}
               </Select>
             </Box>
           </CardContent>
@@ -108,12 +160,23 @@ const CashierSettingsPanel: React.FC = () => {
         {/* Section 2: Discounts & Checkout */}
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary.main">
+            <Typography
+              variant="subtitle1"
+              fontWeight="bold"
+              gutterBottom
+              color="primary.main"
+            >
               Discounts & Checkout
             </Typography>
             <Stack spacing={2}>
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.allow_manual_discount ?? true} onChange={(e) => handleToggle(e, "allow_manual_discount")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.allow_manual_discount ?? true}
+                    onChange={(e) => handleToggle(e, "allow_manual_discount")}
+                  />
+                }
                 label="Allow Manual Discounts"
               />
               <TextField
@@ -128,7 +191,15 @@ const CashierSettingsPanel: React.FC = () => {
                 inputProps={{ min: 0, max: 100 }}
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.require_payment_confirmation ?? true} onChange={(e) => handleToggle(e, "require_payment_confirmation")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.require_payment_confirmation ?? true}
+                    onChange={(e) =>
+                      handleToggle(e, "require_payment_confirmation")
+                    }
+                  />
+                }
                 label="Require Payment Confirmation Dialog"
               />
             </Stack>
@@ -138,16 +209,33 @@ const CashierSettingsPanel: React.FC = () => {
         {/* Section 3: Receipts & Printing */}
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary.main">
+            <Typography
+              variant="subtitle1"
+              fontWeight="bold"
+              gutterBottom
+              color="primary.main"
+            >
               Receipts & Printing
             </Typography>
             <Stack spacing={2}>
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.auto_print_receipt ?? false} onChange={(e) => handleToggle(e, "auto_print_receipt")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.auto_print_receipt ?? false}
+                    onChange={(e) => handleToggle(e, "auto_print_receipt")}
+                  />
+                }
                 label="Auto-Print Receipt After Payment"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.show_proforma_bill ?? true} onChange={(e) => handleToggle(e, "show_proforma_bill")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_proforma_bill ?? true}
+                    onChange={(e) => handleToggle(e, "show_proforma_bill")}
+                  />
+                }
                 label='Show "Print Bill" Button (Proforma)'
               />
               <TextField
@@ -155,7 +243,9 @@ const CashierSettingsPanel: React.FC = () => {
                 label="Custom Receipt Footer Message"
                 size="small"
                 fullWidth
-                value={cs.receipt_footer_message ?? "THANK YOU FOR DINING WITH US!"}
+                value={
+                  cs.receipt_footer_message ?? "THANK YOU FOR DINING WITH US!"
+                }
                 onChange={(e: any) => handleText(e, "receipt_footer_message")}
                 helperText="Appears at the bottom of all printed receipts"
               />
@@ -166,21 +256,96 @@ const CashierSettingsPanel: React.FC = () => {
         {/* Section 4: Display & Audit */}
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary.main">
+            <Typography
+              variant="subtitle1"
+              fontWeight="bold"
+              gutterBottom
+              color="primary.main"
+            >
               Display & Audit
             </Typography>
             <Stack>
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.show_revenue_stats ?? true} onChange={(e) => handleToggle(e, "show_revenue_stats")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_revenue_stats ?? true}
+                    onChange={(e) => handleToggle(e, "show_revenue_stats")}
+                  />
+                }
                 label="Show Revenue KPI Strip on POS Panel"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.show_audit_stats ?? true} onChange={(e) => handleToggle(e, "show_audit_stats")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_audit_stats ?? true}
+                    onChange={(e) => handleToggle(e, "show_audit_stats")}
+                  />
+                }
                 label="Show Stats Cards on Audit Logs Page"
               />
               <FormControlLabel
-                control={<Switch disabled={!isOwner} checked={cs.enable_csv_export ?? true} onChange={(e) => handleToggle(e, "enable_csv_export")} />}
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.enable_csv_export ?? true}
+                    onChange={(e) => handleToggle(e, "enable_csv_export")}
+                  />
+                }
                 label="Enable CSV Export on Audit Logs"
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Audit Logs Metric Categories
+            </Typography>
+            <Stack spacing={2}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_staff_metrics ?? true}
+                    onChange={(e) => handleToggle(e, "show_staff_metrics")}
+                  />
+                }
+                label="Show Staff Performance Metrics"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_menu_metrics ?? true}
+                    onChange={(e) => handleToggle(e, "show_menu_metrics")}
+                  />
+                }
+                label="Show Menu Analytics Metrics"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_operational_metrics ?? true}
+                    onChange={(e) =>
+                      handleToggle(e, "show_operational_metrics")
+                    }
+                  />
+                }
+                label="Show Operational Metrics"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    disabled={!isOwner}
+                    checked={cs.show_financial_metrics ?? false}
+                    onChange={(e) => handleToggle(e, "show_financial_metrics")}
+                  />
+                }
+                label="Show Financial Metrics"
               />
             </Stack>
           </CardContent>

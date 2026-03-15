@@ -31,6 +31,10 @@ export interface PlanLimit {
   canUseCustomReceipt: boolean;
   canUseSessionTimeout: boolean;
   hasPrioritySupport: boolean;
+  // Management permissions
+  canManageEmployees: boolean;
+  canManageTables: boolean;
+  canManageMenu: boolean;
 }
 
 export interface Plan {
@@ -93,6 +97,9 @@ export const plans: Plan[] = [
       canUseCustomReceipt: false,
       canUseSessionTimeout: false,
       hasPrioritySupport: false,
+      canManageEmployees: false,
+      canManageTables: false,
+      canManageMenu: false,
     },
   },
   {
@@ -145,6 +152,9 @@ export const plans: Plan[] = [
       canUseCustomReceipt: false,
       canUseSessionTimeout: false,
       hasPrioritySupport: false,
+      canManageEmployees: true,
+      canManageTables: true,
+      canManageMenu: true,
     },
   },
   {
@@ -160,7 +170,8 @@ export const plans: Plan[] = [
       { text: "Up to 150 menu items", included: true },
       { text: "Up to 25 staff accounts", included: true },
       { text: "Unlimited orders", included: true },
-      { text: "Everything in Growth", included: true },
+      { text: "Employee management", included: true },
+      { text: "Floor plan & table management", included: true },
       { text: "Advanced reports (X/Z, KPIs)", included: true },
       { text: "Audit logs & transaction history", included: true },
       { text: "Employee performance tracking", included: true },
@@ -198,6 +209,9 @@ export const plans: Plan[] = [
       canUseCustomReceipt: true,
       canUseSessionTimeout: true,
       hasPrioritySupport: false,
+      canManageEmployees: true,
+      canManageTables: true,
+      canManageMenu: true,
     },
   },
   {
@@ -212,7 +226,8 @@ export const plans: Plan[] = [
       { text: "Unlimited menu items", included: true },
       { text: "Unlimited staff accounts", included: true },
       { text: "Unlimited orders", included: true },
-      { text: "Everything in Professional", included: true },
+      { text: "Employee management", included: true },
+      { text: "Table & floor management", included: true },
       { text: "Online ordering", included: true },
       { text: "Scheduled menu availability", included: true },
       { text: "Inventory reports", included: true },
@@ -245,6 +260,9 @@ export const plans: Plan[] = [
       canUseCustomReceipt: true,
       canUseSessionTimeout: true,
       hasPrioritySupport: true,
+      canManageEmployees: true,
+      canManageTables: true,
+      canManageMenu: true,
     },
   },
 ];

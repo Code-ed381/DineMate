@@ -313,8 +313,8 @@ export const menuService = {
     }
   },
 
-  async fetchOrdersByWaiter(waiterId: string, startDate: string, endDate: string) {
-    const { data, error } = await supabase
+  async fetchOrdersByWaiter(waiterId: string, startDate: string, endDate: string, restaurantId?: string) {
+    let query = supabase
       .from("orders")
       .select(`
         *,
@@ -322,21 +322,33 @@ export const menuService = {
           id,
           waiter_id,
           table_id,
+          status,
           restaurant_tables(table_number)
         )
       `)
       .eq("table_sessions.waiter_id", waiterId)
       .gte("created_at", startDate)
-      .lte("created_at", endDate)
-      .order("created_at", { ascending: false });
+      .lte("created_at", endDate);
+
+    if (restaurantId) {
+      query = query.eq("restaurant_id", restaurantId);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) throw error;
     
-    // Flatten the Table Number for easier UI use
-    return (data || []).map((order: any) => ({
-      ...order,
-      table_number: order.table_sessions?.restaurant_tables?.table_number
-    })) as Order[];
+    return (data || []).map((order: any) => {
+      // Handle the case where table_sessions might be returned as an array or object
+      const session = Array.isArray(order.table_sessions) 
+        ? order.table_sessions[0] 
+        : order.table_sessions;
+
+      return {
+        ...order,
+        table_number: session?.restaurant_tables?.table_number
+      };
+    }) as Order[];
   },
 
   async startCourse(orderId: string, course: number, restaurantId?: string, waiterId?: string, tableNumber?: string) {
@@ -408,5 +420,25 @@ export const menuService = {
         }
       }
     }
+  },
+
+  async hasUnservedItems(sessionId: string): Promise<boolean> {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (!order) return false;
+
+    const { data: items, error } = await supabase
+      .from("order_items")
+      .select("id")
+      .eq("order_id", order.id)
+      .not("status", "eq", "served")
+      .not("status", "eq", "cancelled");
+
+    if (error) throw error;
+    return (items && items.length > 0) || false;
   },
 };

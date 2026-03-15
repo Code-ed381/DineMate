@@ -21,6 +21,16 @@ import {
   ListItem,
   CircularProgress,
   Tooltip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  useTheme,
+  useMediaQuery,
+  alpha,
 } from "@mui/material";
 import {
   History as HistoryIcon,
@@ -41,6 +51,8 @@ import { printReceipt } from "../../components/PrintWindow";
 import { getCurrencySymbol } from "../../utils/currency";
 
 const BartenderHistory: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { user } = useAuthStore();
   const { myOrders, loadingMyOrders, fetchMyOrderHistory, getOrderItemsByOrderId } = useMenuStore();
   const { selectedRestaurant } = useRestaurantStore();
@@ -100,24 +112,32 @@ const BartenderHistory: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 4 }}>
-        <LocalBar fontSize="large" color="primary" />
+    <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+      <Stack 
+        direction="row" 
+        alignItems="center" 
+        spacing={1.5} 
+        sx={{ 
+          mb: { xs: 2.5, md: 4 }, 
+          display: { xs: 'none', md: 'flex' } 
+        }}
+      >
+        <LocalBar sx={{ fontSize: { xs: 28, md: 32 } }} color="primary" />
         <Box>
-            <Typography variant="h4" fontWeight="800">Order History</Typography>
-            <Typography variant="body2" color="text.secondary">Review past sales and reprints</Typography>
+            <Typography variant="h5" fontWeight="800" sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>Order History</Typography>
+            <Typography variant="caption" color="text.secondary">Review past sales and reprints</Typography>
         </Box>
       </Stack>
 
       {/* ---- Controls ---- */}
       <Stack
         direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+        spacing={1.5}
+        sx={{ mb: 2, mt: { xs: 1, md: 0 } }}
         alignItems="center"
         justifyContent="space-between"
       >
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
           <TextField
             type="date"
             label="Filter by Date"
@@ -125,31 +145,36 @@ const BartenderHistory: React.FC = () => {
             onChange={(e) => setSelectedDate(e.target.value)}
             size="small"
             variant="outlined"
+            fullWidth
             InputLabelProps={{ shrink: true }}
             InputProps={{
+              sx: { borderRadius: 2 },
               startAdornment: (
                 <InputAdornment position="start">
-                  <CalendarIcon color="action" />
+                  <CalendarIcon color="action" sx={{ fontSize: 18 }} />
                 </InputAdornment>
               ),
             }}
           />
-          <Typography variant="body2" color="text.secondary" fontWeight={600}>
-            {filteredOrders.length} Orders Found
-          </Typography>
+          {!isMobile && (
+            <Typography variant="body2" color="text.secondary" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+              {filteredOrders.length} Orders Found
+            </Typography>
+          )}
         </Stack>
 
         <TextField
-          placeholder="Search by Order ID or Table..."
+          placeholder="Search items..."
           size="small"
           fullWidth
           sx={{ maxWidth: { md: 350 } }}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
+            sx: { borderRadius: 2 },
             startAdornment: (
               <InputAdornment position="start">
-                <Search color="action" />
+                <Search color="action" sx={{ fontSize: 18 }} />
               </InputAdornment>
             ),
           }}
@@ -158,111 +183,171 @@ const BartenderHistory: React.FC = () => {
 
       {loadingMyOrders ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-          <CircularProgress />
+          <CircularProgress color="primary" />
         </Box>
-      ) : (
-        <Grid container spacing={2}>
-          {filteredOrders.length === 0 ? (
-            <Grid item xs={12}>
-              <Card sx={{ p: 10, textAlign: 'center', bgcolor: 'transparent', border: '1px dashed grey' }}>
-                <EmptyState 
-                title="No Orders" 
-                description="No orders found for this date." 
-                emoji="📜"
-                height={400}
-              />
-              </Card>
-            </Grid>
-          ) : (
-            filteredOrders.map((order: any) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={order.id}>
-                <Card 
-                  sx={{ 
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: 8
-                    }
-                  }}
+      ) : filteredOrders.length === 0 ? (
+        <Box sx={{ p: 10, textAlign: 'center', bgcolor: 'transparent', border: '1px dashed grey', borderRadius: 4 }}>
+          <EmptyState 
+            title="No Orders" 
+            description="No orders found for this date." 
+            emoji="📜"
+            height={400}
+          />
+        </Box>
+      ) : !isMobile ? (
+        <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow sx={{ '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 800 } }}>
+                <TableCell>Order ID</TableCell>
+                <TableCell>Time</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Amount</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredOrders.map((order: any) => (
+                <TableRow 
+                  key={order.id} 
+                  hover 
+                  onClick={() => handleViewOrder(order)}
+                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
                 >
-                  <CardHeader
-                    avatar={
-                      <Box 
-                        sx={{ 
-                          bgcolor: order.table_number ? 'primary.main' : 'secondary.main', 
-                          color: 'white', 
-                          p: 1, 
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          minWidth: 40,
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {order.table_number ? <TableIcon fontSize="small" /> : <LocalBar fontSize="small" />}
-                        <Typography sx={{ ml: 0.5, fontWeight: 800, fontSize: '0.8rem' }}>
-                            {order.table_number || "OTC"}
-                        </Typography>
-                      </Box>
-                    }
-                    title={`#${order.id.toString().slice(-6)}`}
-                    titleTypographyProps={{ fontWeight: 700 }}
-                    subheader={formatDateTimeWithSuffix(order.created_at)}
-                    sx={{ pb: 1 }}
-                  />
-                  <Divider />
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Stack spacing={1}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography color="text.secondary" variant="body2">Total Amount</Typography>
-                        <Typography fontWeight={800} color="primary.main">
-                          {currency}{order.total?.toFixed(2) || "0.00"}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <Typography color="text.secondary" variant="body2">Status</Typography>
-                         <Chip 
-                            label={order.status?.toUpperCase()} 
-                            size="small" 
-                            color={order.status === 'served' || order.status === 'completed' ? 'success' : 'warning'} 
-                            variant="outlined"
-                            sx={{ fontWeight: 700, fontSize: '0.65rem' }}
-                         />
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                  <Divider />
-                  <Box sx={{ p: 1.5, display: 'flex', gap: 1 }}>
-                    <Button 
-                      fullWidth 
+                  <TableCell sx={{ fontWeight: 700 }}>#{order.id.toString().slice(-6)}</TableCell>
+                  <TableCell>{formatDateTimeWithSuffix(order.created_at)}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={order.table_number ? `Table ${order.table_number}` : "OTC"} 
+                      size="small" 
                       variant="outlined" 
-                      startIcon={<ViewIcon />}
-                      onClick={() => handleViewOrder(order)}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Details
-                    </Button>
+                      sx={{ fontWeight: 700, borderColor: order.table_number ? 'primary.main' : 'secondary.main', color: order.table_number ? 'primary.main' : 'secondary.main' }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: 'primary.main' }}>
+                    {currency}{order.total?.toFixed(2) || "0.00"}
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={order.status?.toUpperCase()} 
+                      size="small" 
+                      color={order.status === 'served' || order.status === 'completed' ? 'success' : 'warning'} 
+                      sx={{ fontWeight: 700, fontSize: '0.65rem' }} 
+                    />
+                  </TableCell>
+                  <TableCell align="right">
                     <Tooltip title="Reprint Receipt">
                       <IconButton 
-                        color="secondary" 
-                        onClick={async () => {
+                        color="primary" 
+                        onClick={async (e) => {
+                          e.stopPropagation();
                           const items = await getOrderItemsByOrderId(order.id);
                           handleReprint(order, items);
                         }}
-                        sx={{ bgcolor: 'secondary.light', '&:hover': { bgcolor: 'secondary.main', color: 'white' } }}
                       >
                         <PrintIcon />
                       </IconButton>
                     </Tooltip>
-                  </Box>
-                </Card>
-              </Grid>
-            ))
-          )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Grid container spacing={2}>
+          {filteredOrders.map((order: any) => (
+            <Grid item xs={12} sm={6} key={order.id}>
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderRadius: 3,
+                  transition: 'all 0.3s ease',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  boxShadow: 'none'
+                }}
+              >
+                <CardHeader
+                  avatar={
+                    <Box 
+                      sx={{ 
+                        bgcolor: order.table_number ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.secondary.main, 0.1), 
+                        color: order.table_number ? 'primary.main' : 'secondary.main', 
+                        p: 1, 
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        minWidth: 40,
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {order.table_number ? <TableIcon fontSize="small" /> : <LocalBar fontSize="small" />}
+                      <Typography sx={{ ml: 0.5, fontWeight: 800, fontSize: '0.8rem' }}>
+                          {order.table_number || "OTC"}
+                      </Typography>
+                    </Box>
+                  }
+                  title={`#${order.id.toString().slice(-6)}`}
+                  titleTypographyProps={{ fontWeight: 700 }}
+                  subheader={formatDateTimeWithSuffix(order.created_at)}
+                  sx={{ pb: 1 }}
+                />
+                <Divider />
+                <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                  <Stack spacing={1}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography color="text.secondary" variant="body2">Total Amount</Typography>
+                      <Typography fontWeight={800} color="primary.main">
+                        {currency}{order.total?.toFixed(2) || "0.00"}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <Typography color="text.secondary" variant="body2">Status</Typography>
+                       <Chip 
+                          label={order.status?.toUpperCase()} 
+                          size="small" 
+                          color={order.status === 'served' || order.status === 'completed' ? 'success' : 'warning'} 
+                          variant="outlined"
+                          sx={{ fontWeight: 700, fontSize: '0.65rem' }} 
+                       />
+                    </Box>
+                  </Stack>
+                </CardContent>
+                <Divider />
+                <Grid container>
+                  <Grid item xs={6} sx={{ borderRight: '1px solid', borderColor: 'divider' }}>
+                    <Button 
+                      fullWidth 
+                      variant="text" 
+                      startIcon={<ViewIcon />}
+                      onClick={() => handleViewOrder(order)}
+                      sx={{ borderRadius: 0, py: 1.5, color: 'primary.main', fontWeight: 700 }}
+                    >
+                      Details
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button 
+                      fullWidth 
+                      variant="text" 
+                      startIcon={<PrintIcon />}
+                      onClick={async () => {
+                        const items = await getOrderItemsByOrderId(order.id);
+                        handleReprint(order, items);
+                      }}
+                      sx={{ borderRadius: 0, py: 1.5, color: 'primary.main', fontWeight: 700 }}
+                    >
+                      Print
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Card>
+            </Grid>
+          ))}
         </Grid>
       )}
 
@@ -274,10 +359,10 @@ const BartenderHistory: React.FC = () => {
         maxWidth="xs"
         PaperProps={{ sx: { borderRadius: 4 } }}
       >
-        <DialogTitle sx={{ textAlign: 'center', pb: 0 }}>
+        <DialogTitle sx={{ textAlign: 'center', pb: 0 }} component="div">
           <ReceiptIcon color="primary" sx={{ fontSize: 40, mb: 1 }} />
-          <Typography variant="h5" fontWeight={800}>Order Details</Typography>
-          <Typography variant="caption" color="text.secondary">#{selectedOrder?.id} • {selectedOrder?.table_number ? `Table ${selectedOrder?.table_number}` : "OTC"}</Typography>
+          <Typography variant="h5" fontWeight={800} component="div">Order Details</Typography>
+          <Typography variant="caption" color="text.secondary" component="div">#{selectedOrder?.id} • {selectedOrder?.table_number ? `Table ${selectedOrder?.table_number}` : "OTC"}</Typography>
         </DialogTitle>
         <DialogContent>
           {loadingDetails ? (

@@ -45,17 +45,23 @@ import {
   PieChart,
   Pie,
 } from "recharts";
-import DashboardHeader from "./components/dashboard-header";
 import dayjs from "dayjs";
 import { getCurrencySymbol } from "../../utils/currency";
 import { useNavigate } from "react-router-dom";
 import { useSettings } from "../../providers/settingsProvider";
 
-const COLORS = ["#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336", "#607d8b"];
+const COLORS = [
+  "#4caf50",
+  "#2196f3",
+  "#ff9800",
+  "#9c27b0",
+  "#f44336",
+  "#607d8b",
+];
 
 const BartenderDashboard: React.FC = () => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const { settings } = useSettings();
   const bs = (settings as any).bar_settings || {};
@@ -79,7 +85,13 @@ const BartenderDashboard: React.FC = () => {
     handleFetchDailyOTCDrinks();
     subscribeToOrderItems();
     return () => unsubscribeFromOrderItems();
-  }, [handleFetchOrderItems, handleFetchDailyDrinkTasks, handleFetchDailyOTCDrinks, subscribeToOrderItems, unsubscribeFromOrderItems]);
+  }, [
+    handleFetchOrderItems,
+    handleFetchDailyDrinkTasks,
+    handleFetchDailyOTCDrinks,
+    subscribeToOrderItems,
+    unsubscribeFromOrderItems,
+  ]);
 
   // --- Data Transformations ---
 
@@ -97,7 +109,7 @@ const BartenderDashboard: React.FC = () => {
 
     dailyOTCDrinks.forEach((task) => {
       const h = dayjs(task.created_at).hour();
-      hours[h].count += (task.quantity || 1);
+      hours[h].count += task.quantity || 1;
     });
 
     // Filter to show only relevant hours (e.g., 8:00 to 23:00) or just non-zero
@@ -122,46 +134,69 @@ const BartenderDashboard: React.FC = () => {
   const prepTimeByDrink = useMemo(() => {
     const times: Record<string, { total: number; count: number }> = {};
     dailyDrinkTasks
-      .filter(t => t.order_item_status?.toLowerCase() === 'served' && t.completed_at && t.task_created_at)
-      .forEach(task => {
-        const diff = (new Date(task.completed_at!).getTime() - new Date(task.task_created_at).getTime()) / 60000;
-        if (diff > 0 && diff < 120) { // Filter out negative or excessively long times
-          if (!times[task.menu_item_name]) times[task.menu_item_name] = { total: 0, count: 0 };
+      .filter(
+        (t) =>
+          t.order_item_status?.toLowerCase() === "served" &&
+          t.completed_at &&
+          t.task_created_at,
+      )
+      .forEach((task) => {
+        const diff =
+          (new Date(task.completed_at!).getTime() -
+            new Date(task.task_created_at).getTime()) /
+          60000;
+        if (diff > 0 && diff < 120) {
+          // Filter out negative or excessively long times
+          if (!times[task.menu_item_name])
+            times[task.menu_item_name] = { total: 0, count: 0 };
           times[task.menu_item_name].total += diff;
           times[task.menu_item_name].count++;
         }
       });
     return Object.entries(times)
-      .map(([name, { total, count }]) => ({ name, avgTime: Math.round((total / count) * 10) / 10 }))
+      .map(([name, { total, count }]) => ({
+        name,
+        avgTime: Math.round((total / count) * 10) / 10,
+      }))
       .sort((a, b) => b.avgTime - a.avgTime)
       .slice(0, 8);
   }, [dailyDrinkTasks]);
 
   // 3. Prep Performance (Quick Report)
   const performanceStats = useMemo(() => {
-    const served = dailyDrinkTasks.filter(t => t.order_item_status?.toLowerCase() === 'served');
-    const otcCount = dailyOTCDrinks.reduce((sum, item) => sum + (item.quantity || 1), 0);
-    const otcTotal = dailyOTCDrinks.reduce((sum, item) => sum + (parseFloat(item.sum_price) || 0), 0);
+    const served = dailyDrinkTasks.filter(
+      (t) => t.order_item_status?.toLowerCase() === "served",
+    );
+    const otcCount = dailyOTCDrinks.reduce(
+      (sum, item) => sum + (item.quantity || 1),
+      0,
+    );
+    const otcTotal = dailyOTCDrinks.reduce(
+      (sum, item) => sum + (parseFloat(item.sum_price) || 0),
+      0,
+    );
     const totalDrinks = dailyDrinkTasks.length + otcCount;
-    
+
     // Average prep time for served drinks (in minutes)
-    const avgTime = served.length > 0 
-      ? served.reduce((sum, t) => {
-          const start = dayjs(t.task_created_at);
-          const end = dayjs(t.updated_at);
-          return sum + end.diff(start, 'minute', true);
-        }, 0) / served.length 
-      : 0;
+    const avgTime =
+      served.length > 0
+        ? served.reduce((sum, t) => {
+            const start = dayjs(t.task_created_at);
+            const end = dayjs(t.updated_at);
+            return sum + end.diff(start, "minute", true);
+          }, 0) / served.length
+        : 0;
 
     // Efficiency: % of served drinks completed within preparation time
-    const onTime = served.filter(t => {
+    const onTime = served.filter((t) => {
       const start = dayjs(t.task_created_at);
       const end = dayjs(t.updated_at);
       const limit = t.menu_item_preparation_time || 5;
-      return end.diff(start, 'minute') <= limit;
+      return end.diff(start, "minute") <= limit;
     }).length;
 
-    const efficiency = served.length > 0 ? Math.round((onTime / served.length) * 100) : 0;
+    const efficiency =
+      served.length > 0 ? Math.round((onTime / served.length) * 100) : 0;
 
     return {
       avgTime: parseFloat(avgTime.toFixed(1)),
@@ -173,41 +208,107 @@ const BartenderDashboard: React.FC = () => {
   }, [dailyDrinkTasks, dailyOTCDrinks]);
 
   const kpis = [
-    { label: "Active Queue", value: pendingOrders.length, icon: <LocalBar />, color: "#ff9800", detail: "Pending now" },
-    { label: "Daily Volume", value: performanceStats.totalDrinks, icon: <TrendingUp />, color: "#2196f3", detail: "Total drinks today" },
-    { label: "Direct OTC", value: `${getCurrencySymbol()}${performanceStats.otcTotal.toFixed(2)}`, icon: <Star />, color: "#9c27b0", detail: `${performanceStats.otcCount} drinks sold` },
-    { label: "Completion", value: `${performanceStats.efficiency}%`, icon: <DoneAll />, color: "#4caf50", detail: "On-time rate" },
+    {
+      label: "Active Queue",
+      value: pendingOrders.length,
+      icon: <LocalBar />,
+      color: "#ff9800",
+      detail: "Pending now",
+    },
+    {
+      label: "Daily Volume",
+      value: performanceStats.totalDrinks,
+      icon: <TrendingUp />,
+      color: "#2196f3",
+      detail: "Total drinks today",
+    },
+    {
+      label: "Direct OTC",
+      value: `${getCurrencySymbol()}${performanceStats.otcTotal.toFixed(2)}`,
+      icon: <Star />,
+      color: "#9c27b0",
+      detail: `${performanceStats.otcCount} drinks sold`,
+    },
+    {
+      label: "Completion",
+      value: `${performanceStats.efficiency}%`,
+      icon: <DoneAll />,
+      color: "#4caf50",
+      detail: "On-time rate",
+    },
   ];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: "background.default", minHeight: "100vh" }}>
-      <DashboardHeader
+    <Box
+      sx={{
+        p: { xs: 1.5, md: 3 },
+        bgcolor: "background.default",
+        minHeight: "100vh",
+      }}
+    >
+      {/* <DashboardHeader
         title="🍸 BAR OPERATIONS"
         description="Operational intelligence and live queue management."
         background="linear-gradient(135deg, #1a237e 0%, #00acc1 100%)"
         color="#fff"
-      />
+      /> */}
 
       {/* KPI Section */}
       {bs.show_dashboard_kpis !== false && (
-        <Grid container spacing={3} sx={{ mt: -4, mb: 4, px: 2 }}>
+        <Grid container spacing={2} sx={{ mb: 4 }}>
           {kpis.map((kpi, i) => (
-            <Grid item xs={12} sm={6} md={3} key={i}>
-              <Card sx={{ 
-                borderRadius: 4, 
-                boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.4)" : "0 8px 32px rgba(0,0,0,0.1)", 
-                border: "1px solid",
-                borderColor: 'divider',
-                bgcolor: 'background.paper'
-              }}>
-                <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Avatar sx={{ bgcolor: kpi.color, width: 56, height: 56, boxShadow: `0 4px 12px ${kpi.color}44` }}>
-                    {kpi.icon}
+            <Grid item xs={6} sm={6} md={3} key={i}>
+              <Card
+                sx={{
+                  borderRadius: 2,
+                  boxShadow: isDark
+                    ? "0 4px 12px rgba(0,0,0,0.3)"
+                    : "0 4px 12px rgba(0,0,0,0.05)",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "background.paper",
+                  height: "100%",
+                }}
+              >
+                <CardContent
+                  sx={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: { xs: 1.5, sm: 2 },
+                    p: { xs: 1.5, sm: 2 },
+                    "&:last-child": { pb: { xs: 1.5, sm: 2 } },
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      bgcolor: kpi.color,
+                      width: { xs: 36, sm: 56 },
+                      height: { xs: 36, sm: 56 },
+                      boxShadow: `0 4px 12px ${kpi.color}44`,
+                    }}
+                  >
+                    {React.cloneElement(kpi.icon as React.ReactElement<any>, {
+                      sx: { fontSize: { xs: 18, sm: 28 } },
+                    })}
                   </Avatar>
                   <Box>
-                    <Typography variant="h4" fontWeight={800}>{kpi.value}</Typography>
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>{kpi.label}</Typography>
-                    <Typography variant="caption" color={kpi.color}>{kpi.detail}</Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: { xs: "1.25rem", sm: "1.5rem", md: "2rem" },
+                      }}
+                    >
+                      {kpi.value}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontWeight: 600, display: "block", lineHeight: 1.2, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+                    >
+                      {kpi.label}
+                    </Typography>
                   </Box>
                 </CardContent>
               </Card>
@@ -217,134 +318,226 @@ const BartenderDashboard: React.FC = () => {
       )}
 
       <Grid container spacing={3}>
-        {/* Main Chart: Hourly Volume */}
+        {/* First Row: Hourly Volume - Full Width */}
         {bs.show_hourly_chart !== false && (
-        <Grid item xs={12} md={8}>
-          <Card sx={{ borderRadius: 4, height: 400, border: '1px solid', borderColor: 'divider' }}>
-            <Box sx={{ p: 3, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <Typography variant="h6" fontWeight={700}>Hourly Drink Volume</Typography>
-              <Chip label="Today" size="small" variant="outlined" color="primary" />
-            </Box>
-            <Box sx={{ height: 300, width: "100%", pr: 2 }}>
-              <ResponsiveContainer>
-                <AreaChart data={hourlyData}>
-                  <defs>
-                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2196f3" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#2196f3" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="hour" axisLine={false} tickLine={false} style={{ fontSize: '12px' }} />
-                  <YAxis hide />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '12px', 
-                      border: 'none', 
-                      boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.1)',
-                      background: theme.palette.background.paper,
-                      color: theme.palette.text.primary
-                    }}
-                    itemStyle={{ color: theme.palette.text.primary }}
-                  />
-                  <Area type="monotone" dataKey="count" stroke="#2196f3" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Box>
-          </Card>
-        </Grid>
-        )}
-
-        {/* Quick Report: Popular Items */}
-        {bs.show_popular_drinks !== false && (
-        <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 4, height: 400, display: "flex", flexDirection: "column", border: '1px solid', borderColor: 'divider' }}>
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight={700}>Popular Drinks</Typography>
-              <Typography variant="caption" color="text.secondary">Top 5 items by volume today</Typography>
-            </Box>
-            <Divider />
-            <List sx={{ flexGrow: 1, overflow: "auto" }}>
-              {topDrinks.map((item, i) => (
-                <ListItem key={i} sx={{ borderBottom: i < topDrinks.length - 1 ? "1px solid" : "none", borderColor: 'divider' }}>
-                  <Avatar sx={{ mr: 2, bgcolor: COLORS[i % COLORS.length], fontSize: 14, width: 32, height: 32 }}>{i + 1}</Avatar>
-                  <ListItemText 
-                    primary={<Typography fontWeight={600}>{item.name}</Typography>} 
-                    secondary={`${item.count} orders today`}
-                  />
-                  <Typography fontWeight={700} color="primary">{item.count}</Typography>
-                </ListItem>
-              ))}
-              {topDrinks.length === 0 && (
-                <Box sx={{ textAlign: "center", py: 4, opacity: 0.5 }}>
-                  <Assessment sx={{ fontSize: 40, mb: 1 }} />
-                  <EmptyState 
-                    title="No Orders" 
-                    description="No data yet today" 
-                    emoji="🍺"
-                    height={300}
-                  />
-                </Box>
-              )}
-            </List>
-          </Card>
-        </Grid>
-        )}
-
-        {/* Speed-of-Service Analytics */}
-        {bs.show_prep_time_chart !== false && (
-        <Grid item xs={12} md={6}>
-          <Card sx={{ borderRadius: 4, height: 400, border: '1px solid', borderColor: 'divider' }}>
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight={700}>Avg Prep Time by Drink</Typography>
-              <Typography variant="caption" color="text.secondary">Minutes per drink today</Typography>
-            </Box>
-            <Box sx={{ height: 300, width: "100%", pr: 2 }}>
-              <ResponsiveContainer>
-                <BarChart data={prepTimeByDrink} layout="vertical">
-                  <XAxis type="number" unit=" min" />
-                  <YAxis type="category" dataKey="name" width={100} style={{ fontSize: '10px' }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '12px', 
-                      border: 'none', 
-                      boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.1)',
-                      background: theme.palette.background.paper,
-                      color: theme.palette.text.primary
-                    }}
-                  />
-                  <Bar dataKey="avgTime" fill="#ff9800" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Card>
-        </Grid>
-        )}
-
-        {/* Queue Management Button */}
-        <Grid item xs={12} md={6}>
-           <Box sx={{ mt: 2, textAlign: 'center' }}>
-             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Need to manage the live order queue?
-             </Typography>
-             <Button 
-                variant="contained" 
-                size="large" 
-                onClick={() => navigate("/app/bar")} // Changed to a more appropriate route
-                startIcon={<LocalBar />}
-                sx={{ borderRadius: 6, px: 6, py: 1.5, fontWeight: 800, textTransform: 'none' }}
+          <Grid item xs={12}>
+            <Card
+              sx={{
+                borderRadius: 4,
+                height: { xs: 300, md: 400 },
+                border: "1px solid",
+                borderColor: "divider",
+                boxShadow: 'none'
+              }}
+            >
+              <Box
+                sx={{
+                  p: { xs: 2, md: 3 },
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
               >
-                Open Bar Interface
-             </Button>
-           </Box>
+                <Typography variant="subtitle1" fontWeight={800}>
+                  Hourly Drink Volume
+                </Typography>
+                <Chip
+                  label="Today"
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                />
+              </Box>
+              <Box sx={{ height: { xs: 220, md: 300 }, width: "100%", pr: 2 }}>
+                <ResponsiveContainer>
+                  <AreaChart data={hourlyData}>
+                    <defs>
+                      <linearGradient
+                        id="colorCount"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#2196f3"
+                          stopOpacity={0.8}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#2196f3"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="hour"
+                      axisLine={false}
+                      tickLine={false}
+                      style={{ fontSize: "12px" }}
+                    />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: isDark
+                          ? "0 4px 20px rgba(0,0,0,0.5)"
+                          : "0 4px 20px rgba(0,0,0,0.1)",
+                        background: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
+                      }}
+                      itemStyle={{ color: theme.palette.text.primary }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#2196f3"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorCount)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Box>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Second Row: Popular Drinks and Prep Time - Equal Width */}
+        <Grid item xs={12} md={6}>
+          {bs.show_popular_drinks !== false && (
+            <Card
+              sx={{
+                borderRadius: 4,
+                height: { xs: 350, md: 400 },
+                display: "flex",
+                flexDirection: "column",
+                border: "1px solid",
+                borderColor: "divider",
+                boxShadow: 'none'
+              }}
+            >
+              <Box sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="subtitle1" fontWeight={800}>
+                  Popular Drinks
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Top 5 items by volume today
+                </Typography>
+              </Box>
+              <Divider />
+              <List sx={{ flexGrow: 1, overflow: "auto" }}>
+                {topDrinks.map((item, i) => (
+                  <ListItem
+                    key={i}
+                    sx={{
+                      borderBottom:
+                        i < topDrinks.length - 1 ? "1px solid" : "none",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        mr: 2,
+                        bgcolor: COLORS[i % COLORS.length],
+                        fontSize: 14,
+                        width: 32,
+                        height: 32,
+                      }}
+                    >
+                      {i + 1}
+                    </Avatar>
+                    <ListItemText
+                      primary={
+                        <Typography fontWeight={600}>{item.name}</Typography>
+                      }
+                      secondary={`${item.count} orders today`}
+                    />
+                    <Typography fontWeight={700} color="primary">
+                      {item.count}
+                    </Typography>
+                  </ListItem>
+                ))}
+                {topDrinks.length === 0 && (
+                  <Box sx={{ textAlign: "center", py: 4, opacity: 0.5 }}>
+                    <Assessment sx={{ fontSize: 40, mb: 1 }} />
+                    <EmptyState
+                      title="No Orders"
+                      description="No data yet today"
+                      emoji="🍺"
+                      height={300}
+                    />
+                  </Box>
+                )}
+              </List>
+            </Card>
+          )}
         </Grid>
+
+        {bs.show_prep_time_chart !== false && (
+          <Grid item xs={12} md={6}>
+            <Card
+              sx={{
+                borderRadius: 4,
+                height: { xs: 350, md: 400 },
+                border: "1px solid",
+                borderColor: "divider",
+                boxShadow: 'none'
+              }}
+            >
+              <Box sx={{ p: { xs: 2, md: 3 } }}>
+                <Typography variant="subtitle1" fontWeight={800}>
+                  Avg Prep Time by Drink
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Minutes per drink today
+                </Typography>
+              </Box>
+              <Box sx={{ height: { xs: 270, md: 300 }, width: "100%", pr: 2 }}>
+                <ResponsiveContainer>
+                  <BarChart data={prepTimeByDrink} layout="vertical">
+                    <XAxis type="number" unit=" min" />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={100}
+                      style={{ fontSize: "10px" }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "none",
+                        boxShadow: isDark
+                          ? "0 4px 20px rgba(0,0,0,0.5)"
+                          : "0 4px 20px rgba(0,0,0,0.1)",
+                        background: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
+                      }}
+                    />
+                    <Bar
+                      dataKey="avgTime"
+                      fill="#ff9800"
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Card>
+          </Grid>
+        )}
 
         {/* Live Queue Section */}
         <Grid item xs={12}>
-          <Box sx={{ mt: 2, mb: 2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <Typography variant="h5" fontWeight={800} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ mt: 2, mb: 2, display: "flex", alignItems: "center" }}>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            >
               <LocalBar color="primary" /> Live Queue
             </Typography>
-            <Button startIcon={<Refresh />} onClick={() => handleFetchOrderItems()}>Refresh Queue</Button>
           </Box>
           <BartenderDineInPanel skipSubscription />
         </Grid>

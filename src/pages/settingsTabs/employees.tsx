@@ -13,6 +13,8 @@ import {
   TextField,
   Divider,
   Chip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { useSettings } from "../../providers/settingsProvider";
 import useRestaurantStore from "../../lib/restaurantStore";
@@ -20,6 +22,8 @@ import useRestaurantStore from "../../lib/restaurantStore";
 const EmployeeSettingsPanel: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { role } = useRestaurantStore();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isOwner = role === "owner";
 
   const perms = (settings as any)?.employee_permissions || {};
@@ -51,12 +55,16 @@ const EmployeeSettingsPanel: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h6" fontWeight="bold" gutterBottom>
-        Employee Settings
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Configure role-based access controls, invitation behavior, display preferences, and scheduling defaults.
-      </Typography>
+      {!isMobile && (
+        <>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            Employee Settings
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Configure role-based access controls, invitation behavior, display preferences, and scheduling defaults.
+          </Typography>
+        </>
+      )}
 
       <Stack spacing={3}>
         {/* Section 1: Role-Based Access Permissions */}

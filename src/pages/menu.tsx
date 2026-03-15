@@ -39,6 +39,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Divider,
+  Fab,
+  Badge,
+  Slide,
+  AppBar,
+  Toolbar,
+  alpha
 } from "@mui/material";
 import {
   TableRestaurant as TableRestaurantIcon,
@@ -56,6 +62,10 @@ import {
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   Star as StarIcon,
+  Close as CloseIcon,
+  ReceiptLong as ReceiptIcon,
+  GridView as GridViewIcon,
+  ViewList as ViewListIcon,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 import useAuthStore from "../lib/authStore";
@@ -128,6 +138,7 @@ const Menu: React.FC = () => {
     resetOrder,
     selectedCourse,
     setSelectedCourse,
+    startCourse,
     tipAmount,
     setTipAmount,
     favoriteItemIds,
@@ -151,6 +162,9 @@ const Menu: React.FC = () => {
   const [itemToModify, setItemToModify] = useState<any>(null);
 
   const [splitBillOpen, setSplitBillOpen] = useState(false);
+  
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [menuViewMode, setMenuViewMode] = useState<'grid' | 'list'>('grid');
 
   const { selectedRestaurant } = useRestaurantStore();
   const { payForItems, payAllItems } = useMenuStore();
@@ -309,6 +323,14 @@ const Menu: React.FC = () => {
       searchTerm === "" || item.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [filteredMenuItems, searchTerm]);
+
+  const hasUnserved = useMemo(() => {
+    return currentOrderItems.some((item: any) => 
+      (item.type === 'food' || item.type === 'drink') && 
+      item.status !== 'served' && 
+      item.status !== 'cancelled'
+    );
+  }, [currentOrderItems]);
 
   const handleCategoryClick = async (category: any) => {
     if (category.name === selectedCategory) {
@@ -535,8 +557,22 @@ const Menu: React.FC = () => {
                   )}
                 </TableBody>
                 <TableFooter>
-                   <TableRow><TableCell colSpan={5}>Subtotal</TableCell><TableCell>{currencySymbol}{totalOrdersPrice?.toFixed(2)}</TableCell></TableRow>
-                   <TableRow><TableCell colSpan={5}><Typography variant="h6" fontWeight="bold">Total</Typography></TableCell><TableCell><Typography variant="h6" fontWeight="bold" color="primary">{currencySymbol}{totalOrdersPrice?.toFixed(2)}</Typography></TableCell></TableRow>
+                   <TableRow>
+                     <TableCell colSpan={5}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                          <Typography variant="body2">Subtotal</Typography>
+                          <Typography variant="body2">{currencySymbol}{totalOrdersPrice?.toFixed(2)}</Typography>
+                        </Box>
+                     </TableCell>
+                   </TableRow>
+                   <TableRow>
+                     <TableCell colSpan={5}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                          <Typography variant="h6" fontWeight="bold">Total</Typography>
+                          <Typography variant="h6" fontWeight="bold" color="primary">{currencySymbol}{totalOrdersPrice?.toFixed(2)}</Typography>
+                        </Box>
+                     </TableCell>
+                   </TableRow>
                 </TableFooter>
               </Table>
             </TableContainer>
@@ -629,15 +665,112 @@ const Menu: React.FC = () => {
     }
   };
 
+  const renderReceiptPanel = () => {
+    const heldCourses = Array.from(new Set(currentOrderItems.filter((item: any) => item.is_started === false).map((item: any) => item.course)));
+
+    return (
+      <Card sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, position: isMobile ? 'static' : 'sticky', top: 20, maxHeight: isMobile ? 'auto' : 'calc(100vh - 100px)', overflowY: isMobile ? 'visible' : 'auto', height: isMobile ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
+        <Typography variant="h5" fontWeight="bold">Table {currentSession?.table_number} Order</Typography>
+        
+        {heldCourses.length > 0 && currentOrder?.id && (
+          <Box sx={{ mt: 1, mb: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {heldCourses.map((courseNum: number | undefined) => {
+              if (!courseNum) return null;
+              return (
+                <Button 
+                  key={courseNum}
+                  size="small" 
+                  variant="contained" 
+                  color="warning" 
+                  onClick={() => currentOrder?.id && startCourse(currentOrder.id, courseNum)}
+                >
+                  Fire {courseNum === 1 ? "STARTER" : courseNum === 2 ? "MAIN" : courseNum === 3 ? "DESSERT" : "COURSE"}
+                </Button>
+              );
+            })}
+          </Box>
+        )}
+
+        {ms.enable_course_selector !== false && (
+        <Box sx={{ mt: 1, mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight="bold">ADD TO COURSE</Typography>
+          <ToggleButtonGroup
+            fullWidth
+            size="small"
+            value={selectedCourse}
+            exclusive
+            onChange={(_, val) => val && setSelectedCourse(val)}
+            sx={{ mt: 0.5 }}
+          >
+             <ToggleButton value={1} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>STARTER</ToggleButton>
+             <ToggleButton value={2} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>MAIN</ToggleButton>
+             <ToggleButton value={3} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>DESSERT</ToggleButton>
+             <ToggleButton value={4} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>DRINKS</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+        )}
+        {/* <Stepper alternativeLabel={isMobile} activeStep={activeStep} orientation="horizontal" sx={{ mb: 4, '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' } }}>
+         {steps.map(s => <Step key={s}><StepLabel sx={{ '& .MuiStepLabel-label': { fontSize: isMobile ? '0.7rem' : '0.875rem' } }}>{s}</StepLabel></Step>)}
+       </Stepper> */}
+       <Box sx={{ minHeight: isMobile ? 'auto' : 300, flexGrow: 1 }}>{getStepContent(activeStep)}</Box>
+        
+        {hasUnserved && (
+          <Box sx={{ mt: 1, p: 1, bgcolor: alpha(theme.palette.warning.main, 0.1), borderRadius: 2, border: '1px solid', borderColor: 'warning.light' }}>
+            <Typography variant="caption" color="warning.dark" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CancelIcon sx={{ fontSize: 14 }} /> PREMATURE PAYMENT BLOCKED: {currentOrderItems.filter((i: any) => (i.type === 'food' || i.type === 'drink') && i.status !== 'served' && i.status !== 'cancelled').length} items unserved.
+            </Typography>
+          </Box>
+        )}
+
+       <CardActions sx={{ mt: 4, p: 0, pt: 2, borderTop: isMobile ? '1px solid #eee' : 'none' }}>
+           {proceedToCheckOut ? (
+             <Stack direction="row" spacing={2} width="100%">
+               <Button fullWidth variant="outlined" size="large" onClick={handleBack} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Back</Button>
+               <Button fullWidth variant="contained" color="success" size="large" disabled={currentOrderItems.length === 0} onClick={() => { handleNext(); if (isMobile) setReceiptOpen(false); }} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Pay</Button>
+             </Stack>
+           ) : (
+             <Stack direction="row" spacing={2} width="100%">
+               {ms.show_print_bill !== false && (
+               <Button 
+                 fullWidth 
+                 variant="contained" 
+                 size="large" 
+                 disabled={currentOrderItems.length === 0} 
+                 onClick={() => handlePrintReceipt("billed")} 
+                 sx={{ borderRadius: 2, fontWeight: 'bold' }}
+               >
+                 Print Bill
+               </Button>
+               )}
+               {isBilled && (
+                 <Button 
+                   fullWidth 
+                   variant="contained" 
+                   color="success" 
+                   size="large" 
+                   disabled={currentOrderItems.length === 0} 
+                   onClick={handleNext} 
+                   sx={{ borderRadius: 2, fontWeight: 'bold' }}
+                 >
+                   Check Out
+                 </Button>
+               )}
+             </Stack>
+           )}
+       </CardActions>
+      </Card>
+    );
+  };
+
   if (loadingSessionsOverview) return <MenuSkeleton />;
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 }, minHeight: '90vh', bgcolor: 'background.default' }}>
       {sessionsOverview?.length === 0 ? (
-         <Box sx={{ textAlign: "center", py: 15, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, bgcolor: 'background.paper', borderRadius: 4, border: '1px solid', borderColor: 'divider', m: 3 }}>
-            <TableRestaurantIcon sx={{ fontSize: 120, color: "primary.main", mb: 2, opacity: 0.1 }} />
-            <Typography variant="h4" color="textPrimary" fontWeight="bold">No Active Sessions</Typography>
-            <Typography color="textSecondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+         <Box sx={{ textAlign: "center", py: { xs: 8, md: 15 }, px: { xs: 3, sm: 4, md: 6 }, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, bgcolor: 'background.paper', borderRadius: 4, border: '1px solid', borderColor: 'divider', m: { xs: 1, sm: 2, md: 3 } }}>
+            <TableRestaurantIcon sx={{ fontSize: { xs: 80, md: 120 }, color: "primary.main", mb: 2, opacity: 0.1 }} />
+            <Typography variant="h5" color="textPrimary" fontWeight="bold">No Active Sessions</Typography>
+            <Typography color="textSecondary" sx={{ maxWidth: 400, mx: 'auto', px: 1 }}>
               You don't have any tables assigned yet. You need to "Start Order" from a table in the management section to begin taking orders.
             </Typography>
             <Button 
@@ -687,7 +820,19 @@ const Menu: React.FC = () => {
                 )}
                 
                 <Typography variant="subtitle2" gutterBottom fontWeight="bold" color="textSecondary">CATEGORIES</Typography>
-                <Stack direction="row" spacing={1.5} sx={{ mb: 3, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 } }}>
+                <Stack direction="row" spacing={1.5} sx={{ mb: 3, overflowX: 'auto', pb: 1, alignItems: 'center', '&::-webkit-scrollbar': { height: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 } }}>
+                  {isMobile && (
+                    <ToggleButtonGroup
+                      size="small"
+                      value={menuViewMode}
+                      exclusive
+                      onChange={(_, val) => val && setMenuViewMode(val)}
+                      sx={{ mr: 1, bgcolor: 'background.paper' }}
+                    >
+                      <ToggleButton value="grid" sx={{ px: 1.5 }}><GridViewIcon fontSize="small" /></ToggleButton>
+                      <ToggleButton value="list" sx={{ px: 1.5 }}><ViewListIcon fontSize="small" /></ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
                   {loadingCategories ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} variant="rectangular" width={100} height={40} sx={{ borderRadius: 2, flexShrink: 0 }} />)
                   ) : (
@@ -696,7 +841,7 @@ const Menu: React.FC = () => {
                       <Button 
                         variant={"Favorites" === selectedCategory ? "contained" : "outlined"} 
                         onClick={() => handleCategoryClick({ name: "Favorites" })}
-                        startIcon={"Favorites" === selectedCategory ? <StarIcon /> : <StarIcon color="warning" />}
+                        startIcon={"Favorites" === selectedCategory ? <FavoriteIcon /> : <FavoriteIcon sx={{ color: '#ff4d4f' }} />}
                         sx={{ borderRadius: 2, px: 3, textTransform: 'none', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}
                       >
                         Favorites
@@ -725,7 +870,7 @@ const Menu: React.FC = () => {
                      ))
                    ) : searchFilter.length > 0 ? (
                      searchFilter.map((item: any, idx) => (
-                       <Grid item xs={12} sm={6} md={3} key={idx}>
+                       <Grid item xs={isMobile && menuViewMode === 'grid' ? 6 : 12} sm={6} md={3} key={idx}>
                           <Card sx={{ borderRadius: 3, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-5px)', boxShadow: 10 }, position: 'relative' }}>
                              <CardActionArea 
                                onClick={() => {
@@ -736,9 +881,21 @@ const Menu: React.FC = () => {
                                    addOrUpdateObject(item);
                                  }
                                }} 
-                               sx={{ display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, alignItems: 'center', p: { xs: 1, sm: 0 }, justifyContent: 'flex-start' }}
+                               sx={{ 
+                                 display: 'flex', 
+                                 flexDirection: isMobile && menuViewMode === 'list' ? 'row' : { xs: 'column', sm: 'column' }, 
+                                 alignItems: 'center', 
+                                 p: isMobile && menuViewMode === 'grid' ? 0 : { xs: 1, sm: 0 }, 
+                                 justifyContent: 'flex-start' 
+                               }}
                              >
-                               <Box sx={{ width: { xs: 70, sm: '100%' }, height: { xs: 70, sm: 150 }, borderRadius: { xs: 2, sm: 0 }, overflow: 'hidden', flexShrink: 0 }}>
+                               <Box sx={{ 
+                                 width: isMobile && menuViewMode === 'grid' ? '100%' : { xs: 70, sm: '100%' }, 
+                                 height: isMobile && menuViewMode === 'grid' ? 120 : { xs: 70, sm: 150 }, 
+                                 borderRadius: isMobile && menuViewMode === 'grid' ? 0 : { xs: 2, sm: 0 }, 
+                                 overflow: 'hidden', 
+                                 flexShrink: 0 
+                               }}>
                                   {ms.show_item_images !== false ? (
                                     <MenuImage 
                                       src={item.image_url} 
@@ -754,10 +911,10 @@ const Menu: React.FC = () => {
                                     </Box>
                                   )}
                                 </Box>
-                                <CardContent sx={{ flexGrow: 1, width: '100%', py: { xs: 0, sm: 2 }, px: 2 }}>
-                                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                       <Box>
-                                          <Typography noWrap variant="body1" fontWeight="bold" sx={{ maxWidth: { xs: '60%', sm: '100%' } }}>{item.name}</Typography>
+                                <CardContent sx={{ flexGrow: 1, width: '100%', py: isMobile && menuViewMode === 'grid' ? 1.5 : { xs: 0, sm: 2 }, px: 2 }}>
+                                   <Stack direction={isMobile && menuViewMode === 'grid' ? 'column' : "row"} justifyContent="space-between" alignItems={isMobile && menuViewMode === 'grid' ? 'flex-start' : "center"}>
+                                       <Box sx={{ mb: isMobile && menuViewMode === 'grid' ? 0.5 : 0 }}>
+                                          <Typography variant="body1" fontWeight="bold">{item.name}</Typography>
                                           {item.modifier_groups?.length > 0 && (
                                             <Typography variant="caption" color="primary">Customizable</Typography>
                                           )}
@@ -779,10 +936,15 @@ const Menu: React.FC = () => {
                                   right: 5, 
                                   bgcolor: 'rgba(255,255,255,0.8)',
                                   '&:hover': { bgcolor: 'rgba(255,255,255,1)' },
-                                  zIndex: 2
+                                  zIndex: 2,
+                                  p: isMobile ? 0.5 : 1
                                 }}
                               >
-                                {isFavorite(item.id) ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
+                                {isFavorite(item.id) ? (
+                                  <FavoriteIcon color="error" sx={{ fontSize: isMobile ? 16 : 22 }} />
+                                ) : (
+                                  <FavoriteBorderIcon sx={{ fontSize: isMobile ? 16 : 22 }} />
+                                )}
                               </IconButton>
                               )}
                            </Card>
@@ -800,10 +962,10 @@ const Menu: React.FC = () => {
                 </Grid>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 15, bgcolor: 'background.paper', borderRadius: 4, border: '2px dashed', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: { xs: 8, md: 15 }, px: { xs: 3, sm: 4, md: 6 }, bgcolor: 'background.paper', borderRadius: 4, border: '2px dashed', borderColor: 'divider', textAlign: 'center' }}>
                  <TableRestaurantIcon sx={{ fontSize: 80, color: "primary.main", mb: 2, opacity: 0.2 }} />
                  <Typography variant="h5" color="textPrimary" fontWeight="bold">Ready to take an order?</Typography>
-                 <Typography color="textSecondary" sx={{ mb: 3 }}>Select an active table above to view the menu and start ordering.</Typography>
+                 <Typography color="textSecondary" sx={{ mb: 3, maxWidth: 400, px: 1 }}>Select an active table above to view the menu and start ordering.</Typography>
                  <Button 
                     variant="outlined" 
                     onClick={() => navigate("/app/tables")}
@@ -818,77 +980,59 @@ const Menu: React.FC = () => {
 
           <Grid item xs={12} md={4}>
              {currentSession ? (
-               <Card sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, position: isMobile ? 'static' : 'sticky', top: 20, maxHeight: isMobile ? 'auto' : 'calc(100vh - 100px)', overflowY: isMobile ? 'visible' : 'auto' }}>
-                   <Typography variant="h5" fontWeight="bold">Table {currentSession.table_number} Order</Typography>
-                   {ms.enable_course_selector !== false && (
-                   <Box sx={{ mt: 1, mb: 2 }}>
-                     <Typography variant="caption" color="text.secondary" fontWeight="bold">ADD TO COURSE</Typography>
-                     <ToggleButtonGroup
-                       fullWidth
-                       size="small"
-                       value={selectedCourse}
-                       exclusive
-                       onChange={(_, val) => val && setSelectedCourse(val)}
-                       sx={{ mt: 0.5 }}
-                     >
-                        <ToggleButton value={1} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>STARTER</ToggleButton>
-                        <ToggleButton value={2} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>MAIN</ToggleButton>
-                        <ToggleButton value={3} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>DESSERT</ToggleButton>
-                        <ToggleButton value={4} sx={{ py: 0.5, px: 1, fontSize: '0.7rem', fontWeight: 'bold' }}>DRINKS</ToggleButton>
-                     </ToggleButtonGroup>
-                   </Box>
-                   )}
-                   <Stepper activeStep={activeStep} orientation={isMobile ? "vertical" : "horizontal"} sx={{ mb: 4, '& .MuiStepIcon-root.Mui-active': { color: 'primary.main' } }}>
-                    {steps.map(s => <Step key={s}><StepLabel optional={isMobile ? <Typography variant="caption">{s}</Typography> : null}>{!isMobile && s}</StepLabel></Step>)}
-                  </Stepper>
-                  <Box sx={{ minHeight: isMobile ? 'auto' : 300 }}>{getStepContent(activeStep)}</Box>
-                  <CardActions sx={{ mt: 4, p: 0 }}>
-                      {proceedToCheckOut ? (
-                        <Stack direction="row" spacing={2} width="100%">
-                          <Button fullWidth variant="outlined" size="large" onClick={handleBack} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Back</Button>
-                          <Button fullWidth variant="contained" color="success" size="large" disabled={currentOrderItems.length === 0} onClick={handleNext} sx={{ borderRadius: 2, fontWeight: 'bold' }}>Pay</Button>
-                        </Stack>
-                      ) : (
-                        <Stack direction="row" spacing={2} width="100%">
-                          {ms.show_print_bill !== false && (
-                          <Button 
-                            fullWidth 
-                            variant="contained" 
-                            size="large" 
-                            disabled={currentOrderItems.length === 0} 
-                            onClick={() => handlePrintReceipt("billed")} 
-                            sx={{ borderRadius: 2, fontWeight: 'bold' }}
-                          >
-                            Print Bill
-                          </Button>
-                          )}
-                          {isBilled && (
-                            <Button 
-                              fullWidth 
-                              variant="contained" 
-                              color="success" 
-                              size="large" 
-                              disabled={currentOrderItems.length === 0} 
-                              onClick={handleNext} 
-                              sx={{ borderRadius: 2, fontWeight: 'bold' }}
-                            >
-                              Check Out
-                            </Button>
-                          )}
-                        </Stack>
-                      )}
-                  </CardActions>
-               </Card>
+               !isMobile ? renderReceiptPanel() : null
              ) : (
-                <Card sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <Card sx={{ p: { xs: 3, md: 4 }, borderRadius: 4, border: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                   <RestaurantMenuIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2, opacity: 0.3 }} />
                   <Typography variant="h6" color="textSecondary">No Table Selected</Typography>
-                  <Typography color="textSecondary" variant="body2">Choose one of your assigned tables to manage its current order.</Typography>
+                  <Typography color="textSecondary" variant="body2" sx={{ maxWidth: 320, px: 1 }}>Choose one of your assigned tables to manage its current order.</Typography>
                 </Card>
               )}
           </Grid>
         </Grid>
       )}
+
+      {/* FAB for Mobile View */}
+      {isMobile && currentSession && (
+        <Fab 
+          color="primary" 
+          aria-label="receipt" 
+          onClick={() => setReceiptOpen(true)}
+          sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}
+        >
+          <Badge badgeContent={currentOrderItems.length} color="error">
+            <ReceiptIcon />
+          </Badge>
+        </Fab>
+      )}
+
+      {/* Full Screen Dialog for Receipt */}
+      <Dialog
+        fullScreen
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        TransitionComponent={Slide}
+        TransitionProps={{ direction: "up" } as any}
+      >
+        <AppBar sx={{ position: 'relative', bgcolor: 'primary.main' }}>
+          <Toolbar>
+            <IconButton
+              edge="start"
+              color="inherit"
+              onClick={() => setReceiptOpen(false)}
+              aria-label="close"
+            >
+              <CloseIcon />
+            </IconButton>
+            <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div" fontWeight="bold">
+              Current Order
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <Box sx={{ p: 2, bgcolor: 'background.default', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          {renderReceiptPanel()}
+        </Box>
+      </Dialog>
 
       <Dialog open={noteDialogOpen} onClose={() => setNoteDialogOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>Order Note</DialogTitle>

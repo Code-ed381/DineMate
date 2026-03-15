@@ -136,7 +136,11 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
 
   deleteOrderBySessionId: async (sessionId) => {
     if (!sessionId) return;
-    await supabase.from("orders").update({ status: 'served' }).eq("session_id", sessionId);
+    const { data: order } = await supabase.from('orders').select('id').eq('session_id', sessionId).single();
+    if (order) {
+       await supabase.from('order_items').delete().eq('order_id', order.id);
+    }
+    await supabase.from("orders").delete().eq("session_id", sessionId);
     set({ currentOrder: null });
   },
 
@@ -247,20 +251,118 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
   },
 
   repeatRound: async () => {
-    const items = get().currentOrderItems.filter(i => i.status !== 'cancelled' && i.payment_status !== 'completed');
-    if (items.length === 0) return;
+    const itemsInRound = get().currentOrderItems.filter(i => i.status !== 'cancelled' && i.payment_status !== 'completed');
+    if (itemsInRound.length === 0) return;
+
+    const { currentOrder } = get();
+    if (!currentOrder) return;
 
     try {
-      // We loop through items and re-add them
-      // To avoid multiple notifications/swals, we could optimize, but addOrUpdateObject is sequential
-      for (const item of items) {
-        await get().reorderItem(item);
+      const { user } = useAuthStore.getState();
+      const { selectedRestaurant } = useRestaurantStore.getState();
+      const tableNum = get().chosenTable || useTablesStore.getState().selectedSession?.table_number || "?";
+
+      // 1. Prepare batch of order items
+      const newItemsBatch = itemsInRound.map(item => ({
+        order_id: currentOrder.id,
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        sum_price: item.sum_price,
+        type: item.type,
+        status: "pending",
+        course: item.course || get().selectedCourse,
+        is_started: true, // Repeated rounds are usually started immediately
+        notes: item.notes,
+        updated_at: new Date().toISOString()
+      }));
+
+      // 2. Insert items
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from("order_items")
+        .insert(newItemsBatch)
+        .select();
+
+      if (itemsError) throw itemsError;
+      if (!insertedItems) return;
+
+      // 3. Handle modifiers and kitchen tasks in batch
+      const modifiersToInsert: any[] = [];
+      const tasksToInsert: any[] = [];
+
+      insertedItems.forEach((newItem, index) => {
+        const originalItem = itemsInRound[index];
+        
+        // Map modifiers
+        if (originalItem.selected_modifiers && originalItem.selected_modifiers.length > 0) {
+          originalItem.selected_modifiers.forEach((m: any) => {
+            modifiersToInsert.push({
+              order_item_id: newItem.id,
+              modifier_id: m.modifier_id || m.id,
+              name: m.name,
+              price: m.price || m.price_adjustment || 0
+            });
+          });
+        }
+
+        // Map kitchen tasks (one task per item quantity)
+        const itemType = (newItem.type || "").toLowerCase();
+        if (itemType === 'food' || itemType === 'drink') {
+          for (let i = 0; i < (newItem.quantity || 1); i++) {
+            tasksToInsert.push({
+              order_id: currentOrder.id,
+              order_item_id: newItem.id,
+              menu_item_id: newItem.menu_item_id,
+              status: "pending",
+              created_at: new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      // 4. Batch insert modifiers
+      if (modifiersToInsert.length > 0) {
+        const { error: modError } = await supabase.from("order_item_modifiers").insert(modifiersToInsert);
+        if (modError) throw modError;
       }
+
+      // 5. Batch insert kitchen tasks
+      if (tasksToInsert.length > 0) {
+        await menuService.createKitchenTasks(tasksToInsert);
+        
+        // 6. Send summary notifications
+        const foodCount = insertedItems.filter(i => (i.type || "").toLowerCase() === 'food').length;
+        const drinkCount = insertedItems.filter(i => (i.type || "").toLowerCase() === 'drink').length;
+
+        const { notificationService } = await import("../../../services/notificationService");
+        if (selectedRestaurant?.id) {
+          if (foodCount > 0) {
+            notificationService.sendRoleNotification(selectedRestaurant.id, user?.id || "", {
+              title: "Round Repeated (Food)",
+              message: `Table ${tableNum}: ${foodCount} food items repeated.`,
+              priority: "high",
+              roles: ["chef", "kitchen"]
+            }).catch(e => console.error(e));
+          }
+          if (drinkCount > 0) {
+            notificationService.sendRoleNotification(selectedRestaurant.id, user?.id || "", {
+              title: "Round Repeated (Drinks)",
+              message: `Table ${tableNum}: ${drinkCount} drinks repeated.`,
+              priority: "high",
+              roles: ["bartender"]
+            }).catch(e => console.error(e));
+          }
+        }
+      }
+
+      // 7. Final single state refresh
+      await get().getOrderItemsByOrderId(currentOrder.id);
+
       Swal.fire({
         title: "Round Repeated",
-        text: "All active items have been duplicated.",
+        text: `Duplicated ${insertedItems.length} items successfully.`,
         icon: "success",
-        timer: 1500,
+        timer: 2000,
         showConfirmButton: false
       });
     } catch (error) {
@@ -651,6 +753,14 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
     
     const totalToPay = itemsToPay.reduce((sum: number, item: any) => sum + (item.sum_price || 0), 0);
     const totalPaid = cashVal + cardVal;
+    
+    // Check for unserved items among THE ITEMS BEING PAID FOR
+    const hasUnserved = itemsToPay.some((item: OrderItem) => item.status !== 'served');
+    if (hasUnserved) {
+      Swal.fire("UNSERVED ITEMS", "Some items you are trying to pay for have not been served yet. Please ensure all items are served before accepting payment.", "warning");
+      return false;
+    }
+
     const roundedTotalToPay = Math.round(totalToPay * 100) / 100;
     const roundedTotalPaid = Math.round(totalPaid * 100) / 100;
     
@@ -706,7 +816,7 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
           .from("payments")
           .insert({
             payment_type: "order",
-            order_id: parseInt(oId),
+            order_id: oId,
             restaurant_id: selectedRestaurant?.id,
             cashier_id: currentUser?.id, // Waiter acting as cashier
             amount: totalPaid,
@@ -790,7 +900,8 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
   fetchMyOrderHistory: async (waiterId, startDate, endDate) => {
     set({ loadingMyOrders: true });
     try {
-      const data = await menuService.fetchOrdersByWaiter(waiterId, startDate, endDate);
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+      const data = await menuService.fetchOrdersByWaiter(waiterId, startDate, endDate, restaurantId);
       set({ myOrders: data || [] });
     } catch (error) {
       handleError(error as Error);

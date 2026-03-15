@@ -122,19 +122,51 @@ export default function OrdersServedPerformance() {
   ];
 
   return (
-    <Card sx={{ borderRadius: 3, boxShadow: 3 }}>
-      <CardHeader title="Performance Summary" avatar={<TimerTwoToneIcon />} sx={{ "& .MuiCardHeader-title": { fontWeight: 700, fontSize: "1.05rem" } }} />
+    <Card sx={{ borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider' }}>
+      <CardHeader 
+        title="Performance Summary" 
+        avatar={<TimerTwoToneIcon />} 
+        sx={{ 
+          "& .MuiCardHeader-title": { fontWeight: 800, fontSize: { xs: "1rem", md: "1.1rem" } },
+          pb: 1
+        }} 
+      />
       <Divider />
-      <CardContent>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, alignItems: "center", justifyContent: "flex-end" }}>
-          <TextField type="date" label="Pick date" InputLabelProps={{ shrink: true }} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} sx={{ minWidth: 170 }} size="small" />
-          <TextField select label="Period" value={period} onChange={(e) => setPeriod(e.target.value)} sx={{ minWidth: 140 }} size="small">
+      <CardContent sx={{ p: { xs: 1.5, md: 3 } }}>
+        <Stack 
+          direction={{ xs: "column", sm: "row" }} 
+          spacing={{ xs: 1.5, sm: 2 }} 
+          sx={{ mb: { xs: 2.5, md: 3 }, alignItems: { xs: "stretch", sm: "center" }, justifyContent: "flex-end" }}
+        >
+          <TextField 
+            type="date" 
+            label="Pick date" 
+            InputLabelProps={{ shrink: true }} 
+            value={selectedDate} 
+            onChange={(e) => setSelectedDate(e.target.value)} 
+            sx={{ flex: { xs: 1, sm: '0 1 170px' } }} 
+            size="small" 
+          />
+          <TextField 
+            select 
+            label="Period" 
+            value={period} 
+            onChange={(e) => setPeriod(e.target.value)} 
+            sx={{ flex: { xs: 1, sm: '0 1 150px' } }} 
+            size="small"
+          >
             <MenuItem value="week">Week (days)</MenuItem>
             <MenuItem value="month">Month (weeks)</MenuItem>
             <MenuItem value="year">Year (months)</MenuItem>
             <MenuItem value="all">All (years)</MenuItem>
           </TextField>
-          <Button onClick={() => { setSelectedDate(""); setPeriod("week"); }}>Reset</Button>
+          <Button 
+            variant="outlined"
+            onClick={() => { setSelectedDate(""); setPeriod("week"); }}
+            sx={{ flex: { xs: 1, sm: 'auto' }, fontWeight: 700 }}
+          >
+            Reset
+          </Button>
         </Stack>
         {selectedDate ? (
           dayItems.length === 0 ? (

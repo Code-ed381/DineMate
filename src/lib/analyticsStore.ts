@@ -12,7 +12,7 @@ interface AnalyticsState {
   categoryData: any[];
   staffPerformance: any[];
   topItems: any[];
-  paymentAnalysis: { cash: number; card: number; online: number; total: number };
+  paymentAnalysis: { cash: number; card: number; online: number; momo: number; total: number };
   peakHours: { hour: string; orders: number; revenue: number }[];
   loading: boolean;
   hasFetched: boolean;
@@ -29,7 +29,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
   categoryData: [],
   staffPerformance: [],
   topItems: [],
-  paymentAnalysis: { cash: 0, card: 0, online: 0, total: 0 },
+  paymentAnalysis: { cash: 0, card: 0, online: 0, momo: 0, total: 0 },
   peakHours: [],
   loading: false,
   hasFetched: false,
@@ -46,19 +46,36 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
       let startOfPrevious: dayjs.Dayjs;
       let interval: "hour" | "day" | "week";
 
-      if (timeRange === "today") {
-        startOfCurrent = now.startOf("day");
-        startOfPrevious = now.subtract(1, "day").startOf("day");
-        interval = "hour";
-      } else if (timeRange === "week") {
-        startOfCurrent = now.subtract(7, "days").startOf("day");
-        startOfPrevious = now.subtract(14, "days").startOf("day");
-        interval = "day";
-      } else {
-        // month
-        startOfCurrent = now.startOf("month");
-        startOfPrevious = now.subtract(1, "month").startOf("month");
-        interval = "day";
+      switch (timeRange) {
+        case "today":
+          startOfCurrent = now.startOf("day");
+          startOfPrevious = now.subtract(1, "day").startOf("day");
+          interval = "hour";
+          break;
+        case "yesterday":
+          startOfCurrent = now.subtract(1, "day").startOf("day");
+          startOfPrevious = now.subtract(2, "days").startOf("day");
+          interval = "hour";
+          break;
+        case "week":
+          startOfCurrent = now.subtract(7, "days").startOf("day");
+          startOfPrevious = now.subtract(14, "days").startOf("day");
+          interval = "day";
+          break;
+        case "month":
+          startOfCurrent = now.subtract(30, "days").startOf("day");
+          startOfPrevious = now.subtract(60, "days").startOf("day");
+          interval = "day";
+          break;
+        case "year":
+          startOfCurrent = now.startOf("year");
+          startOfPrevious = now.subtract(1, "year").startOf("year");
+          interval = "week";
+          break;
+        default:
+          startOfCurrent = now.startOf("day");
+          startOfPrevious = now.subtract(1, "day").startOf("day");
+          interval = "hour";
       }
 
       // Use cashier_orders_overview view — the raw `orders` table only has
@@ -128,7 +145,9 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
             menu_item_id,
             menu_items (
               name,
-              category
+              menu_categories (
+                name
+              )
             )
           `)
           .in("order_id", orderIds);
@@ -140,7 +159,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
 
         (items || []).forEach((item: any) => {
           const name = item.menu_items?.name || "Unknown";
-          const category = item.menu_items?.category || "Other";
+          const category = item.menu_items?.menu_categories?.name || "Other";
           
           if (!itemAggregation[name]) {
             itemAggregation[name] = { name, sold: 0, revenue: 0 };
@@ -199,12 +218,31 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
         topItems,
         categoryData,
         staffPerformance,
-        paymentAnalysis: {
-            cash: currentOrders.reduce((sum, o: any) => sum + (o.payment_method === 'cash' ? (o.order_total || 0) : 0), 0),
-            card: currentOrders.reduce((sum, o: any) => sum + (o.payment_method === 'card' ? (o.order_total || 0) : 0), 0),
-            online: 0, // Placeholder if online payment is added later
-            total: currentRev
-        },
+        paymentAnalysis: currentOrders.reduce((acc: any, o: any) => {
+            const total = parseFloat(o.order_total) || 0;
+            const method = (o.payment_method || '').toLowerCase();
+            
+            const cashVal = parseFloat(o.amount_cash) || 0;
+            const cardVal = parseFloat(o.amount_card) || 0;
+            const momoVal = parseFloat(o.amount_momo) || 0;
+
+            if (cashVal > 0 || cardVal > 0 || momoVal > 0) {
+                acc.cash += cashVal;
+                acc.card += cardVal;
+                acc.momo += momoVal;
+            } else {
+                // Fallback for older records or single-method payments without explicit breakdown columns populated
+                if (method === 'cash') acc.cash += total;
+                else if (method === 'card') acc.card += total;
+                else if (method === 'online') acc.online += total;
+                else if (method === 'momo') acc.momo += total;
+                else if (method === 'card+cash' || method === 'cash+card') {
+                    acc.cash += total / 2;
+                    acc.card += total / 2;
+                }
+            }
+            return acc;
+        }, { cash: 0, card: 0, online: 0, momo: 0, total: currentRev }),
         peakHours: Object.values(
             currentOrders.reduce((acc: any, order: any) => {
                 const date = dayjs(order.opened_at);

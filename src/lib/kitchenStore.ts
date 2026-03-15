@@ -7,6 +7,25 @@ import useRestaurantStore from "./restaurantStore";
 import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
 
+/**
+ * Helper to check if ALL sibling tasks for an order_item have reached a target status (or beyond)
+ * status order: pending < preparing < ready < served
+ */
+async function shouldSyncOrderItemStatus(orderItemId: string, targetStatus: string): Promise<boolean> {
+  const statusOrder = ["pending", "preparing", "ready", "served"];
+  const targetIdx = statusOrder.indexOf(targetStatus);
+  
+  const { data: siblings } = await supabase
+    .from("kitchen_tasks")
+    .select("status")
+    .eq("order_item_id", orderItemId);
+    
+  if (!siblings || siblings.length === 0) return true;
+  
+  // ALL siblings must be at targetStatus or beyond
+  return siblings.every(s => statusOrder.indexOf(s.status) >= targetIdx);
+}
+
 interface KitchenTask {
   kitchen_task_id: string;
   order_item_id: string;
@@ -14,8 +33,14 @@ interface KitchenTask {
   menu_item_id: string;
   menu_item_name: string;
   quantity: number;
-  order_item_status: string;
+  status: string; // Individual task status
+  order_item_status: string; // Parent order_item status
   task_created_at: string;
+  task_updated_at?: string;
+  task_completed_at?: string;
+  order_item_updated_at?: string;
+  updated_at?: string;
+  completed_at?: string;
   table_number: string;
   waiter_id: string;
   waiter_first_name?: string;
@@ -24,6 +49,7 @@ interface KitchenTask {
   menu_item_preparation_time?: number; // Added to support SLA
   modifier_names?: { name: string }[];
   course?: number;
+  notes?: string; // Add notes field
 }
 
 interface KitchenState {
@@ -134,120 +160,60 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
     const restaurantId = selectedRestaurant?.id;
 
     try {
+      // Query order_items_full for comprehensive data
       const { data, error } = await supabase
-        .from("kitchen_tasks_full")
+        .from("order_items_full")
         .select("*")
-        .ilike("item_type", "food")
-        .eq("menu_item_restaurant_id", restaurantId);
+        .eq("type", "food")
+        .eq("restaurant_id", restaurantId)
+        .order("order_item_created_at", { ascending: false })
+        .limit(200);
 
       if (error) handleError(error);
 
-      const tasks = (data as KitchenTask[]) || [];
+      const items = data || [];
       
-      // 1. Identify tasks with missing waiter_id
-      const tasksMissingWaiter = tasks.filter(t => !t.waiter_id && t.order_id);
-      const missingOrderIds = Array.from(new Set(tasksMissingWaiter.map(t => t.order_id)));
-      
-      let resolvedWaitersByOrder: Record<string, string> = {};
-
-      // 2. Resolve missing waiters via Orders -> Sessions -> Waiter
-      if (missingOrderIds.length > 0) {
-          const { data: orders } = await supabase
-            .from("orders")
-            .select("id, session_id")
-            .in("id", missingOrderIds);
-            
-          const sessionIds = Array.from(new Set((orders || []).map((o: any) => o.session_id).filter(Boolean)));
-          
-          if (sessionIds.length > 0) {
-              const { data: sessions } = await supabase
-                .from("table_sessions")
-                .select("id, waiter_id")
-                .in("id", sessionIds);
-                
-              const sessionWaiterMap: Record<string, string> = {};
-              sessions?.forEach((s: any) => {
-                  if (s.waiter_id) sessionWaiterMap[s.id] = s.waiter_id;
-              });
-              
-              orders?.forEach((o: any) => {
-                  if (sessionWaiterMap[o.session_id]) {
-                      resolvedWaitersByOrder[o.id] = sessionWaiterMap[o.session_id];
-                  }
-              });
-          }
-      }
-
-      // 3. Collect ALL waiter IDs (existing + newly resolved)
-      const allWaiterIds = new Set<string>();
-      tasks.forEach(t => {
-          if (t.waiter_id) allWaiterIds.add(t.waiter_id);
-          else if (resolvedWaitersByOrder[t.order_id]) allWaiterIds.add(resolvedWaitersByOrder[t.order_id]);
-      });
-      
-      const uniqueWaiterIds = Array.from(allWaiterIds);
-      
-      // 4. Fetch User Details
-      let waiterMap: Record<string, any> = {};
-      
-      if (uniqueWaiterIds.length > 0) {
-        const { data: waiters } = await supabase
-          .from("users")
-          .select("user_id, first_name, last_name, avatar_url") 
-          .in("user_id", uniqueWaiterIds);
-          
-        if (waiters) {
-          waiters.forEach((w: any) => {
-             waiterMap[w.user_id] = {
-               first_name: w.first_name,
-               last_name: w.last_name,
-               avatar: w.avatar_url 
-             };
-          });
-        }
-      }
-
-      // 5. Fetch Modifiers and Course
-      const orderItemIds = Array.from(new Set(tasks.map(t => t.order_item_id)));
-      let modMap: Record<string, { name: string }[]> = {};
-      let courseMap: Record<string, number> = {};
-      
-      if (orderItemIds.length > 0) {
-        const [modsResult, itemsResult] = await Promise.all([
-          supabase.from("order_item_modifiers").select("order_item_id, name").in("order_item_id", orderItemIds),
-          supabase.from("order_items").select("id, course").in("id", orderItemIds)
-        ]);
-          
-        modsResult.data?.forEach(m => {
-          if (!modMap[m.order_item_id]) modMap[m.order_item_id] = [];
-          modMap[m.order_item_id].push({ name: m.name });
-        });
-
-        itemsResult.data?.forEach(i => {
-          courseMap[i.id] = i.course;
-        });
-      }
-
-      // 6. Map attributes to tasks
-      const correctedTasks = tasks.map(task => {
-        const finalWaiterId = task.waiter_id || resolvedWaitersByOrder[task.order_id];
-        const waiter = waiterMap[finalWaiterId] || {};
+      // Calculate derived fields and ensure consistent naming
+      const enrichedTasks = items.map((item: any) => {
+        // Calculate preparation duration if served
+        let duration = null;
+        const startTime = item.order_item_created_at;
+        const taskEndTime = item.task_completed_at || item.task_updated_at;
+        const endTime = taskEndTime || item.order_item_updated_at;
         
-        return { 
-          ...task, 
-          quantity: 1,
-          waiter_id: finalWaiterId || task.waiter_id, 
-          waiter_first_name: waiter.first_name || (finalWaiterId ? "Unknown Name" : "Unknown"),
-          waiter_last_name: waiter.last_name || "",
-          waiter_avatar: waiter.avatar,
-          modifier_names: modMap[task.order_item_id] || [],
-          course: courseMap[task.order_item_id] || 1
+        if (item.order_item_status === 'served' && startTime && endTime) {
+          const start = new Date(startTime).getTime();
+          const end = new Date(endTime).getTime();
+          duration = Math.max(0, Math.floor((end - start) / 60000));
+        }
+
+        return {
+          ...item,
+          kitchen_task_id: item.order_item_id, 
+          menu_item_name: item.item_name,
+          waiter_first_name: item.waiter_first_name || "Unknown",
+          waiter_last_name: item.waiter_last_name || "",
+          waiter_avatar: item.waiter_avatar,
+          
+          preparer_first_name: item.prepared_by_first_name || "",
+          preparer_last_name: item.prepared_by_last_name || "",
+          preparer_avatar: item.prepared_by_avatar,
+          
+          preparation_duration: duration,
+          unit_price: item.unit_price || 0,
+          total_price: item.sum_price || item.unit_price || 0,
+          order_item_status: item.order_item_status,
+          task_created_at: startTime,
+          updated_at: endTime,
+          completed_at: item.task_completed_at || item.completed_at,
+          course: item.course || 1,
+          table_number: item.table_number || "—"
         };
       });
 
-      set({ itemsLoading: false, orderItems: correctedTasks });
+      set({ itemsLoading: false, orderItems: enrichedTasks });
     } catch (error) {
-      console.error("Error fetching order items:", error);
+      console.error("Error fetching order history items:", error);
       set({ itemsLoading: false });
     }
   },
@@ -262,7 +228,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         .from("kitchen_tasks_full")
         .select("*")
         .eq("item_type", "food")
-        .or(`order_item_status.eq.pending,order_item_status.eq.preparing`)
+        .or(`status.eq.pending,status.eq.preparing`)
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
 
@@ -295,7 +261,9 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         ...task, 
         quantity: 1,
         modifier_names: modMap[task.order_item_id] || [],
-        course: courseMap[task.order_item_id] || 1
+        course: courseMap[task.order_item_id] || 1,
+        updated_at: (task as any).task_updated_at || (task as any).order_item_updated_at,
+        completed_at: (task as any).task_completed_at
       }));
       set({ pendingMeals: correctedTasks, loadingPending: false });
     } catch (error) {
@@ -314,7 +282,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         .from("kitchen_tasks_full")
         .select("*")
         .eq("item_type", "food")
-        .eq("order_item_status", "preparing")
+        .eq("status", "preparing")
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
 
@@ -347,7 +315,9 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         ...task, 
         quantity: 1, 
         modifier_names: modMap[task.order_item_id] || [],
-        course: courseMap[task.order_item_id] || 1
+        course: courseMap[task.order_item_id] || 1,
+        updated_at: (task as any).task_updated_at || (task as any).order_item_updated_at,
+        completed_at: (task as any).task_completed_at
       }));
       set({ preparingMeals: correctedTasks, loadingPreparing: false });
     } catch (error) {
@@ -366,7 +336,7 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         .from("kitchen_tasks_full")
         .select("*")
         .eq("item_type", "food")
-        .eq("order_item_status", "ready")
+        .eq("status", "ready")
         .eq("menu_item_restaurant_id", restaurantId)
         .order("task_created_at", { ascending: true });
 
@@ -399,7 +369,9 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
         ...task, 
         quantity: 1,
         modifier_names: modMap[task.order_item_id] || [],
-        course: courseMap[task.order_item_id] || 1
+        course: courseMap[task.order_item_id] || 1,
+        updated_at: (task as any).task_updated_at || (task as any).order_item_updated_at,
+        completed_at: (task as any).task_completed_at
       }));
       set({ readyMeals: correctedTasks, loadingReady: false });
     } catch (error) {
@@ -445,7 +417,9 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
       const correctedTasks = tasks.map(task => ({ 
         ...task, 
         quantity: 1,
-        course: courseMap[task.order_item_id] || 1
+        course: courseMap[task.order_item_id] || 1,
+        updated_at: (task as any).task_updated_at || (task as any).order_item_updated_at,
+        completed_at: (task as any).task_completed_at
       }));
       set({ servedMeals: correctedTasks, loadingServed: false });
     } catch (error) {
@@ -486,15 +460,17 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
               .eq("id", task.kitchen_task_id);
             if (error) handleError(error);
 
-            // Also update the order_item status so waiters can't modify it
-            await supabase
-              .from("order_items")
-              .update({
-                status: "preparing",
-                updated_at: new_date,
-                prepared_by: userId,
-              })
-              .eq("id", task.order_item_id);
+            // Only sync parent order_item if all siblings are at least 'preparing'
+            if (await shouldSyncOrderItemStatus(task.order_item_id, "preparing")) {
+              await supabase
+                .from("order_items")
+                .update({
+                  status: "preparing",
+                  updated_at: new_date,
+                  prepared_by: userId,
+                })
+                .eq("id", task.order_item_id);
+            }
 
             get().handleFetchPendingMeals();
           }
@@ -564,14 +540,16 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
 
             if (error) handleError(error as Error);
 
-            // Sync order_item status to ready
-            await supabase
-              .from("order_items")
-              .update({
-                status: "ready",
-                updated_at: new_date,
-              })
-              .eq("id", task.order_item_id);
+            // Only sync parent order_item if all siblings are at least 'ready'
+            if (await shouldSyncOrderItemStatus(task.order_item_id, "ready")) {
+              await supabase
+                .from("order_items")
+                .update({
+                  status: "ready",
+                  updated_at: new_date,
+                })
+                .eq("id", task.order_item_id);
+            }
 
             // Send notification to the waiter
             const { selectedRestaurant } = useRestaurantStore.getState();
@@ -663,20 +641,22 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
               .from("kitchen_tasks")
               .update({
                 status: "served",
-                updated_at: new Date(),
-                completed_at: new Date(),
+                updated_at: new Date().toISOString(),
+                completed_at: new Date().toISOString(),
               })
               .eq("id", task.kitchen_task_id);
             if (error) handleError(error as Error);
 
-            // Sync order_item status to served
-            await supabase
-              .from("order_items")
-              .update({
-                status: "served",
-                updated_at: new Date(),
-              })
-              .eq("id", task.order_item_id);
+            // Only sync parent order_item if all siblings are 'served'
+            if (await shouldSyncOrderItemStatus(task.order_item_id, "served")) {
+              await supabase
+                .from("order_items")
+                .update({
+                  status: "served",
+                  updated_at: new Date(),
+                })
+                .eq("id", task.order_item_id);
+            }
 
             get().handleFetchReadyMeals();
             get().handleFetchServedMeals();
@@ -706,14 +686,17 @@ const useKitchenStore = create<KitchenState>((set, get) => ({
 
       if (error) handleError(error);
 
-      await supabase
-        .from("order_items")
-        .update({
-          status: "preparing",
-          updated_at: new_date,
-          prepared_by: userId,
-        })
-        .eq("id", task.order_item_id);
+      // Only sync parent order_item if all siblings are at least 'preparing'
+      if (await shouldSyncOrderItemStatus(task.order_item_id, "preparing")) {
+        await supabase
+          .from("order_items")
+          .update({
+            status: "preparing",
+            updated_at: new_date,
+            prepared_by: userId,
+          })
+          .eq("id", task.order_item_id);
+      }
 
       get().handleFetchPendingMeals();
     } catch (error) {

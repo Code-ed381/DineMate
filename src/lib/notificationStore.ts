@@ -346,13 +346,20 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Notification subscription status:', status);
+      .subscribe(async (status) => {
+        console.log(`📡 Notification subscription status: ${status}`);
         if (status === 'SUBSCRIBED') {
           console.log('✅ Successfully subscribed to notifications');
         }
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Failed to subscribe to notifications. Check if realtime is enabled on user_notifications table.');
+          console.error('❌ Failed to subscribe to notifications. Retrying in 5s...');
+          setTimeout(() => {
+            get().subscribeToNotifications();
+          }, 5000);
+        }
+        if (status === 'TIMED_OUT') {
+           console.warn('🕒 Notification subscription timed out. Retrying...');
+           get().subscribeToNotifications();
         }
       });
 

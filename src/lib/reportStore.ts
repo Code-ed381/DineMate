@@ -11,6 +11,8 @@ interface Order {
   waiter: any;
   card: number;
   cash: number;
+  momo: number;
+  online: number;
   balance: number;
   total: number;
 }
@@ -19,9 +21,11 @@ interface PreprocessedOrder {
   id: string;
   created_at: string;
   waiter: string;
-  waiter_id: string; // Add waiter_id for filtering
+  waiter_id: string;
   card: number;
   cash: number;
+  momo: number;
+  online: number;
   balance: number;
   total: number;
 }
@@ -33,10 +37,14 @@ interface ReportState {
   cash: string | number;
   balance: string | number;
   card: string | number;
+  momo: string | number;
+  online: string | number;
   total: string | number;
   overallCash: string | number;
   overallBalance: string | number;
   overallCard: string | number;
+  overallMomo: string | number;
+  overallOnline: string | number;
   overallTotal: string | number;
   loading: boolean;
   isFiltered: boolean;
@@ -57,10 +65,14 @@ const useReportStore = create<ReportState>((set, get) => ({
   cash: 0,
   balance: 0,
   card: 0,
+  momo: 0,
+  online: 0,
   total: 0,
   overallCash: 0,
   overallBalance: 0,
   overallCard: 0,
+  overallMomo: 0,
+  overallOnline: 0,
   overallTotal: 0,
   loading: true,
   isFiltered: false,
@@ -81,6 +93,8 @@ const useReportStore = create<ReportState>((set, get) => ({
       waiter_id: order.waiter ? order.waiter.user_id : '',    // ID for filtering
       card: order.card,
       cash: order.cash,
+      momo: order.momo,
+      online: order.online,
       balance: order.balance,
       total: order.total,
     }));
@@ -96,14 +110,16 @@ const useReportStore = create<ReportState>((set, get) => ({
       let query = supabase
         .from('cashier_orders_overview')
         .select('*')
-        .eq('restaurant_id', restaurantId);
+        .eq('restaurant_id', restaurantId)
+        .eq('order_status', 'served')
+        .eq('session_status', 'close');
 
       if (startDate) {
-        query = query.gte('opened_at', startDate);
+        query = query.gte('closed_at', `${startDate}T00:00:00`);
       }
       if (endDate) {
         const endDateTime = dayjs(endDate).endOf('day').toISOString();
-        query = query.lte('opened_at', endDateTime);
+        query = query.lte('closed_at', endDateTime);
       }
 
       const { data: rows, error } = await query;
@@ -111,22 +127,48 @@ const useReportStore = create<ReportState>((set, get) => ({
       if (error) throw error;
 
       // Map the view's columns to our Order interface
-      const orderData: Order[] = (rows || []).map((row: any) => ({
-        id: row.order_id,
-        created_at: row.opened_at || row.created_at,
-        waiter: { 
-          first_name: row.waiter_first_name || 'Unknown', 
-          last_name: row.waiter_last_name || '',
-          user_id: row.waiter_id 
-        },
-        card: row.payment_method === 'card' ? (row.order_total || 0) : 0,
-        cash: row.payment_method === 'cash' ? (row.order_total || 0) : 0,
-        balance: 0,
-        total: row.order_total || 0,
-      }));
+      const orderData: Order[] = (rows || []).map((row: any) => {
+        const total = parseFloat(row.order_total) || 0;
+        const method = (row.payment_method || '').toLowerCase();
+        
+        let cash = parseFloat(row.amount_cash) || 0;
+        let card = parseFloat(row.amount_card) || 0;
+        let momo = parseFloat(row.amount_momo) || 0;
+        let online = 0;
+        
+        // If the breakdown columns are zero, fall back to method-based total allocation (for older records)
+        if (cash === 0 && card === 0 && momo === 0) {
+            if (method === 'cash') cash = total;
+            else if (method === 'card') card = total;
+            else if (method === 'momo') momo = total;
+            else if (method === 'online') online = total;
+            else if (method === 'card+cash' || method === 'cash+card') {
+                cash = total / 2;
+                card = total / 2;
+            }
+        }
+
+        return {
+          id: row.order_id,
+          created_at: row.opened_at || row.created_at,
+          waiter: { 
+            first_name: row.waiter_first_name || 'Unknown', 
+            last_name: row.waiter_last_name || '',
+            user_id: row.waiter_id 
+          },
+          card,
+          cash,
+          momo,
+          online,
+          balance: 0,
+          total,
+        };
+      });
 
       const cash = orderData.reduce((acc, cur) => acc + (Number(cur.cash) || 0), 0).toFixed(2);
       const card = orderData.reduce((acc, cur) => acc + (Number(cur.card) || 0), 0).toFixed(2);
+      const momo = orderData.reduce((acc, cur) => acc + (Number(cur.momo) || 0), 0).toFixed(2);
+      const online = orderData.reduce((acc, cur) => acc + (Number(cur.online) || 0), 0).toFixed(2);
       const total = orderData.reduce((acc, cur) => acc + (Number(cur.total) || 0), 0).toFixed(2);
       const balance = orderData.reduce((acc, cur) => acc + (Number(cur.balance) || 0), 0).toFixed(2);
 
@@ -136,10 +178,14 @@ const useReportStore = create<ReportState>((set, get) => ({
         balance,
         cash,
         card,
+        momo,
+        online,
         total,
         overallBalance: balance,
         overallCash: cash,
         overallCard: card,
+        overallMomo: momo,
+        overallOnline: online,
         overallTotal: total,
         orders: preprocessed,
         filteredOrders: preprocessed,
@@ -216,6 +262,8 @@ const useReportStore = create<ReportState>((set, get) => ({
     
     const cash = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.cash as any) || 0), 0).toFixed(2);
     const card = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.card as any) || 0), 0).toFixed(2);
+    const momo = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.momo as any) || 0), 0).toFixed(2);
+    const online = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.online as any) || 0), 0).toFixed(2);
     const total = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.total as any) || 0), 0).toFixed(2);
     const balance = actualFiltered.reduce((acc, cur) => acc + (parseFloat(cur.balance as any) || 0), 0).toFixed(2);
 
@@ -224,19 +272,23 @@ const useReportStore = create<ReportState>((set, get) => ({
       balance,
       cash,
       card,
+      momo,
+      online,
       total,
       isFiltered: true,
     });
   },
 
   clearFilters: () => {
-    const { orders, overallCash, overallCard, overallTotal, overallBalance } = get();
+    const { orders, overallCash, overallCard, overallMomo, overallOnline, overallTotal, overallBalance } = get();
 
     set({
       filteredOrders: orders,
       balance: overallBalance,
       cash: overallCash,
       card: overallCard,
+      momo: overallMomo,
+      online: overallOnline,
       total: overallTotal,
       isFiltered: false,
     });

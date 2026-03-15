@@ -510,6 +510,7 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
         price: parseFloat(item.price),
         category_id: item.category_id,
         available: item.available === "true" || item.available === true,
+        type: item.type || "food",
         image_url: finalImageUrl,
         tags: item.tags || []
       }]);
@@ -559,6 +560,7 @@ const useMenuItemsStore = create<MenuItemsState>()((set, get) => ({
         price: parseFloat(item.price),
         category_id: item.category_id,
         available: item.available === "true" || item.available === true,
+        type: item.type,
         tags: item.tags || []
       };
 

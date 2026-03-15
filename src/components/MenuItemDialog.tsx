@@ -33,6 +33,7 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ open, onClose, onSubmit
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [available, setAvailable] = useState("true");
+  const [type, setType] = useState<"food" | "drink">("food");
   const [tags, setTags] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -49,6 +50,7 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ open, onClose, onSubmit
       setDescription(item.description || "");
       setAvailable(item.available ? "true" : "false");
       setTags((item.tags || []).join(", "));
+      setType(item.type || "food");
       setImagePreview(item.image_url || null);
     } else {
       setName("");
@@ -57,6 +59,7 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ open, onClose, onSubmit
       setDescription("");
       setAvailable("true");
       setTags("");
+      setType("food");
       setImagePreview(null);
     }
     setImageFile(null);
@@ -87,6 +90,7 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ open, onClose, onSubmit
           category_id: categoryId,
           description,
           available,
+          type,
           tags: parsedTags,
           ...(isEdit ? { image_url: item.image_url } : {}),
         },
@@ -204,6 +208,18 @@ const MenuItemDialog: React.FC<MenuItemDialogProps> = ({ open, onClose, onSubmit
               placeholder="spicy, vegan"
               helperText="Comma separated"
             />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              select
+              label="Type (Kitchen/Bar Routing)"
+              value={type}
+              onChange={(e) => setType(e.target.value as "food" | "drink")}
+            >
+              <MenuItem value="food">Food (Kitchen)</MenuItem>
+              <MenuItem value="drink">Drink (Bar)</MenuItem>
+            </TextField>
           </Grid>
         </Grid>
         {error && (

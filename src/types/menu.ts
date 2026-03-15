@@ -244,7 +244,7 @@ export interface MenuState {
   getOrders: () => Promise<void>;
   filterMealsByCategory: (category: string, color: string, backgroundColor: string) => void;
   filterDrinksByCategory: (category: string, color: string, backgroundColor: string) => void;
-  setChosenTable: (table: string | number | null) => Promise<void>;
+  setChosenTable: (table: RestaurantTable) => Promise<void>;
   updateSessionStatus: (status: string) => Promise<void>;
   handlePrintBill: () => Promise<void>;
   addOrUpdateObject: (orderItem: MenuItem, selectedModifiers?: Modifier[]) => Promise<void>;

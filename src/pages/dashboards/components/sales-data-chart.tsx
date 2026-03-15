@@ -42,7 +42,43 @@ const SalesBarChart: React.FC<SalesBarChartProps> = ({ orders = [] }) => {
     };
   }, [orders]);
 
-  return <Bar data={salesData} options={{ responsive: true, plugins: { legend: { display: true, position: "top" }, tooltip: { callbacks: { label: (ctx) => `Total: ₵${(ctx.raw as number).toFixed(2)}` } } }, scales: { x: { title: { display: true, text: "Date" } }, y: { title: { display: true, text: "Total Sales (₵)" }, beginAtZero: true } } }} />;
+  return (
+    <div style={{ width: "100%", height: "250px" }}>
+      <Bar 
+        data={salesData} 
+        options={{ 
+          responsive: true, 
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { 
+              display: false 
+            }, 
+            tooltip: { 
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              padding: 12,
+              titleFont: { size: 14, weight: 'bold' },
+              callbacks: { 
+                label: (ctx) => ` ₵${(ctx.raw as number).toFixed(2)}` 
+              } 
+            } 
+          }, 
+          scales: { 
+            x: { 
+              grid: { display: false },
+              ticks: { font: { size: 10 } }
+            }, 
+            y: { 
+              beginAtZero: true,
+              ticks: { 
+                font: { size: 10 },
+                callback: (val) => `₵${val}`
+              }
+            } 
+          } 
+        }} 
+      />
+    </div>
+  );
 };
 
 export default SalesBarChart;

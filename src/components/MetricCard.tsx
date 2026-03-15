@@ -42,18 +42,23 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const targetProgress = target ? (numericValue / target) * 100 : 0;
 
   return (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
+    <Card sx={{ height: '100%', borderRadius: 3 }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
         <Stack
           direction="row"
           justifyContent="space-between"
           alignItems="flex-start"
-          mb={2}
+          mb={{ xs: 1, sm: 2 }}
         >
           <Avatar
             sx={{
               bgcolor: alpha((theme.palette as any)[color].main, 0.1),
               color: `${color}.main`,
+              width: { xs: 32, sm: 40 },
+              height: { xs: 32, sm: 40 },
+              '& .MuiSvgIcon-root': {
+                fontSize: { xs: 18, sm: 24 }
+              }
             }}
           >
             {icon}
@@ -68,10 +73,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
             />
           )}
         </Stack>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
+        <Typography variant="body2" color="text.secondary" gutterBottom sx={{ fontSize: { xs: '0.65rem', sm: '0.875rem' } }}>
           {title}
         </Typography>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
+        <Typography 
+          variant="h4" 
+          fontWeight={700} 
+          gutterBottom 
+          sx={{ 
+            fontSize: { xs: '1.2rem', sm: '1.75rem', md: '2.125rem' },
+            wordBreak: 'break-all',
+            lineHeight: 1.2
+          }}
+        >
           {value}
         </Typography>
         {subtitle && (

@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Card, CardHeader, CardContent, Divider, Typography, Chip, Stack, Paper, LinearProgress } from "@mui/material";
+import { Box, Card, CardHeader, CardContent, Divider, Typography, Chip, Stack, Paper, LinearProgress, alpha } from "@mui/material";
 import OutdoorGrillTwoToneIcon from "@mui/icons-material/OutdoorGrillTwoTone";
 import PendingActionsTwoToneIcon from "@mui/icons-material/PendingActionsTwoTone";
 import EmptyState from "../../../components/empty-state";
@@ -20,19 +20,20 @@ const LiveOrderQueueCard: React.FC<LiveOrderQueueCardProps> = ({ pendingMeals, f
   }, []);
 
   return (
-    <Card sx={{ borderRadius: 3, boxShadow: 3, height: "100%", maxHeight: 900, display: "flex", flexDirection: "column" }}>
+    <Card sx={{ borderRadius: 3, boxShadow: 'none', border: '1px solid', borderColor: 'divider', height: "100%", maxHeight: 900, display: "flex", flexDirection: "column" }}>
       <CardHeader 
-        avatar={filter === "pending" ? <PendingActionsTwoToneIcon /> : <OutdoorGrillTwoToneIcon />} 
+        avatar={filter === "pending" ? <PendingActionsTwoToneIcon sx={{ fontSize: { xs: 20, md: 24 } }} /> : <OutdoorGrillTwoToneIcon sx={{ fontSize: { xs: 20, md: 24 } }} />} 
         title={<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" fontWeight="bold">{title}</Typography>
-          <Chip label={pendingMeals?.filter((o) => o?.order_item_status === filter).length || 0} size="small" color="primary" />
+          <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>{title}</Typography>
+          <Chip label={pendingMeals?.filter((o) => o?.order_item_status === filter).length || 0} size="small" color="primary" sx={{ fontWeight: 800 }} />
         </Box>} 
+        sx={{ p: { xs: 1.5, md: 2 }, pb: 0 }}
       />
-      <Divider />
-      <CardContent sx={{ p: 2, overflowY: "auto", flex: 1 }}>
-        <Stack spacing={2}>
+      <Divider sx={{ mt: 1.5 }} />
+      <CardContent sx={{ p: { xs: 1, md: 2 }, overflowY: "auto", flex: 1 }}>
+        <Stack spacing={1.5}>
           {pendingMeals?.filter((o) => o?.order_item_status === filter).map((order) => {
-            // Calculate precise elapsed time
+            // ... (keep the same logic for calculations)
             const startTime = filter === 'pending' ? order.task_created_at : (order.updated_at || order.task_created_at);
             const startMs = new Date(startTime).getTime();
             const nowMs = Date.now();
@@ -46,54 +47,44 @@ const LiveOrderQueueCard: React.FC<LiveOrderQueueCardProps> = ({ pendingMeals, f
             const isCritical = progress >= 100;
             const isWarning = progress >= 75;
 
-            // Dynamic border color
-            let borderColor = "transparent";
-            if (isCritical) borderColor = "#d32f2f"; // error.main
-            else if (isWarning) borderColor = "#ed6c02"; // warning.main
-
             return (
               <Paper 
                 key={order.kitchen_task_id || order.order_item_id} 
                 variant="outlined" 
                 sx={(theme) => ({ 
-                  p: 2, 
+                  p: { xs: 1.5, md: 2 }, 
                   borderRadius: 2, 
                   position: 'relative',
                   overflow: 'hidden',
                   transition: 'all 0.3s ease',
                   border: `1px solid ${theme.palette.divider}`,
-                  borderLeft: `6px solid ${isCritical ? theme.palette.error.main : isWarning ? theme.palette.warning.main : theme.palette.info.main}`,
-                  boxShadow: isCritical ? `0 4px 12px ${theme.palette.error.light}` : 'none',
+                  borderLeft: `${{ xs: '4px', md: '6px' }} solid ${isCritical ? theme.palette.error.main : isWarning ? theme.palette.warning.main : theme.palette.info.main}`,
+                  boxShadow: isCritical ? `0 4px 12px ${theme.palette.error.light}44` : 'none',
                   animation: isCritical ? "pulseCritical 2s infinite" : "none",
-                  "@keyframes pulseCritical": {
-                    "0%": { boxShadow: `0 0 0 0 ${theme.palette.error.light}40` },
-                    "70%": { boxShadow: `0 0 0 10px ${theme.palette.error.light}00` },
-                    "100%": { boxShadow: `0 0 0 0 ${theme.palette.error.light}00` }
-                  }
                 })}
               >
                 <Box sx={{ width: '100%' }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 1 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '1.05rem' }}>{order?.menu_item_name}</Typography>
-                    {isCritical && <Chip label="Overdue" size="small" color="error" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: { xs: '0.95rem', md: '1.05rem' }, lineHeight: 1.2 }}>{order?.menu_item_name}</Typography>
+                    {isCritical && <Chip label="Overdue" size="small" color="error" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }} />}
                   </Stack>
                   
-                  <Stack direction="row" spacing={2} sx={{ mb: 2, color: 'text.secondary' }}>
-                    <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Stack direction="row" spacing={2} sx={{ mb: 1.5, color: 'text.secondary' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
                       Box {order?.table_number || "—"}
                     </Typography>
-                    <Typography variant="caption">Order #{String(order?.order_id || "").slice(0, 5) || "—"}</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>#{String(order?.order_id || "").slice(0, 5) || "—"}</Typography>
                   </Stack>
 
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1, md: 2 } }}>
                     <Box sx={{ flex: 1 }}>
                        <LinearProgress 
                           variant="determinate" 
                           value={progress} 
                           sx={{ 
-                            height: 8, 
-                            borderRadius: 4, 
-                            bgcolor: (theme) => theme.palette.grey[200],
+                            height: 6, 
+                            borderRadius: 3, 
+                            bgcolor: (theme) => alpha(theme.palette.divider, 0.1),
                             "& .MuiLinearProgress-bar": {
                                 bgcolor: isCritical ? "error.main" : isWarning ? "warning.main" : "primary.main",
                                 transition: "transform 0.5s linear"
@@ -101,14 +92,10 @@ const LiveOrderQueueCard: React.FC<LiveOrderQueueCardProps> = ({ pendingMeals, f
                           }} 
                         />
                     </Box>
-                    <Typography variant="caption" fontWeight="bold" color={isCritical ? "error.main" : "text.primary"} sx={{ minWidth: 60, textAlign: 'right' }}>
-                       {elapsedMins} / {sla} m
+                    <Typography variant="caption" fontWeight="900" color={isCritical ? "error.main" : "text.primary"} sx={{ minWidth: 50, textAlign: 'right', fontSize: '0.75rem' }}>
+                       {elapsedMins}/{sla}m
                     </Typography>
                   </Box>
-                  
-                  <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
-                     {filter === 'pending' ? 'Ordered' : 'Started'} {formatDateTimeWithSuffix(startTime)}
-                  </Typography>
                 </Box>
               </Paper>
             );

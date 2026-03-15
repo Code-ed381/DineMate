@@ -17,7 +17,7 @@ const CashierDashboardSkeleton: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {[...Array(4)].map((_, idx) => (
-          <Grid item xs={12} sm={6} md={3} key={idx}>
+          <Grid item xs={6} sm={6} md={3} key={idx}>
             <Paper sx={{ p: 2, display: "flex", alignItems: "center" }}>
               <Skeleton variant="circular"><Avatar /></Skeleton>
               <Box sx={{ ml: 2 }}><Skeleton variant="text" width={60} height={28} /><Skeleton variant="text" width={40} /></Box>

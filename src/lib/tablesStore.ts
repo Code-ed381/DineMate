@@ -6,6 +6,8 @@ import useMenuStore from "./menuStore";
 import useRestaurantStore from "./restaurantStore";
 import useAuthStore from "./authStore";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { menuService } from "../services/menuService";
+import Swal from "sweetalert2";
 
 let tablesDebounceTimer: NodeJS.Timeout | null = null;
 
@@ -251,6 +253,21 @@ const useTablesStore = create<TableState>()(
           setAssignedTables,
         } = useMenuStore.getState();
 
+        // CHECK FOR UNSERVED ITEMS
+        try {
+          const hasUnserved = await menuService.hasUnservedItems(tableSession.session_id);
+          if (hasUnserved) {
+            Swal.fire({
+              icon: "warning",
+              title: "Unserved Items",
+              text: "This table has items that haven't been served yet. Please ensure all items are served before closing the table.",
+            });
+            return;
+          }
+        } catch (err) {
+          console.error("Error checking for unserved items:", err);
+        }
+
         const { selectedRestaurant } = useRestaurantStore.getState() as any;
         
         const { error: ordersError } = await supabase
@@ -394,9 +411,29 @@ const useTablesStore = create<TableState>()(
         }
 
         if (action === "closed") {
-          await get().endSession(table.id, waiterId, restaurantId);
-        }
+          const selected = get().selectedSession;
+          if (selected) {
+            // Delete order items
+            const { data: order } = await supabase.from('orders').select('id').eq('session_id', selected.session_id).single();
+            if (order) {
+              await supabase.from('order_items').delete().eq('order_id', order.id);
+            }
+            
+            // Delete order
+            await supabase.from("orders").delete().eq("session_id", selected.session_id);
 
+            // Delete table_session
+            await supabase.from("table_sessions").delete().eq("id", selected.session_id);
+            
+            // Clean up local state
+            set((state) => ({
+              sessions: state.sessions.filter((session) => session.table_id !== table.id),
+              sessionsOverview: state.sessionsOverview.filter((session) => session.table_id !== table.id),
+              selectedTable: state.selectedTable?.id === table.id ? null : state.selectedTable,
+              selectedSession: state.selectedSession?.session_id === selected.session_id ? null : state.selectedSession,
+            }));
+          }
+        }
         const { error: reservedError } = await supabase
           .from("restaurant_tables")
           .update({ status: "available" })
@@ -488,14 +525,13 @@ const useTablesStore = create<TableState>()(
               .from("table_sessions_overview")
               .select("*")
               .eq("restaurant_id", restaurantId)
-              .eq("waiter_id", waiterId)
-              .neq("session_status", "close");
+              .eq("waiter_id", waiterId);
 
           if (error) throw error;
 
           const currentSelectedSession = get().selectedSession;
           if (currentSelectedSession) {
-             const stillOpen = data?.find((s: any) => s.session_id === currentSelectedSession.session_id && s.session_status !== 'close');
+             const stillOpen = data?.find((s: any) => s.session_id === currentSelectedSession.session_id);
              if (!stillOpen) {
                  set({ selectedSession: null });
              }
@@ -565,7 +601,6 @@ const useTablesStore = create<TableState>()(
             .eq("table_id", table_id)
             .eq("waiter_id", waiter_id)
             .eq("restaurant_id", restaurant_id)
-            .neq("session_status", "close")
             .order("session_created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
