@@ -83,11 +83,19 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
     if (tableNumber === null || tableNumber === undefined) return;
     set({ loadingActiveSessionByTableNumber: true });
     try {
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+      const userId = useAuthStore.getState().user?.id;
+      if (!restaurantId || !userId) return;
+
       const { data, error } = await supabase
         .from("waiter_orders_overview")
         .select("*")
+        .eq("restaurant_id", restaurantId)
+        .eq("waiter_id", userId)
         .eq("table_number", tableNumber)
         .neq("session_status", "close")
+        .order("session_created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -182,6 +190,28 @@ export const createTableSlice: StateCreator<MenuState, [], [], TableSlice> = (se
     if (error) {
       handleError(error as Error);
       return;
+    }
+
+    // Bidirectional Notification: Staff -> Cashier
+    // Trigger when status becomes 'billed' or 'close' (e.g. OTC closure by staff)
+    if (status === "billed" || status === "close") {
+      const restaurantId = useRestaurantStore.getState().selectedRestaurant?.id;
+      const userId = useAuthStore.getState().user?.id;
+      const activeSession = chosenTableSession || selectedSession;
+      
+      if (restaurantId && userId && activeSession) {
+        const { menuService } = await import("../../../services/menuService");
+        menuService.notifySessionUpdate(
+          restaurantId,
+          userId,
+          sessionId,
+          "STAFF_CLOSED",
+          { 
+            orderId: activeSession.order_id || (activeSession as any).id, 
+            tableNumber: activeSession.table_number || (activeSession as any).table_number || "OTC"
+          }
+        ).catch(e => console.error("Session notification error:", e));
+      }
     }
 
     if (chosenTableSession?.session_id === sessionId) {

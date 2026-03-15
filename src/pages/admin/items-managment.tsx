@@ -21,12 +21,16 @@ import {
   MenuItem,
   ListItemIcon,
   Fab,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SearchIcon from "@mui/icons-material/Search";
-import { Download, FileDownload, Print } from "@mui/icons-material";
+import { Download, FileDownload, Print, Article, GridOn } from "@mui/icons-material";
 import useMenuItemsStore from "../../lib/menuItemsStore";
 import CategoryItem from "../../components/category";
 import AdminHeader from "../../components/admin-header";
@@ -559,21 +563,35 @@ const MenuItemsManagement: React.FC = () => {
         onClose={() => setOpenUpgradeModal(false)} 
       />
 
-      {/* Mobile Export FAB */}
+      {/* Mobile Export SpeedDial */}
       {isMobile && (
-        <Fab
-          color="primary"
-          aria-label="export"
-          onClick={handleExportClick}
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: 24,
-            zIndex: 1100,
-          }}
+        <SpeedDial
+          ariaLabel="Export Options"
+          sx={{ position: "fixed", bottom: 24, left: 24 }}
+          icon={<SpeedDialIcon icon={<Download />} />}
+          direction="up"
         >
-          <Download />
-        </Fab>
+          <SpeedDialAction
+            icon={<FileDownload />}
+            tooltipTitle="CSV"
+            onClick={handleExportCSV}
+          />
+          <SpeedDialAction
+            icon={<GridOn />}
+            tooltipTitle="Excel"
+            onClick={handleExportExcel}
+          />
+          <SpeedDialAction
+            icon={<Article />}
+            tooltipTitle="TXT"
+            onClick={handleExportTXT}
+          />
+          <SpeedDialAction
+            icon={<Print />}
+            tooltipTitle="PDF"
+            onClick={handleExportPDF}
+          />
+        </SpeedDial>
       )}
     </Box>
   );

@@ -52,7 +52,7 @@ interface ReportState {
   formatNumber: (number: number) => string;
   handleError: (error: any) => void;
   preprocessOrders: (orders: Order[]) => PreprocessedOrder[];
-  getOrdersNow: (restaurantId: string, startDate?: string, endDate?: string) => Promise<void>;
+  getOrdersNow: (restaurantId: string, startDate?: string, endDate?: string, waiterId?: string | null) => Promise<void>;
   getWaiters: (restaurantId: string) => Promise<void>;
   filterOrders: (fromDate: string | null, toDate: string | null, waiterId: string | null) => void;
   clearFilters: () => void;
@@ -100,13 +100,10 @@ const useReportStore = create<ReportState>((set, get) => ({
     }));
   },
 
-  getOrdersNow: async (restaurantId: string, startDate?: string, endDate?: string) => {
+  getOrdersNow: async (restaurantId: string, startDate?: string, endDate?: string, waiterId?: string | null) => {
     try {
       set({ loading: true });
       
-      // Query the cashier_orders_overview view which contains full order data
-      // including waiter info, payment method, and order totals.
-      // The raw `orders` table only has: id, created_at, restaurant_id, session_id, status, total
       let query = supabase
         .from('cashier_orders_overview')
         .select('*')
@@ -115,11 +112,15 @@ const useReportStore = create<ReportState>((set, get) => ({
         .eq('session_status', 'close');
 
       if (startDate) {
-        query = query.gte('closed_at', `${startDate}T00:00:00`);
+        const startDateTime = dayjs(startDate).startOf('day').toISOString();
+        query = query.gte('closed_at', startDateTime);
       }
       if (endDate) {
         const endDateTime = dayjs(endDate).endOf('day').toISOString();
         query = query.lte('closed_at', endDateTime);
+      }
+      if (waiterId) {
+        query = query.eq('waiter_id', waiterId);
       }
 
       const { data: rows, error } = await query;

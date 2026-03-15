@@ -22,6 +22,12 @@ import {
   ListItemIcon,
   useMediaQuery,
   Fab,
+  Pagination,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -39,6 +45,8 @@ import {
   Download,
   Print,
   FileDownload,
+  Article,
+  GridOn,
 } from "@mui/icons-material";
 import {
   LineChart,
@@ -80,6 +88,8 @@ const AdminDashboard: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [timeRange, setTimeRange] = useState("today");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showPulse, setShowPulse] = useState(false);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
   const { selectedRestaurant, role } = useRestaurantStore();
@@ -90,7 +100,10 @@ const AdminDashboard: React.FC = () => {
     kpis, 
     revenueData, 
     topItems, 
+    categoryData,
     staffPerformance, 
+    paymentAnalysis,
+    peakHours,
     fetchDashboardData,
     loading 
   } = useAnalyticsStore();
@@ -101,11 +114,27 @@ const AdminDashboard: React.FC = () => {
     subscribeToNotifications, 
     unsubscribe 
   } = useNotificationStore();
+  
+  const refreshData = async (manual = false) => {
+    if (!selectedRestaurant?.id) return;
+    setIsRefreshing(true);
+    setShowPulse(true);
+    try {
+      await Promise.all([
+        fetchDashboardData(selectedRestaurant.id, timeRange),
+        fetchNotifications()
+      ]);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setTimeout(() => setShowPulse(false), 800);
+      }, 1000);
+    }
+  };
 
   useEffect(() => {
     if (selectedRestaurant?.id) {
-      fetchDashboardData(selectedRestaurant.id, timeRange);
-      fetchNotifications();
+      refreshData();
       subscribeToNotifications();
     }
     return () => unsubscribe();
@@ -114,8 +143,7 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!autoRefresh || !selectedRestaurant?.id) return;
     const interval = setInterval(() => {
-      fetchDashboardData(selectedRestaurant.id, timeRange);
-      fetchNotifications();
+      refreshData();
     }, 30000); // 30 seconds refresh to match owner dashboard
     return () => clearInterval(interval);
   }, [autoRefresh, selectedRestaurant?.id, timeRange, fetchDashboardData, fetchNotifications]);
@@ -139,30 +167,72 @@ const AdminDashboard: React.FC = () => {
     setExportAnchorEl(null);
   };
 
-  const getExportData = () => {
-    return revenueData.map(item => ({
-        Time: item.time,
-        Revenue: item.revenue
+  const getReportTitle = () => `Admin Dashboard Report (${timeRange.toUpperCase()})`;
+
+  const getFullExportData = () => {
+    const summary = [
+      { Metric: "Total Revenue", Value: formatCurrency(kpis.revenue.current) },
+      { Metric: "Total Orders", Value: kpis.orders.current },
+      { Metric: "Avg Order Value", Value: formatCurrency(kpis.avgOrderValue.current) },
+      { Metric: "Period", Value: timeRange },
+      { Metric: "Export Date", Value: new Date().toLocaleString() }
+    ];
+
+    const trends = revenueData.map(item => ({
+      Time: item.time,
+      Revenue: item.revenue,
+      Orders: item.orders
     }));
+
+    const items = topItems.map((item, i) => ({
+      Rank: i + 1,
+      Name: item.name,
+      Sold: item.sold,
+      Revenue: item.revenue
+    }));
+
+    const staff = staffPerformance.map(staff => ({
+      Name: staff.name,
+      Orders: staff.orders,
+      Revenue: staff.revenue
+    }));
+
+    return { summary, trends, items, staff };
   };
 
   const handleExportCSV = () => {
-    exportToCSV(getExportData(), `revenue_data_${timeRange}`);
+    const { summary, trends } = getFullExportData();
+    // Combined summary and trends for CSV
+    const combined = [...summary.map(s => ({ Type: "SUMMARY", Name: s.Metric, Value: s.Value })), ...trends.map(t => ({ Type: "TREND", Name: t.Time, Value: t.Revenue }))];
+    exportToCSV(combined, `admin_dashboard_${timeRange}`);
     handleExportClose();
   };
 
   const handleExportExcel = () => {
-    exportToExcel(getExportData(), `revenue_data_${timeRange}`);
+    const { summary, trends, items, staff } = getFullExportData();
+    exportToExcel({
+      Summary: summary,
+      Trends: trends,
+      "Top Items": items,
+      Staff: staff
+    }, `admin_dashboard_${timeRange}`);
     handleExportClose();
   };
 
   const handleExportTXT = () => {
-    exportToTXT(getExportData(), `revenue_data_${timeRange}`);
+    const { summary } = getFullExportData();
+    exportToTXT(summary, `admin_dashboard_summary_${timeRange}`);
     handleExportClose();
   };
 
   const handleExportPDF = () => {
-    exportToPDF(getExportData(), `revenue_data_${timeRange}`, "Revenue Trends Overview");
+    const { summary, trends, items, staff } = getFullExportData();
+    exportToPDF([
+      { title: "Summary KPIs", data: summary },
+      { title: "Revenue Trends", data: trends },
+      { title: "Top Selling Items", data: items },
+      { title: "Staff Performance", data: staff }
+    ], `admin_dashboard_${timeRange}`, getReportTitle());
     handleExportClose();
   };
 
@@ -240,61 +310,128 @@ const AdminDashboard: React.FC = () => {
                   color="primary" 
                   startIcon={<Download />}
                   onClick={handleExportClick}
-                  fullWidth={isMobile}
               >
                   Export
               </Button>
-              <Menu
-                  anchorEl={exportAnchorEl}
-                  open={Boolean(exportAnchorEl)}
-                  onClose={handleExportClose}
-              >
-                  <MenuItem onClick={handleExportCSV}>
-                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                      Export Data (CSV)
-                  </MenuItem>
-                  <MenuItem onClick={handleExportExcel}>
-                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                      Export Excel (XLSX)
-                  </MenuItem>
-                  <MenuItem onClick={handleExportTXT}>
-                      <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
-                      Export Plain Text (TXT)
-                  </MenuItem>
-                  <MenuItem onClick={handleExportPDF}>
-                      <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-                      Export PDF (Table)
-                  </MenuItem>
-              </Menu>
           </Box>
         )}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+        <Stack direction="row" spacing={0} sx={{ 
+          flex: 1,
+          bgcolor: 'background.paper',
+          p: 0.5,
+          borderRadius: 2,
+          border: '1px solid',
+          borderColor: 'divider',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
             <ToggleButtonGroup
               value={timeRange}
               exclusive
               onChange={(_e, v) => v && setTimeRange(v)}
               size="small"
-              sx={{ bgcolor: 'background.paper', display: 'flex', width: '100%' }}
+              sx={{ border: 'none', '& .MuiToggleButton-root': { border: 'none', borderRadius: 1.5, px: 2 } }}
             >
-              <ToggleButton value="today" sx={{ flex: 1 }}>Today</ToggleButton>
-              <ToggleButton value="week" sx={{ flex: 1 }}>Week</ToggleButton>
-              <ToggleButton value="month" sx={{ flex: 1 }}>Month</ToggleButton>
+              <ToggleButton value="today">Today</ToggleButton>
+              <ToggleButton value="week">Week</ToggleButton>
+              <ToggleButton value="month">Month</ToggleButton>
             </ToggleButtonGroup>
-             <Button
-                variant={autoRefresh ? "contained" : "outlined"}
-                color="primary"
-                startIcon={<Refresh />}
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                size="small"
-                fullWidth={isMobile}
-                sx={{ 
-                  bgcolor: autoRefresh ? 'primary.main' : 'background.paper', 
-                  color: autoRefresh ? 'white' : 'primary.main',
-                  '&:hover': { bgcolor: autoRefresh ? 'primary.dark' : 'background.default' } 
-                }}
-              >
-                {autoRefresh ? "Live" : "Paused"}
-              </Button>
+            
+            <Divider orientation="vertical" flexItem sx={{ mx: 1, height: 20, my: 'auto' }} />
+            
+            {isMobile ? (
+              <Box sx={{ position: 'relative' }}>
+                <Tooltip title={autoRefresh ? "Live - Click to Pause" : "Paused - Click to Resume"}>
+                  <IconButton
+                    onClick={() => {
+                      const newState = !autoRefresh;
+                      setAutoRefresh(newState);
+                      if (newState) refreshData(true);
+                    }}
+                    size="small"
+                    sx={{ 
+                      border: '1px solid', 
+                      borderColor: autoRefresh ? 'primary.main' : 'divider',
+                      bgcolor: autoRefresh ? 'primary.main' : 'background.paper',
+                      color: autoRefresh ? 'primary.contrastText' : 'text.secondary',
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        top: -4,
+                        left: -4,
+                        right: -4,
+                        bottom: -4,
+                        borderRadius: '50%',
+                        border: `2px solid ${theme.palette.primary.main}`,
+                        opacity: 0,
+                        animation: showPulse ? 'pulseFade 1.5s ease-out' : 'none',
+                      },
+                      '@keyframes pulseFade': {
+                        '0%': { transform: 'scale(0.8)', opacity: 0 },
+                        '40%': { transform: 'scale(1.1)', opacity: 0.6 },
+                        '100%': { transform: 'scale(1.4)', opacity: 0 },
+                      },
+                      '&:hover': {
+                        bgcolor: autoRefresh ? 'primary.dark' : alpha(theme.palette.primary.main, 0.04),
+                      },
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    <Refresh 
+                      sx={{ 
+                        fontSize: 18,
+                        animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                      }} 
+                    />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ) : (
+              <Button
+                  variant={autoRefresh ? "contained" : "outlined"}
+                  color="primary"
+                  startIcon={<Refresh sx={{ 
+                      animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' },
+                      }
+                  }} />}
+                  onClick={() => {
+                    const newState = !autoRefresh;
+                    setAutoRefresh(newState);
+                    if (newState) refreshData(true);
+                  }}
+                  size="small"
+                  sx={{ 
+                    borderRadius: 1.5,
+                    minWidth: 90,
+                    position: 'relative',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: -4,
+                      left: -4,
+                      right: -4,
+                      bottom: -4,
+                      borderRadius: 'inherit',
+                      border: `2px solid ${theme.palette.primary.main}`,
+                      opacity: 0,
+                      animation: showPulse ? 'pulseFadeRect 1.5s ease-out' : 'none',
+                    },
+                    '@keyframes pulseFadeRect': {
+                      '0%': { transform: 'scaleX(0.95) scaleY(0.85)', opacity: 0 },
+                      '40%': { transform: 'scaleX(1.05) scaleY(1.1)', opacity: 0.5 },
+                      '100%': { transform: 'scaleX(1.15) scaleY(1.3)', opacity: 0 },
+                    }
+                  }}
+                >
+                  {autoRefresh ? "Live" : "Paused"}
+                </Button>
+            )}
         </Stack>
       </Box>
 
@@ -410,132 +547,169 @@ const AdminDashboard: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Notifications / Tasks */}
+        {/* Peak Operating Hours */}
         <Grid item xs={12} md={4}>
           <Card sx={{ borderRadius: 3, height: '100%' }}>
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Typography variant="h6" sx={{ mb: 2 }}>
-                🔔 Recent Notifications
+                ⏰ Peak Operating Hours
               </Typography>
-              <List sx={{ flex: 1, overflowY: 'auto', maxHeight: 300 }}>
-                {notifications.length > 0 ? (
-                    notifications.slice(0, 5).map((n) => (
-                        <React.Fragment key={n.id}>
-                            <ListItem alignItems="flex-start">
-                            <Box sx={{ mb: { xs: 1.5, md: 2 }, mt: 0.5 }}>
-                                {getNotificationIcon(n.notification?.priority || 'normal', n.notification?.type || 'info')}
-                            </Box>
-                            <ListItemText
-                                primary={n.notification?.title}
-                                secondary={
-                                    <React.Fragment>
-                                        <Typography
-                                            sx={{ display: 'inline' }}
-                                            component="span"
-                                            variant="body2"
-                                            color="text.primary"
-                                        >
-                                            {n.notification?.message}
-                                        </Typography>
-                                        <br />
-                                        <Typography variant="caption" color="text.secondary">
-                                            {dayjs(n.created_at).fromNow()}
-                                        </Typography>
-                                    </React.Fragment>
-                                }
-                            />
-                            </ListItem>
-                            <Divider component="li" />
-                        </React.Fragment>
-                    ))
+              <Box sx={{ flex: 1, minHeight: 300 }}>
+                {peakHours.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={peakHours}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="hour" fontSize={10} />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Bar dataKey="orders" fill="#ff9800" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 ) : (
                     <EmptyState 
-                    title="All Caught Up" 
-                    description="No new notifications" 
-                    emoji="🔔"
-                    height={200}
+                    title="No Traffic Data" 
+                    description="Traffic patterns will appear here" 
+                    emoji="⏰"
+                    height={260}
                   />
                 )}
-              </List>
-              <Button fullWidth size="small" sx={{ mt: 1 }}>View All Notifications</Button>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Quick Actions */}
-      <Box sx={{ mt: 2, mb: 1 }}>
+      {/* Financial Insights */}
+      <Box sx={{ mt: 3, mb: 2 }}>
         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-            Quick Actions
+            💰 Financial Insights
         </Typography>
-        <Grid container spacing={2}>
-            {[
-            { label: "Manage Staff", icon: <Group />, desc: "Add or edit staff members", link: "/app/employees" },
-            { label: "Manage Menu", icon: <RestaurantMenu />, desc: "Update menu items and categories", link: "/app/menu-items-management" },
-            { label: "Sales Reports", icon: <Assignment />, desc: "View detailed financial reports", link: "/app/report" },
-            { label: "System Settings", icon: <Settings />, desc: "Configure restaurant details", link: "/app/settings" },
-            ].map((item, i) => (
-            <Grid item xs={12} sm={6} md={3} key={i}>
-                <Card
-                onClick={() => {
-                    if (item.link === "/app/report" && role === "admin" && !settings?.employee_permissions?.admins_view_report) {
-                        Swal.fire({
-                            title: "Access Denied",
-                            text: "You do not have permission to view sales reports. Please contact your restaurant owner.",
-                            icon: "warning",
-                            confirmButtonColor: theme.palette.primary.main
-                        });
-                        return;
-                    }
-                    navigate(item.link);
-                }}
-                sx={{
-                    mb: { xs: 1.5, md: 2 }, 
-                    borderRadius: 3,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                    cursor: "pointer",
-                    border: '1px solid transparent',
-                    "&:hover": { 
-                        bgcolor: alpha(theme.palette.primary.main, 0.02),
-                        border: `1px solid ${theme.palette.primary.main}`,
-                        transform: 'translateY(-2px)'
-                    },
-                    transition: 'all 0.2s ease-in-out'
-                }}
-                >
-                    <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}>
-                        {item.icon}
-                    </Avatar>
-                    <Box>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                            {item.label}
+        <Grid container spacing={3}>
+            {/* Payment Methods */}
+            <Grid item xs={12} md={6}>
+                <Card sx={{ borderRadius: 3, height: '100%', minHeight: 350 }}>
+                    <CardContent>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                            Payment Method Breakdown
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            {item.desc}
-                        </Typography>
-                    </Box>
+                        <Box sx={{ height: 280 }}>
+                            {paymentAnalysis.total > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={[
+                                                { name: 'Cash', value: paymentAnalysis.cash },
+                                                { name: 'Card', value: paymentAnalysis.card },
+                                                { name: 'Momo', value: paymentAnalysis.momo },
+                                                { name: 'Online', value: paymentAnalysis.online },
+                                            ].filter(p => p.value > 0)}
+                                            dataKey="value"
+                                            nameKey="name"
+                                            innerRadius={60}
+                                            outerRadius={90}
+                                            paddingAngle={5}
+                                        >
+                                            <Cell fill="#4caf50" />
+                                            <Cell fill="#1976d2" />
+                                            <Cell fill="#ff9800" />
+                                            <Cell fill="#9c27b0" />
+                                        </Pie>
+                                        <RechartsTooltip formatter={(value) => formatCurrency(value as number)} />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <EmptyState title="No Payment Data" description="Payment splits will show here" emoji="💳" height={240} />
+                            )}
+                        </Box>
+                    </CardContent>
                 </Card>
             </Grid>
-            ))}
+
+            {/* Category Performance */}
+            <Grid item xs={12} md={6}>
+                <Card sx={{ borderRadius: 3, height: '100%', minHeight: 350 }}>
+                    <CardContent>
+                        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                            Revenue by Category
+                        </Typography>
+                        <Box sx={{ height: 280 }}>
+                            {categoryData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={categoryData} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" width={100} fontSize={12} />
+                                        <RechartsTooltip formatter={(value) => `${value}%`} />
+                                        <Bar dataKey="value" fill="#9c27b0" radius={[0, 4, 4, 0]} barSize={25}>
+                                            {categoryData.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <EmptyState title="No Category Data" description="Most popular categories will show here" emoji="🍽️" height={240} />
+                            )}
+                        </Box>
+                    </CardContent>
+                </Card>
+            </Grid>
         </Grid>
       </Box>
-      {/* Mobile Export FAB */}
+      {/* Export Menu (for Desktop Button) */}
+      <Menu
+          anchorEl={exportAnchorEl}
+          open={Boolean(exportAnchorEl)}
+          onClose={handleExportClose}
+      >
+          <MenuItem onClick={handleExportCSV}>
+              <ListItemIcon><FileDownload fontSize="small" /></ListItemIcon>
+              Export Data (CSV)
+          </MenuItem>
+          <MenuItem onClick={handleExportExcel}>
+              <ListItemIcon><GridOn fontSize="small" /></ListItemIcon>
+              Export Excel (XLSX)
+          </MenuItem>
+          <MenuItem onClick={handleExportTXT}>
+              <ListItemIcon><Article fontSize="small" /></ListItemIcon>
+              Export Plain Text (TXT)
+          </MenuItem>
+          <MenuItem onClick={handleExportPDF}>
+              <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+              Export PDF (Table)
+          </MenuItem>
+      </Menu>
+
+      {/* Mobile Export SpeedDial */}
       {isMobile && (
-        <Fab
-          color="primary"
-          aria-label="export"
-          onClick={handleExportClick}
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: 24,
-            zIndex: 1100,
-          }}
+        <SpeedDial
+          ariaLabel="Export Options"
+          sx={{ position: "fixed", bottom: 24, left: 24 }}
+          icon={<SpeedDialIcon icon={<Download />} />}
+          direction="up"
         >
-          <Download />
-        </Fab>
+          <SpeedDialAction
+            icon={<FileDownload />}
+            tooltipTitle="CSV"
+            onClick={handleExportCSV}
+          />
+          <SpeedDialAction
+            icon={<GridOn />}
+            tooltipTitle="Excel"
+            onClick={handleExportExcel}
+          />
+          <SpeedDialAction
+            icon={<Article />}
+            tooltipTitle="TXT"
+            onClick={handleExportTXT}
+          />
+          <SpeedDialAction
+            icon={<Print />}
+            tooltipTitle="PDF"
+            onClick={handleExportPDF}
+          />
+        </SpeedDial>
       )}
     </Box>
   );

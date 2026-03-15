@@ -22,6 +22,10 @@ import {
   MenuItem,
   ListItemIcon,
   Fab,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
+  Tooltip,
 } from "@mui/material";
 import {
   Search,
@@ -40,6 +44,8 @@ import {
   Download,
   FileDownload,
   Print,
+  Article,
+  GridOn,
 } from "@mui/icons-material";
 import useTableManagementStore from "../../lib/tableManagementStore";
 import AdminHeader from "../../components/admin-header";
@@ -392,21 +398,35 @@ const TableManagement: React.FC = () => {
         onClose={() => setOpenUpgradeModal(false)} 
       />
 
-      {/* Mobile Export FAB */}
+      {/* Mobile Export SpeedDial */}
       {isMobile && (
-        <Fab
-          color="primary"
-          aria-label="export"
-          onClick={handleExportClick}
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: 24,
-            zIndex: 1100,
-          }}
+        <SpeedDial
+          ariaLabel="Export Options"
+          sx={{ position: "fixed", bottom: 24, left: 24 }}
+          icon={<SpeedDialIcon icon={<Download />} />}
+          direction="up"
         >
-          <Download />
-        </Fab>
+          <SpeedDialAction
+            icon={<FileDownload />}
+            tooltipTitle="CSV"
+            onClick={handleExportCSV}
+          />
+          <SpeedDialAction
+            icon={<GridOn />}
+            tooltipTitle="Excel"
+            onClick={handleExportExcel}
+          />
+          <SpeedDialAction
+            icon={<Article />}
+            tooltipTitle="TXT"
+            onClick={handleExportTXT}
+          />
+          <SpeedDialAction
+            icon={<Print />}
+            tooltipTitle="PDF"
+            onClick={handleExportPDF}
+          />
+        </SpeedDial>
       )}
     </Box>
   );

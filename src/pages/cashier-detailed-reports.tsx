@@ -25,6 +25,9 @@ import {
   Divider,
   Collapse,
   Pagination,
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialIcon,
 } from "@mui/material";
 import {
   Assignment,
@@ -40,6 +43,8 @@ import {
   ExpandMore,
   Assessment,
   Schedule,
+  Article,
+  GridOn,
 } from "@mui/icons-material";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import useCashierStore from "../lib/cashierStore";
@@ -357,6 +362,8 @@ const CashierDetailedReports: React.FC = () => {
 
               <Menu anchorEl={exportAnchorEl} open={Boolean(exportAnchorEl)} onClose={handleExportClose}>
                 <MenuItem onClick={handleExportCSV}><FileDownload sx={{ mr: 1 }} fontSize="small" /> CSV</MenuItem>
+                <MenuItem onClick={handleExportExcel}><GridOn sx={{ mr: 1 }} fontSize="small" /> Excel (XLSX)</MenuItem>
+                <MenuItem onClick={handleExportTXT}><Article sx={{ mr: 1 }} fontSize="small" /> TXT</MenuItem>
                 <MenuItem onClick={handleExportPDF}><Print sx={{ mr: 1 }} fontSize="small" /> PDF</MenuItem>
               </Menu>
 
@@ -469,6 +476,37 @@ const CashierDetailedReports: React.FC = () => {
         </Box>
       </Card>
       
+      {/* Mobile Export SpeedDial */}
+      {isMobile && (
+        <SpeedDial
+          ariaLabel="Export Options"
+          sx={{ position: "fixed", bottom: 24, left: 24 }}
+          icon={<SpeedDialIcon icon={<Download />} />}
+          direction="up"
+        >
+          <SpeedDialAction
+            icon={<FileDownload />}
+            tooltipTitle="CSV"
+            onClick={handleExportCSV}
+          />
+          <SpeedDialAction
+            icon={<GridOn />}
+            tooltipTitle="Excel"
+            onClick={handleExportExcel}
+          />
+          <SpeedDialAction
+            icon={<Article />}
+            tooltipTitle="TXT"
+            onClick={handleExportTXT}
+          />
+          <SpeedDialAction
+            icon={<Print />}
+            tooltipTitle="PDF"
+            onClick={handleExportPDF}
+          />
+        </SpeedDial>
+      )}
+
       {/* Analysis Sections */}
       <Grid container spacing={2} sx={{ mt: 1 }}>
          <Grid item xs={12} md={6}>

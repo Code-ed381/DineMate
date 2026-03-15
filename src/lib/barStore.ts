@@ -147,6 +147,7 @@ interface BarState {
   setTip: (value: string) => void;
   handleVoidOTCOrder: (orderId: string) => Promise<void>;
   handleRemoveTab: (tabId: string | number) => Promise<boolean>;
+  syncTabsWithDB: () => Promise<void>;
   taxAmount: string;
 }
 
@@ -260,11 +261,28 @@ const useBarStore = create<BarState>()(
               total: total + taxAmount,
               tip: tipValue,
               status: "served",
+              payment_method: cashValue >= total ? "cash" : "card",
               updated_at: new Date().toISOString(),
             })
             .eq("id", orderId);
 
           if (orderError) throw orderError;
+
+          // Bidirectional Notification: Staff -> Cashier
+          // (Bartender just finalized an OTC order)
+          try {
+            const { menuService } = await import("../services/menuService");
+            menuService.notifySessionUpdate(
+              restaurantId,
+              userId,
+              sessionId,
+              "STAFF_CLOSED",
+              { 
+                orderId: orderId, 
+                tableNumber: "OTC" 
+              }
+            ).catch(e => console.error("Session notification error:", e));
+          } catch (e) {}
 
           // 🆕 Record the OTC payment in the unified ledger
           const { error: paymentError } = await supabase
@@ -359,7 +377,7 @@ const useBarStore = create<BarState>()(
             },
             (payload) => {
               // If a session is closed (e.g. by cashier), remove from local tabs
-              if (payload.new.status === "close") {
+              if (payload.new.status !== "open") {
                 set((state) => {
                   const newTabs = state.tabs.filter(tab => tab.db_session_id !== payload.new.id);
                   let newActiveTab = state.activeTab;
@@ -557,6 +575,7 @@ const useBarStore = create<BarState>()(
 
       handleFetchItems: async () => {
         set({ loadingItems: true });
+        get().syncTabsWithDB(); // Sync local tabs with actual DB status
         const { selectedRestaurant } = useRestaurantStore.getState();
         const restaurantId = selectedRestaurant?.id;
         try {
@@ -1131,6 +1150,42 @@ const useBarStore = create<BarState>()(
         });
 
         return true;
+      },
+
+      syncTabsWithDB: async () => {
+        const { tabs, activeTab } = get();
+        const tabsWithDB = tabs.filter(t => t.db_session_id);
+        if (tabsWithDB.length === 0) return;
+
+        const sessionIds = tabsWithDB.map(t => t.db_session_id);
+        
+        try {
+          const { data: activeSessions, error } = await supabase
+            .from("table_sessions")
+            .select("id, status")
+            .in("id", sessionIds);
+
+          if (error) throw error;
+
+          const activeSessionIds = new Set(
+            (activeSessions || [])
+              .filter(s => s.status === "open")
+              .map(s => s.id)
+          );
+
+          const newTabs = tabs.filter(t => !t.db_session_id || activeSessionIds.has(t.db_session_id));
+          
+          if (newTabs.length !== tabs.length) {
+            console.log("🔄 Syncing local tabs with DB status (removing closed/stale tabs)");
+            let newActiveTab = activeTab;
+            if (!newTabs.some(t => String(t.id) === String(activeTab))) {
+              newActiveTab = newTabs.length > 0 ? newTabs[0].id : 0;
+            }
+            set({ tabs: newTabs, activeTab: newActiveTab });
+          }
+        } catch (error) {
+          console.error("Error syncing tabs with DB:", error);
+        }
       },
     }),
     {

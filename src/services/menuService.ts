@@ -54,6 +54,8 @@ export const menuService = {
       .from("orders")
       .select("*")
       .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) throw error;
     return data as Order | null;
@@ -64,7 +66,7 @@ export const menuService = {
       .from("orders")
       .insert([{ session_id: sessionId, restaurant_id: restaurantId }])
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data as Order;
   },
@@ -116,6 +118,8 @@ export const menuService = {
       .from("orders")
       .select("id")
       .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!order) return [];
@@ -155,7 +159,7 @@ export const menuService = {
       .update({ status: "close", closed_at: new Date().toISOString() })
       .eq("id", sessionId)
       .select("table_id")
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -291,14 +295,14 @@ export const menuService = {
         .from("order_items")
         .select("menu_item_id, type")
         .eq("id", orderItemId)
-        .single();
+        .maybeSingle();
 
       if (item) {
         const { data: menuItem } = await supabase
           .from("menu_items")
           .select("name")
           .eq("id", item.menu_item_id)
-          .single();
+          .maybeSingle();
 
         const { notificationService } = await import("./notificationService");
         const itemType = (item.type || "").toLowerCase();
@@ -427,6 +431,8 @@ export const menuService = {
       .from("orders")
       .select("id")
       .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!order) return false;
@@ -441,4 +447,42 @@ export const menuService = {
     if (error) throw error;
     return (items && items.length > 0) || false;
   },
+
+  async notifySessionUpdate(
+    restaurantId: string, 
+    senderId: string, 
+    sessionId: string, 
+    type: "STAFF_CLOSED" | "CASHIER_FINALIZED",
+    metadata: { orderId: string, tableNumber: string | number, waiterId?: string, targetUserId?: string }
+  ) {
+    try {
+      const { notificationService } = await import("./notificationService");
+      
+      if (type === "STAFF_CLOSED") {
+        // Staff (Waiter/Bartender) closed an OTC or requested bill
+        await notificationService.sendSessionNotification(restaurantId, senderId, {
+          title: "Order Ready for Payout",
+          message: `Table ${metadata.tableNumber} (Order ${metadata.orderId}) has been closed/billed and is ready for payout.`,
+          targetType: "TO_CASHIER",
+          priority: "high"
+        });
+      } else if (type === "CASHIER_FINALIZED") {
+        // Cashier finalized the session
+        const targetStaffId = metadata.waiterId || metadata.targetUserId;
+        if (targetStaffId) {
+            await notificationService.sendSessionNotification(restaurantId, senderId, {
+              title: "Order Finalized",
+              message: `Your order for Table ${metadata.tableNumber || "OTC"} has been finalized by the Cashier.`,
+              targetType: "TO_STAFF",
+              targetUserId: targetStaffId,
+              priority: "normal"
+            });
+        } else {
+            console.warn("⚠️ notifySessionUpdate: CASHIER_FINALIZED skipped - No waiterId found in metadata", metadata);
+        }
+      }
+    } catch (e) {
+      console.error("❌ Session notification failed:", e);
+    }
+  }
 };

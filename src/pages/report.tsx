@@ -184,54 +184,62 @@ const ReportDashboard: React.FC = () => {
     }
   }, [role, settings, navigate]);
 
-  // Initial Fetch & Date Range Logic
+  // Initial Fetch
   useEffect(() => {
     if (selectedRestaurant?.id) {
       getWaiters(selectedRestaurant.id);
-      handleFetchOrders();
     }
   }, [selectedRestaurant?.id]);
-
+  
+  // Refined Date Range & Auto-Fetch Effect
   useEffect(() => {
-    // Update dates based on predefined ranges
+    if (!selectedRestaurant?.id) return;
+
     const today = dayjs();
+    let newStart = startDate;
+    let newEnd = endDate;
+
     if (filterType === "today") {
-      setStartDate(today.format("YYYY-MM-DD"));
-      setEndDate(today.format("YYYY-MM-DD"));
+      newStart = today.format("YYYY-MM-DD");
+      newEnd = today.format("YYYY-MM-DD");
     } else if (filterType === "week") {
-      setStartDate(today.startOf("week").format("YYYY-MM-DD"));
-      setEndDate(today.endOf("week").format("YYYY-MM-DD"));
+      // Last 7 days including today
+      newStart = today.subtract(6, 'day').format("YYYY-MM-DD");
+      newEnd = today.format("YYYY-MM-DD");
     } else if (filterType === "month") {
-      setStartDate(today.startOf("month").format("YYYY-MM-DD"));
-      setEndDate(today.endOf("month").format("YYYY-MM-DD"));
+      // Last 30 days including today
+      newStart = today.subtract(29, 'day').format("YYYY-MM-DD");
+      newEnd = today.format("YYYY-MM-DD");
     }
-    // "custom" leaves dates as is
-  }, [filterType]);
 
-  const handleFetchOrders = () => {
+    if (filterType !== 'custom') {
+      setStartDate(newStart);
+      setEndDate(newEnd);
+      getOrdersNow(selectedRestaurant.id, newStart, newEnd, selectedWaiter);
+    }
+  }, [filterType, selectedRestaurant?.id, selectedWaiter]); // Added selectedWaiter to dependencies
+
+  const handleFetchOrders = async (wId: string = selectedWaiter) => {
     if (selectedRestaurant?.id) {
-      getOrdersNow(selectedRestaurant.id, startDate, endDate);
+      await getOrdersNow(selectedRestaurant.id, startDate, endDate, wId);
     }
   };
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = async () => {
     setReportMode("standard");
-    handleFetchOrders();
-    if (selectedWaiter) {
-        filterOrders(null, null, selectedWaiter);
-    } else {
-        filterOrders(startDate, endDate, selectedWaiter || null);
-    }
+    await handleFetchOrders();
   };
 
-  const handleGenerateReport = (mode: "X" | "Z") => {
+  const handleGenerateReport = async (mode: "X" | "Z") => {
     setReportMode(mode);
     setFilterType("today");
     const today = dayjs().format("YYYY-MM-DD");
     setStartDate(today);
     setEndDate(today);
     setSelectedWaiter("");
-    handleFetchOrders();
+    if (selectedRestaurant?.id) {
+      await getOrdersNow(selectedRestaurant.id, today, today, null);
+    }
   };
 
   const handleExport = () => {
@@ -240,44 +248,44 @@ const ReportDashboard: React.FC = () => {
 
   // Columns for DataTable
   const columns: GridColDef[] = [
-    { field: "id", headerName: "Order ID", width: 120 },
+    { field: "id", headerName: "Order ID", width: 100 },
     { field: "created_at", headerName: "Date", flex: 1, minWidth: 160 },
     { field: "waiter", headerName: "Waiter", flex: 1, minWidth: 140 },
     ...(rs.show_cash_column !== false ? [{ 
       field: "cash", 
-      headerName: "Cash", 
-      width: 100, 
-      renderCell: (params: any) => formatCurrency(params.value) 
+      headerName: `Cash (${settings?.general?.currency_symbol || "₵"})`, 
+      width: 110, 
+      renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }] : []),
     ...(rs.show_card_column !== false ? [{ 
       field: "card", 
-      headerName: "Card", 
-      width: 100,
-      renderCell: (params: any) => formatCurrency(params.value)
+      headerName: `Card (${settings?.general?.currency_symbol || "₵"})`, 
+      width: 110,
+      renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }] : []),
     ...(rs.show_momo_column !== false ? [{ 
       field: "momo", 
-      headerName: "MoMo", 
-      width: 100,
-      renderCell: (params: any) => formatCurrency(params.value)
+      headerName: `MoMo (${settings?.general?.currency_symbol || "₵"})`, 
+      width: 110,
+      renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }] : []),
     ...(rs.show_online_column !== false ? [{ 
       field: "online", 
-      headerName: "Online", 
-      width: 100,
-      renderCell: (params: any) => formatCurrency(params.value)
+      headerName: `Online (${settings?.general?.currency_symbol || "₵"})`, 
+      width: 110,
+      renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }] : []),
     ...(rs.show_balance_column !== false ? [{ 
         field: "balance", 
-        headerName: "Balance", 
-        width: 100,
-        renderCell: (params: any) => formatCurrency(params.value)
+        headerName: `Balance (${settings?.general?.currency_symbol || "₵"})`, 
+        width: 110,
+        renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     }] : []),
     { 
         field: "total", 
-        headerName: "Total", 
-        width: 100,
-        renderCell: (params: any) => formatCurrency(params.value)
+        headerName: `Total (${settings?.general?.currency_symbol || "₵"})`, 
+        width: 110,
+        renderCell: (params: any) => (parseFloat(params.value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     },
   ];
 
@@ -306,38 +314,38 @@ const ReportDashboard: React.FC = () => {
         <Stack spacing={0.5} mt={1}>
           {rs.show_cash_column !== false && order.cash > 0 && (
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">Cash</Typography>
-              <Typography variant="caption" fontWeight={600}>{formatCurrency(order.cash)}</Typography>
+              <Typography variant="caption" color="text.secondary">Cash ({settings?.general?.currency_symbol || "₵"})</Typography>
+              <Typography variant="caption" fontWeight={600}>{(parseFloat(order.cash) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
             </Stack>
           )}
           {rs.show_card_column !== false && order.card > 0 && (
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">Card</Typography>
-              <Typography variant="caption" fontWeight={600}>{formatCurrency(order.card)}</Typography>
+              <Typography variant="caption" color="text.secondary">Card ({settings?.general?.currency_symbol || "₵"})</Typography>
+              <Typography variant="caption" fontWeight={600}>{(parseFloat(order.card) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
             </Stack>
           )}
           {rs.show_momo_column !== false && order.momo > 0 && (
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">MoMo</Typography>
-              <Typography variant="caption" fontWeight={600}>{formatCurrency(order.momo)}</Typography>
+              <Typography variant="caption" color="text.secondary">MoMo ({settings?.general?.currency_symbol || "₵"})</Typography>
+              <Typography variant="caption" fontWeight={600}>{(parseFloat(order.momo) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
             </Stack>
           )}
           {rs.show_online_column !== false && order.online > 0 && (
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">Online</Typography>
-              <Typography variant="caption" fontWeight={600}>{formatCurrency(order.online)}</Typography>
+              <Typography variant="caption" color="text.secondary">Online ({settings?.general?.currency_symbol || "₵"})</Typography>
+              <Typography variant="caption" fontWeight={600}>{(parseFloat(order.online) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
             </Stack>
           )}
           {rs.show_balance_column !== false && order.balance > 0 && (
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="caption" color="text.secondary">Balance</Typography>
-              <Typography variant="caption" fontWeight={600} color="error.main">{formatCurrency(order.balance)}</Typography>
+              <Typography variant="caption" color="text.secondary">Balance ({settings?.general?.currency_symbol || "₵"})</Typography>
+              <Typography variant="caption" fontWeight={600} color="error.main">{(parseFloat(order.balance) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
             </Stack>
           )}
           <Divider sx={{ my: 0.5, borderStyle: 'dashed' }} />
           <Stack direction="row" justifyContent="space-between">
-            <Typography variant="body2" fontWeight={800}>Total</Typography>
-            <Typography variant="body2" fontWeight={800} color="primary.main">{formatCurrency(order.total)}</Typography>
+            <Typography variant="body2" fontWeight={800}>Total ({settings?.general?.currency_symbol || "₵"})</Typography>
+            <Typography variant="body2" fontWeight={800} color="primary.main">{(parseFloat(order.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
           </Stack>
         </Stack>
       </CardContent>

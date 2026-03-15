@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { handleError } from "../components/Error";
 import Swal from "sweetalert2";
 import { menuService } from "../services/menuService";
+import useAuthStore from "./authStore";
 
 interface CashierSession {
   session_id: string;
@@ -15,6 +16,9 @@ interface CashierSession {
   order_total: number;
   session_status: string;
   is_otc_order?: boolean;
+  waiter_id?: string;
+  waiter_name?: string;
+  closed_at?: string;
   [key: string]: any;
 }
 
@@ -267,17 +271,23 @@ const useCashierStore = create<CashierState>()(
 
           const rawSessions = cashier_orders_overview || [];
           const orderIds = rawSessions.map((s: any) => s.order_id).filter(Boolean);
+          const sessionIds = rawSessions.map((s: any) => s.session_id).filter(Boolean);
 
           let orderDataMap: Record<string, { total: number, payment_method: string, discount: number }> = {};
-          if (orderIds.length > 0) {
-            // Fetch both total and payment_method from the orders table
-            const { data: ordersData } = await supabase
-              .from("orders")
-              .select("id, total, payment_method, discount")
-              .in("id", orderIds);
+          let sessionDataMap: Record<string, { waiter_id: string, closed_at: string }> = {};
 
-            if (ordersData) {
-              ordersData.forEach((order: any) => {
+          if (orderIds.length > 0 || sessionIds.length > 0) {
+            const [ordersRes, sessionsRes] = await Promise.all([
+              orderIds.length > 0 
+                ? supabase.from("orders").select("id, total, payment_method, discount").in("id", orderIds)
+                : Promise.resolve({ data: null, error: null }),
+              sessionIds.length > 0
+                ? supabase.from("table_sessions").select("id, waiter_id, closed_at").in("id", sessionIds)
+                : Promise.resolve({ data: null, error: null })
+            ]);
+
+            if (ordersRes.data) {
+              ordersRes.data.forEach((order: any) => {
                 orderDataMap[order.id] = { 
                   total: parseFloat(order.total) || 0,
                   payment_method: order.payment_method,
@@ -285,10 +295,20 @@ const useCashierStore = create<CashierState>()(
                 };
               });
             }
+
+            if (sessionsRes.data) {
+              sessionsRes.data.forEach((sess: any) => {
+                sessionDataMap[sess.id] = { 
+                  waiter_id: sess.waiter_id,
+                  closed_at: sess.closed_at
+                };
+              });
+            }
           }
 
           const sessions = rawSessions.map((session: any) => {
             const orderData = orderDataMap[session.order_id];
+            const sessionData = sessionDataMap[session.session_id];
             
             // Determine if this is an OTC order (no table_id or table_number is null/undefined)
             const isOTCOrder = !session.table_id || !session.table_number || session.table_number === null;
@@ -301,6 +321,9 @@ const useCashierStore = create<CashierState>()(
               // Prefer payment_method from orders table
               payment_method: orderData ? orderData.payment_method : session.payment_method,
               discount: orderData ? orderData.discount : 0,
+              // Add waiter_id for notifications
+              waiter_id: sessionData ? sessionData.waiter_id : session.waiter_id,
+              closed_at: sessionData ? sessionData.closed_at : session.closed_at,
               // Override table number display for OTC orders
               table_number: tableDisplay,
               is_otc_order: isOTCOrder
@@ -313,7 +336,11 @@ const useCashierStore = create<CashierState>()(
 
           const closedSessions = sessions.filter(
             (session) => session.session_status === "close"
-          );
+          ).sort((a, b) => {
+            const dateA = a.closed_at ? new Date(a.closed_at).getTime() : 0;
+            const dateB = b.closed_at ? new Date(b.closed_at).getTime() : 0;
+            return dateB - dateA;
+          });
 
           set({
             allSessions: sessions,
@@ -441,9 +468,13 @@ const useCashierStore = create<CashierState>()(
         const finalTotal = Math.max(0, baseTotal - discountAmount);
 
         try {
+          // Declare here for unified use
+          const { selectedRestaurant } = useRestaurantStore.getState();
+          const { currentMember } = (await import("./authStore")).default.getState();
+
           const { error: sessionError } = await supabase
             .from("table_sessions")
-            .update({ status: "close", closed_at: new Date(), payment_method: paymentMethod })
+            .update({ status: "close", closed_at: new Date().toISOString(), payment_method: paymentMethod })
             .eq("id", sessionId);
 
           if (sessionError) throw sessionError;
@@ -457,16 +488,50 @@ const useCashierStore = create<CashierState>()(
               discount: discountPercent,
               amount_cash: parseFloat(cashAmount) || 0,
               amount_card: parseFloat(cardAmount) || 0,
-              amount_momo: parseFloat(momoAmount) || 0
+          amount_momo: parseFloat(momoAmount) || 0
             })
             .eq("id", orderId);
 
           if (orderError) throw orderError;
+          
+          // Bidirectional Notification: Cashier -> Staff
+          // We capture these values BEFORE the potentially clearing set state
+          let targetWaiterId = selectedSession?.waiter_id;
+          const targetTableNumber = selectedSession?.table_number || "OTC";
+          const targetOrderId = selectedSession?.order_id || orderId;
+
+          // Robust fallback: If waiterId is missing in state, fetch it directly from DB
+          if (!targetWaiterId) {
+            console.log("🔍 Fetching waiter_id from DB for session:", sessionId);
+            const { data: sessionData } = await supabase
+              .from("table_sessions")
+              .select("waiter_id")
+              .eq("id", sessionId)
+              .single();
+            if (sessionData?.waiter_id) {
+              targetWaiterId = sessionData.waiter_id;
+              console.log("✅ Recovered waiter_id from DB:", targetWaiterId);
+            }
+          }
+
+          if (targetWaiterId) {
+            console.log(`🔔 Notifying staff (${targetWaiterId}) about finalized table: ${targetTableNumber}`);
+            menuService.notifySessionUpdate(
+              selectedRestaurant?.id || "",
+              useAuthStore.getState().user?.id || currentMember?.user_id || currentMember?.id || "",
+              sessionId,
+              "CASHIER_FINALIZED",
+              { 
+                orderId: targetOrderId, 
+                tableNumber: targetTableNumber,
+                waiterId: targetWaiterId
+              }
+            ).catch(e => console.error("Session notification error:", e));
+          } else {
+            console.warn("⚠️ No waiter_id found for session even after DB lookup, staff notification skipped.");
+          }
 
           // 🆕 Record the payment in the ledger
-          const { selectedRestaurant } = useRestaurantStore.getState();
-          const { currentMember } = (await import("./authStore")).default.getState();
-          
           const { error: paymentError } = await supabase
             .from("payments")
             .insert({

@@ -136,7 +136,13 @@ export const createOrderSlice: StateCreator<MenuState, [], [], OrderSlice> = (se
 
   deleteOrderBySessionId: async (sessionId) => {
     if (!sessionId) return;
-    const { data: order } = await supabase.from('orders').select('id').eq('session_id', sessionId).single();
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (order) {
        await supabase.from('order_items').delete().eq('order_id', order.id);
     }

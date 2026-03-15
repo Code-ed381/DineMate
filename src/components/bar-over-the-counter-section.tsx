@@ -94,6 +94,8 @@ const OTCTabs: React.FC = () => {
     isCreatingTab,
     handleVoidOTCOrder,
     handleRemoveTab,
+    subscribeToOrderItems,
+    unsubscribeFromOrderItems,
   } = useBarStore();
   const { selectedRestaurant } = useRestaurantStore();
   const { settings } = useSettingsStore();
@@ -102,7 +104,9 @@ const OTCTabs: React.FC = () => {
 
   useEffect(() => {
     handleFetchItems();
-  }, [handleFetchItems]);
+    subscribeToOrderItems();
+    return () => unsubscribeFromOrderItems();
+  }, [handleFetchItems, subscribeToOrderItems, unsubscribeFromOrderItems]);
 
   const filteredItems = items
     .filter((item: any) => {
